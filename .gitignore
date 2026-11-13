@@ -1,0 +1,20 @@
+# secrets (SEC-80)
+ssh/
+.env
+*.env
+!*.env.example
+*.pem
+*.key
+keys/
+
+# build
+backend/target/
+frontend/node_modules/
+frontend/dist/
+
+# tools
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
