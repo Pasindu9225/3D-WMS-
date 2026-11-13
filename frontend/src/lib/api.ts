@@ -4,6 +4,7 @@
  * - Every non-GET sends the XSRF-TOKEN cookie back as X-XSRF-TOKEN (SEC-11).
  * - A 401 triggers ONE shared refresh for all waiting requests, then each retries once.
  *   Two parallel refreshes would look like token theft to the server and end the session (SEC-04).
+ *   Tabs share the cookies, so the refresh is also serialised across tabs with a Web Lock (F2).
  */
 
 const BASE = '/api/v1'
@@ -89,13 +90,23 @@ async function rawFetch(path: string, method: Method, body: unknown): Promise<Re
 }
 
 function refreshOnce(): Promise<boolean> {
-  refreshing ??= rawFetch('/auth/refresh', 'POST', undefined)
-    .then((res) => res.ok)
+  refreshing ??= acrossTabs(() => rawFetch('/auth/refresh', 'POST', undefined).then((res) => res.ok))
     .catch(() => false)
     .finally(() => {
       refreshing = null
     })
   return refreshing
+}
+
+/**
+ * Runs the refresh while holding a browser-wide lock. Without it, two tabs whose shared access cookie
+ * expires at the same moment would both send the same refresh token, and the second would look like a
+ * stolen token and end the session. A tab that waited sends the cookie the first tab just received.
+ */
+function acrossTabs<T>(work: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks
+  // request() resolves with the callback's own result; its typing nests the Promise one level too deep.
+  return locks ? (locks.request('wms-auth-refresh', work) as unknown as Promise<T>) : work()
 }
 
 /** Makes sure the XSRF-TOKEN cookie exists (or is renewed) before a state-changing request. */

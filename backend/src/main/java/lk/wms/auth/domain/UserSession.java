@@ -62,6 +62,10 @@ public class UserSession extends TenantScoped {
         return user;
     }
 
+    public boolean isOlderThan(java.time.Duration maxAge, Instant now) {
+        return createdAt.plus(maxAge).isBefore(now);
+    }
+
     public boolean isActive() {
         return revokedAt == null;
     }

@@ -31,7 +31,7 @@ public class IpRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String ip = RequestInfo.ip(request);
+        String ip = RequestInfo.clientKey(RequestInfo.ip(request)); // IPv6 counts per /64 (F7)
         long wait = limiter.tryConsume(RateLimiter.Scope.GLOBAL, ip);
         if (wait == 0 && "POST".equals(request.getMethod()) && LOGIN_PATH.equals(request.getRequestURI())) {
             wait = limiter.tryConsume(RateLimiter.Scope.LOGIN, ip);

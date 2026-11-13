@@ -18,6 +18,7 @@ import lk.wms.auth.repo.AppUserRepository;
 import lk.wms.auth.repo.UserSessionRepository;
 import lk.wms.common.security.CurrentUser;
 import lk.wms.common.tenant.TenantContext;
+import lk.wms.tenant.service.TenantService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -38,13 +39,15 @@ public class SessionService {
     private final UserSessionRepository sessions;
     private final RefreshTokenRepository refreshTokens;
     private final AppUserRepository users;
+    private final TenantService tenants;
     private final TransactionTemplate readTx;
 
     public SessionService(UserSessionRepository sessions, RefreshTokenRepository refreshTokens,
-            AppUserRepository users, PlatformTransactionManager tm) {
+            AppUserRepository users, TenantService tenants, PlatformTransactionManager tm) {
         this.sessions = sessions;
         this.refreshTokens = refreshTokens;
         this.users = users;
+        this.tenants = tenants;
         this.readTx = new TransactionTemplate(tm);
         this.readTx.setReadOnly(true);
     }
@@ -103,6 +106,8 @@ public class SessionService {
         return TenantContext.callAsSystem(() -> readTx.execute(s -> sessions.findWithUser(sessionId)
                 .filter(UserSession::isActive)
                 .filter(session -> session.getUser().getStatus() == AppUser.Status.ACTIVE)
+                .filter(session -> !session.isOlderThan(TokenService.SESSION_MAX_AGE, java.time.Instant.now()))
+                .filter(session -> tenants.isActive(session.getTenantId())) // F8: suspension applies within 60 s
                 .map(this::toCurrentUser)));
     }
 

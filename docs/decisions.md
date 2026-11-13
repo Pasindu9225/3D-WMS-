@@ -44,3 +44,7 @@
 | 2026-11-13 | CI actions pinned to commit SHAs; versions about a month old | A moved or hijacked tag cannot run new code in CI; stable over newest |
 | 2026-11-13 | `backend/mvnw` stored with the executable bit (git update-index --chmod=+x) | Commits from Windows drop it; Linux CI could not run the Maven wrapper |
 | 2026-11-13 | npm `overrides`: minimatch ^11.0.1 | Fixes GHSA-g3hv-75wg-m249 (ReDoS) in ESLint's dependency chain; lint verified working; npm audit now 0 findings |
+| 2026-11-13 | Behind a proxy, client IP from X-Forwarded-For trusted only from loopback | Spring's default trusts all private LAN ranges; an office PC could forge its IP (review F1) |
+| 2026-11-13 | Sessions end 30 days after login; Argon2 at 19 MiB / 2 iterations; IPv6 counted per /64 | Review F3, F4, F7 |
+| 2026-11-13 | `app_user.password_set_at` (V3) and a nightly cleanup (30-day retention, audit log excluded) | Review F6; cleanup also removes old client IPs (personal data) |
+| 2026-11-13 | Suspended companies refused at login, refresh and session check | Review F8; the suspend screen itself comes in v2.0 |

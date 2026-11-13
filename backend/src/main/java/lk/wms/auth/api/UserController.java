@@ -88,6 +88,12 @@ public class UserController {
         return users.enable(CurrentUser.require(), id);
     }
 
+    @PostMapping("/users/{id}/unlock")
+    @PreAuthorize("hasAuthority('users:manage')")
+    public UserView unlock(@PathVariable @Size(max = 26) String id) {
+        return users.unlock(CurrentUser.require(), id);
+    }
+
     @PutMapping("/users/{id}/roles")
     @PreAuthorize("hasAuthority('users:manage')")
     public UserView setRoles(@PathVariable @Size(max = 26) String id, @Valid @RequestBody RolesRequest body) {

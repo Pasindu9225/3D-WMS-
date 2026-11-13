@@ -96,6 +96,31 @@ describe('api', () => {
     expect(err.errors[0]?.field).toBe('email')
   })
 
+  it('refreshes inside a browser-wide lock so two tabs never refresh at once (F2)', async () => {
+    const events: string[] = []
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: async (name: string, work: () => Promise<unknown>) => {
+          events.push(`lock ${name}`)
+          const result = await work()
+          events.push('unlock')
+          return result
+        },
+      },
+    })
+    let refreshed = false
+    mockFetch((url) => {
+      if (url.endsWith('/auth/refresh')) {
+        events.push('refresh')
+        refreshed = true
+        return json(200, {})
+      }
+      return refreshed ? json(200, {}) : json(401, { code: 'UNAUTHENTICATED' })
+    })
+    await api('/users')
+    expect(events).toEqual(['lock wms-auth-refresh', 'refresh', 'unlock'])
+  })
+
   it('turns a network failure into code NETWORK', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => {
       throw new TypeError('Failed to fetch')

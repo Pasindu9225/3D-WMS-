@@ -58,6 +58,10 @@ public class AppUser extends TenantScoped {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    /** When the user last set a password; null while only invited (never had a usable password). */
+    @Column(name = "password_set_at")
+    private Instant passwordSetAt;
+
     protected AppUser() {
     }
 
@@ -68,6 +72,7 @@ public class AppUser extends TenantScoped {
         this.passwordHash = passwordHash;
         this.status = status;
         this.createdAt = Instant.now();
+        this.passwordSetAt = status == Status.INVITED ? null : createdAt;
     }
 
     public static String normalizeEmail(String email) {
@@ -140,6 +145,19 @@ public class AppUser extends TenantScoped {
     public void changePassword(String newHash) {
         this.passwordHash = newHash;
         this.updatedAt = Instant.now();
+        this.passwordSetAt = updatedAt;
+    }
+
+    /** Re-hash with stronger settings at login; the password itself did not change. */
+    public void upgradeHash(String newHash) {
+        this.passwordHash = newHash;
+    }
+
+    /** Admin unlock after a lockout (SEC-06 can be abused to lock someone out on purpose). */
+    public void unlock() {
+        this.failedLogins = 0;
+        this.lockedUntil = null;
+        this.updatedAt = Instant.now();
     }
 
     /** The invited user set their password through the invite link. */
@@ -147,6 +165,7 @@ public class AppUser extends TenantScoped {
         this.passwordHash = newHash;
         this.status = Status.ACTIVE;
         this.updatedAt = Instant.now();
+        this.passwordSetAt = updatedAt;
     }
 
     public void disable() {
@@ -155,8 +174,8 @@ public class AppUser extends TenantScoped {
     }
 
     /** Back to ACTIVE, or to INVITED if they never set a password. Also clears any lockout. */
-    public void enable(boolean hasSetPassword) {
-        this.status = hasSetPassword ? Status.ACTIVE : Status.INVITED;
+    public void enable() {
+        this.status = passwordSetAt != null ? Status.ACTIVE : Status.INVITED;
         this.failedLogins = 0;
         this.lockedUntil = null;
         this.updatedAt = Instant.now();

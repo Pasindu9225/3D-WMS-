@@ -268,6 +268,40 @@ class AuthFlowTest extends IntegrationTest {
         login(user.getEmail(), newPassword).andExpect(status().isOk());
     }
 
+    // ---------------------------------------------------------------- security review v0.1
+
+    @Test
+    void weakOldHashIsUpgradedAtLoginWithoutCountingAsPasswordChange() throws Exception {
+        String weak = "{argon2}" + org.springframework.security.crypto.argon2.Argon2PasswordEncoder
+                .defaultsForSpringSecurity_v5_8().encode(PASSWORD); // 16 MiB, the old setting
+        jdbc.update("UPDATE app_user SET password_hash = ?, password_set_at = NOW(3) - INTERVAL 10 DAY WHERE id = ?",
+                weak, user.getId());
+        login(user.getEmail(), PASSWORD).andExpect(status().isOk());
+        String upgraded = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id = ?", String.class, user.getId());
+        assertThat(upgraded).contains("m=19456").isNotEqualTo(weak); // F3
+        assertThat(jdbc.queryForObject("SELECT password_set_at < NOW(3) - INTERVAL 9 DAY FROM app_user WHERE id = ?",
+                Boolean.class, user.getId())).isTrue();
+        login(user.getEmail(), PASSWORD).andExpect(status().isOk()); // still the same password
+    }
+
+    @Test
+    void sessionEndsThirtyDaysAfterLoginEvenIfRefreshed() throws Exception {
+        MvcResult r = login(user.getEmail(), PASSWORD).andReturn();
+        jdbc.update("UPDATE user_session SET created_at = NOW(3) - INTERVAL 31 DAY WHERE user_id = ?", user.getId());
+        refresh(refresh(r)).andExpect(status().isUnauthorized()); // F4
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM user_session WHERE user_id = ? AND revoked_at IS NULL",
+                Integer.class, user.getId())).isZero();
+    }
+
+    @Test
+    void suspendedCompanyCannotSignInOrRefresh() throws Exception {
+        MvcResult r = login(user.getEmail(), PASSWORD).andExpect(status().isOk()).andReturn();
+        jdbc.update("UPDATE tenant SET status = 'SUSPENDED' WHERE id = ?", tenantId);
+        login(user.getEmail(), PASSWORD).andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_FAILED")); // F8, same generic answer
+        refresh(refresh(r)).andExpect(status().isUnauthorized());
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private org.springframework.test.web.servlet.ResultActions login(String email, String password) throws Exception {

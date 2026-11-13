@@ -24,4 +24,15 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Modifying
     @Query("update RefreshToken t set t.revokedAt = :now where t.session.id = :sessionId and t.revokedAt is null")
     int revokeBySession(@Param("sessionId") String sessionId, @Param("now") Instant now);
+
+    /** Cleanup: every token expires 7 days after issue, used or not. */
+    @Modifying
+    @Query("delete from RefreshToken t where t.expiresAt < :cutoff")
+    int deleteExpiredBefore(@Param("cutoff") Instant cutoff);
+
+    /** Cleanup: tokens of sessions about to be deleted (keeps the foreign key happy). */
+    @Modifying
+    @Query("delete from RefreshToken t where t.session.id in (select s.id from UserSession s"
+            + " where s.revokedAt < :cutoff or s.lastSeenAt < :cutoff)")
+    int deleteForOldSessions(@Param("cutoff") Instant cutoff);
 }

@@ -10,6 +10,8 @@ export interface User {
   status: UserStatus
   roles: string[]
   createdAt: string
+  /** Set only while a lockout after failed sign-ins is running. */
+  lockedUntil: string | null
 }
 
 export interface Page<T> {
@@ -66,6 +68,8 @@ export const useRename = () =>
 export const useSetRoles = () =>
   useUserMutation(({ id, roles }: { id: string; roles: string[] }) =>
     api<User>(`/users/${id}/roles`, { method: 'PUT', body: { roles } }))
+
+export const useUnlock = () => useUserMutation((id: string) => api<User>(`/users/${id}/unlock`, { method: 'POST' }))
 
 export const useSetEnabled = () =>
   useUserMutation(({ id, enabled }: { id: string; enabled: boolean }) =>

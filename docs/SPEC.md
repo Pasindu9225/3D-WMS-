@@ -304,7 +304,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [ ] Supervisor task board: assign, re-assign, priorities, live status
 - [ ] Dashboard: stock value, low stock, today's receipts and shipments, bin utilisation %, KPIs (dock-to-stock time, lines picked per hour)
 - [ ] Exports: stock, movements, orders to Excel and PDF (streamed)
-- [ ] Deployment: Nginx + HTTPS, systemd services, `backup.sh` with daily encrypted dumps, restore guide (SEC-66, SEC-83, SEC-84)
+- [ ] Deployment: Nginx + HTTPS, systemd services, `backup.sh` with daily encrypted dumps, restore guide (SEC-66, SEC-83, SEC-84). Nginx must: send CSP/HSTS/nosniff/frame headers for the web app, keep `Host` (`proxy_set_header Host $host`), set `X-Forwarded-For`/`-Proto`, and never forward `/actuator` (security review v0.1, F12)
 - [ ] Production profile: Swagger off, Actuator localhost only, log rotation
 - [ ] OWASP ZAP baseline scan; fix all high findings (SEC-85)
 - [ ] User guide (short, with screenshots) for admin and workers

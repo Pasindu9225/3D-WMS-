@@ -21,9 +21,9 @@ public interface UserInviteRepository extends JpaRepository<UserInvite, Long> {
     @Query("update UserInvite i set i.revokedAt = :now where i.user.id = :userId and i.usedAt is null and i.revokedAt is null")
     int revokeOpenForUser(@Param("userId") long userId, @Param("now") Instant now);
 
-    @Query("select count(i) > 0 from UserInvite i where i.user.id = :userId and i.usedAt is not null")
-    boolean hasAccepted(@Param("userId") long userId);
+    /** Cleanup: every invite expires 72 h after it is made, used or not. */
+    @Modifying
+    @Query("delete from UserInvite i where i.expiresAt < :cutoff")
+    int deleteExpiredBefore(@Param("cutoff") Instant cutoff);
 
-    @Query("select count(i) > 0 from UserInvite i where i.user.id = :userId")
-    boolean hasAny(@Param("userId") long userId);
 }

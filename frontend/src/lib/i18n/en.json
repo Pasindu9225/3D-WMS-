@@ -68,6 +68,8 @@
   "users.disable": "Disable",
   "users.enable": "Enable",
   "users.reinvite": "New invite link",
+  "users.unlock": "Unlock",
+  "users.lockedUntil": "Locked until {time}",
   "users.status.ACTIVE": "Active",
   "users.status.INVITED": "Invited",
   "users.status.DISABLED": "Disabled",
@@ -128,6 +130,7 @@
   "action.USER_DISABLED": "Disabled user",
   "action.USER_ENABLED": "Enabled user",
   "action.USER_ROLES_CHANGED": "Changed roles",
+  "action.USER_UNLOCKED": "Unlocked user",
 
   "common.cancel": "Cancel",
   "common.save": "Save",

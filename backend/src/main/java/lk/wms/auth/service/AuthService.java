@@ -18,6 +18,8 @@ import lk.wms.common.audit.AuditService;
 import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
 import lk.wms.common.tenant.TenantContext;
+import lk.wms.common.web.RequestInfo;
+import lk.wms.tenant.service.TenantService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -54,12 +56,14 @@ public class AuthService {
     private final PasswordEncoder passwords;
     private final JwtDecoder jwtDecoder;
     private final AuditService audit;
+    private final TenantService tenants;
     private final TransactionTemplate tx;
     private final String dummyHash;
 
     public AuthService(AppUserRepository users, UserSessionRepository sessions, RefreshTokenRepository refreshTokens,
             LoginAttemptRepository attempts, SessionService sessionService, TokenService tokens,
-            PasswordEncoder passwords, JwtDecoder jwtDecoder, AuditService audit, PlatformTransactionManager tm) {
+            PasswordEncoder passwords, JwtDecoder jwtDecoder, AuditService audit, TenantService tenants,
+            PlatformTransactionManager tm) {
         this.users = users;
         this.sessions = sessions;
         this.refreshTokens = refreshTokens;
@@ -69,6 +73,7 @@ public class AuthService {
         this.passwords = passwords;
         this.jwtDecoder = jwtDecoder;
         this.audit = audit;
+        this.tenants = tenants;
         this.tx = new TransactionTemplate(tm);
         this.dummyHash = passwords.encode("timing-equaliser-not-a-real-password");
     }
@@ -76,19 +81,20 @@ public class AuthService {
     // ---------------------------------------------------------------- login
 
     public LoginResult login(String email, String password, String ip, String userAgent) {
+        String client = RequestInfo.clientKey(ip);
         String normalized = AppUser.normalizeEmail(email);
         String emailHash = TokenService.sha256(normalized);
 
         record Lookup(boolean ipBlocked, AppUser user) {
         }
         Lookup lookup = inSystemTx(() -> new Lookup(
-                attempts.countFailuresFromIp(ip, Instant.now().minus(IP_WINDOW)) >= IP_MAX_FAILURES,
+                attempts.countFailuresFromIp(client, Instant.now().minus(IP_WINDOW)) >= IP_MAX_FAILURES,
                 users.findByEmail(normalized).orElse(null)));
 
         if (lookup.ipBlocked() || lookup.user() == null) {
             passwords.matches(password, dummyHash); // same work as a real check: no timing hint (SEC-07)
             inSystemTx(() -> {
-                attempts.save(new LoginAttempt(ip, emailHash, false));
+                attempts.save(new LoginAttempt(client, emailHash, false));
                 audit.record(null, null, lookup.ipBlocked() ? "LOGIN_BLOCKED_IP" : "LOGIN_FAILED", "app_user", null);
                 return null;
             });
@@ -110,13 +116,13 @@ public class AuthService {
             } else if (!passwords.matches(password, user.getPasswordHash())) {
                 user.recordFailedLogin(now);
                 o = Outcome.BAD_CREDENTIALS;
-            } else if (user.getStatus() != AppUser.Status.ACTIVE) {
+            } else if (user.getStatus() != AppUser.Status.ACTIVE || !tenants.isActive(tenantId)) {
                 o = Outcome.INACTIVE; // checked after the password so status never leaks to strangers
             } else {
                 o = Outcome.SUCCESS;
                 user.recordSuccessfulLogin(now);
                 if (passwords.upgradeEncoding(user.getPasswordHash())) {
-                    user.changePassword(passwords.encode(password));
+                    user.upgradeHash(passwords.encode(password));
                 }
                 UserSession session = sessions.save(new UserSession(user, ip, userAgent));
                 String refresh = tokens.newRefreshToken();
@@ -125,7 +131,7 @@ public class AuthService {
                 CurrentUser cu = sessionService.toCurrentUser(session);
                 ok = new LoginResult(tokens.issueAccessToken(cu, now), refresh, me(user, cu));
             }
-            attempts.save(new LoginAttempt(ip, emailHash, o == Outcome.SUCCESS));
+            attempts.save(new LoginAttempt(client, emailHash, o == Outcome.SUCCESS));
             audit.record(tenantId, user.getId(), "LOGIN_" + o.name(), "app_user", user.getPublicId());
             return new Step(o, ok);
         });
@@ -162,7 +168,8 @@ public class AuthService {
             if (token.isRevoked() || token.isExpired(now) || !session.isActive()) {
                 return null;
             }
-            if (user.getStatus() != AppUser.Status.ACTIVE) {
+            if (user.getStatus() != AppUser.Status.ACTIVE || session.isOlderThan(TokenService.SESSION_MAX_AGE, now)
+                    || !tenants.isActive(session.getTenantId())) {
                 refreshTokens.revokeBySession(session.getId(), now);
                 session.revoke(now);
                 evict.add(session.getId());

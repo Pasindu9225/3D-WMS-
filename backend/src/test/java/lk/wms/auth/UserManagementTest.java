@@ -202,6 +202,24 @@ class UserManagementTest extends IntegrationTest {
     }
 
     @Test
+    void adminSeesAndClearsALockout() throws Exception {
+        AppUser picker = newUser(tenantA, "PICKER");
+        for (int i = 0; i < 5; i++) {
+            login(picker.getEmail(), "wrong-" + i).andExpect(status().isUnauthorized());
+        }
+        login(picker.getEmail(), PASSWORD).andExpect(status().isUnauthorized()); // locked
+        String list = as(adminCookie, get("/api/v1/users?q=" + picker.getEmail())).andReturn().getResponse()
+                .getContentAsString();
+        assertThat((String) JsonPath.read(list, "$.items[0].lockedUntil")).isNotNull(); // F5: visible
+
+        as(adminCookie, post("/api/v1/users/" + picker.getPublicId() + "/unlock")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.lockedUntil").doesNotExist());
+        login(picker.getEmail(), PASSWORD).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_log WHERE action = 'USER_UNLOCKED' AND entity_id = ?",
+                Integer.class, picker.getPublicId())).isOne();
+    }
+
+    @Test
     void cannotDisableYourselfOrRemoveTheLastAdmin() throws Exception {
         as(adminCookie, post("/api/v1/users/" + adminA.getPublicId() + "/disable"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANNOT_DISABLE_SELF"));

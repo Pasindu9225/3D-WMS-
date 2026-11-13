@@ -21,6 +21,8 @@ public class TokenService {
 
     public static final Duration ACCESS_TTL = Duration.ofMinutes(15);
     public static final Duration REFRESH_TTL = Duration.ofDays(7);
+    /** F4: a session ends 30 days after login, however often it is refreshed. */
+    public static final Duration SESSION_MAX_AGE = Duration.ofDays(30);
     public static final String ISSUER = "wms";
 
     private static final SecureRandom RANDOM = new SecureRandom();

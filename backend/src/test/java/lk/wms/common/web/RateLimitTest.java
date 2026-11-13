@@ -67,6 +67,21 @@ class RateLimitTest {
         }
     }
 
+    @Test
+    void ipv6CountsPerSlash64AndIpv4PerAddress() throws Exception {
+        assertThat(RequestInfo.clientKey("2001:db8:1:2:aaaa::1")).isEqualTo("2001:db8:1:2::/64");
+        assertThat(RequestInfo.clientKey("2001:0db8:0001:0002:ffff:ffff:ffff:ffff")).isEqualTo("2001:db8:1:2::/64");
+        assertThat(RequestInfo.clientKey("::ffff:10.0.0.7")).isEqualTo("10.0.0.7");
+        assertThat(RequestInfo.clientKey("10.0.0.7")).isEqualTo("10.0.0.7");
+
+        // F7: rotating addresses inside one /64 does not escape the login limit (2/min here)
+        IpRateLimitFilter filter = new IpRateLimitFilter(limiter);
+        assertThat(send(filter, "POST", IpRateLimitFilter.LOGIN_PATH, "2001:db8:5:5::1").getStatus()).isEqualTo(200);
+        assertThat(send(filter, "POST", IpRateLimitFilter.LOGIN_PATH, "2001:db8:5:5::2").getStatus()).isEqualTo(200);
+        assertThat(send(filter, "POST", IpRateLimitFilter.LOGIN_PATH, "2001:db8:5:5::3").getStatus()).isEqualTo(429);
+        assertThat(send(filter, "POST", IpRateLimitFilter.LOGIN_PATH, "2001:db8:5:6::1").getStatus()).isEqualTo(200);
+    }
+
     private static MockHttpServletResponse send(jakarta.servlet.Filter filter, String method, String uri, String ip)
             throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest(method, uri);

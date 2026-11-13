@@ -187,11 +187,13 @@ public class SecurityConfig {
         return decoder;
     }
 
-    /** SEC-29: Argon2id; the {id} prefix lets us move to stronger settings later without a reset. */
+    /**
+     * SEC-29: Argon2id at the OWASP minimum (19 MiB, 2 iterations, 1 lane). Hashes made with weaker
+     * settings are re-hashed at the next successful login (F3).
+     */
     @Bean
     PasswordEncoder passwordEncoder() {
-        return new DelegatingPasswordEncoder("argon2",
-                Map.of("argon2", Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()));
+        return new DelegatingPasswordEncoder("argon2", Map.of("argon2", new Argon2PasswordEncoder(16, 32, 1, 19_456, 2)));
     }
 
     private static RSAPublicKey readPublic(Resource resource) throws IOException {

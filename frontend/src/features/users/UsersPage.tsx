@@ -9,7 +9,7 @@ import { can, useMe } from '@/features/auth/session'
 import { errorMessage } from '@/lib/errors'
 import { t, type MessageKey } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
-import { PAGE_SIZE, useReinvite, useRoles, useSetEnabled, useUsers, type Invite, type User, type UserStatus } from './api'
+import { PAGE_SIZE, useReinvite, useRoles, useSetEnabled, useUnlock, useUsers, type Invite, type User, type UserStatus } from './api'
 import { DisableDialog, InviteDialog, InviteLinkDialog, RenameDialog, RolesDialog } from './UserDialogs'
 
 const STATUS_TONE: Record<UserStatus, 'good' | 'warn' | 'bad' | 'neutral'> = {
@@ -33,6 +33,7 @@ export function UsersPage() {
   const [open, setOpen] = useState<Open>(null)
   const reinvite = useReinvite()
   const setEnabled = useSetEnabled()
+  const unlock = useUnlock()
   const data = users.data
 
   return (
@@ -53,7 +54,9 @@ export function UsersPage() {
       </div>
 
       {users.isError && <FormMessage tone="error">{errorMessage(users.error)}</FormMessage>}
-      {(reinvite.isError || setEnabled.isError) && <FormMessage tone="error">{errorMessage(reinvite.error ?? setEnabled.error)}</FormMessage>}
+      {(reinvite.isError || setEnabled.isError || unlock.isError) && (
+        <FormMessage tone="error">{errorMessage(reinvite.error ?? setEnabled.error ?? unlock.error)}</FormMessage>
+      )}
 
       <Table>
         <thead>
@@ -78,7 +81,16 @@ export function UsersPage() {
                   {u.roles.map((r) => <Badge key={r}>{roleNames.get(r) ?? r}</Badge>)}
                 </div>
               </td>
-              <td><Badge tone={STATUS_TONE[u.status]}>{t(`users.status.${u.status}` as MessageKey)}</Badge></td>
+              <td>
+                <div className="flex flex-wrap gap-1">
+                  <Badge tone={STATUS_TONE[u.status]}>{t(`users.status.${u.status}` as MessageKey)}</Badge>
+                  {u.lockedUntil && (
+                    <Badge tone="bad">
+                      {t('users.lockedUntil', { time: new Date(u.lockedUntil).toLocaleTimeString(undefined, { timeStyle: 'short' }) })}
+                    </Badge>
+                  )}
+                </div>
+              </td>
               {manage && (
                 <td className="text-right">
                   <DropdownMenu>
@@ -88,6 +100,9 @@ export function UsersPage() {
                     <DropdownMenuContent>
                       <DropdownMenuItem onSelect={() => setOpen({ kind: 'rename', user: u })}>{t('users.rename')}</DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => setOpen({ kind: 'roles', user: u })}>{t('users.setRoles')}</DropdownMenuItem>
+                      {u.lockedUntil && (
+                        <DropdownMenuItem onSelect={() => unlock.mutate(u.id)}>{t('users.unlock')}</DropdownMenuItem>
+                      )}
                       {u.status === 'INVITED' && (
                         <DropdownMenuItem onSelect={() => reinvite.mutate(u.id, { onSuccess: (invite) => setOpen({ kind: 'link', invite }) })}>
                           {t('users.reinvite')}

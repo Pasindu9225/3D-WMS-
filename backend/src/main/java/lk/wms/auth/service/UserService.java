@@ -43,8 +43,9 @@ public class UserService {
     static final Duration INVITE_TTL = Duration.ofHours(72);
 
     /** API view of a user: no internal ID, no password hash (SEC-25). */
+    /** {@code lockedUntil} is set only while a lockout is running (F5). */
     public record UserView(String id, String email, String fullName, String status, List<String> roles,
-            Instant createdAt) {
+            Instant createdAt, Instant lockedUntil) {
     }
 
     public record Invite(UserView user, String inviteUrl, Instant expiresAt) {
@@ -219,10 +220,19 @@ public class UserService {
         AppUser user = find(userPublicId);
         List<String> codes = currentCodes(user);
         Snapshot before = snapshot(user, codes);
-        // Back to INVITED only if they were invited and never set a password.
-        user.enable(invites.hasAccepted(user.getId()) || !invites.hasAny(user.getId()));
+        user.enable();
         audit.record(actor.tenantId(), actor.userId(), "USER_ENABLED", "app_user", user.getPublicId(),
                 before, snapshot(user, codes));
+        return view(user, codes);
+    }
+
+    /** F5: clear a lockout (anyone who knows an email can trigger one on purpose). */
+    @Transactional
+    public UserView unlock(CurrentUser actor, String userPublicId) {
+        AppUser user = find(userPublicId);
+        List<String> codes = currentCodes(user);
+        user.unlock();
+        audit.record(actor.tenantId(), actor.userId(), "USER_UNLOCKED", "app_user", user.getPublicId());
         return view(user, codes);
     }
 
@@ -298,7 +308,7 @@ public class UserService {
 
     private static UserView view(AppUser u, List<String> codes) {
         return new UserView(u.getPublicId(), u.getEmail(), u.getFullName(), u.getStatus().name(), codes,
-                u.getCreatedAt());
+                u.getCreatedAt(), u.isLocked(Instant.now()) ? u.getLockedUntil() : null);
     }
 
     private static Snapshot snapshot(AppUser u, List<String> codes) {
