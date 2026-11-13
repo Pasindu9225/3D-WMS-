@@ -53,3 +53,7 @@
 | 2026-11-13 | Bin labels with ZXing (QR) + OpenPDF, not bwip-js | bwip-js is a JavaScript library; the server is Java |
 | 2026-11-13 | Warehouse create locks the company row to check the plan limit; archive = soft delete that frees a slot | No race past the limit; archived warehouses keep their history |
 | 2026-11-13 | Assigning users to a warehouse needs `users:manage` | It decides who sees what: a user-management act, not a layout one |
+| 2026-11-13 | Layout document in millimetres; rack position = its centre; rotation in 90° steps | No rounding between editor, server and 3D; rotating a rack does not move it |
+| 2026-11-13 | Layout checks: errors (outline crosses itself, outside floor/zone, overlaps, duplicate codes, unknown type/zone, door not on wall) refuse the save; narrow aisles only warn (minimum per layout, default 1.2 m; back-to-back racks not flagged) | Planners may want tight aisles for hand picking; overlaps are never valid |
+| 2026-11-13 | Draft saves carry `baseRevision`; a stale save gets 409 LAYOUT_CHANGED | Two planners editing at once cannot silently overwrite each other |
+| 2026-11-13 | Validation errors list `{field, message}` also when Spring validates the whole method (constrained path variable) | Bug found in task 2: those endpoints (incl. PATCH /users/{id}) returned no field list |

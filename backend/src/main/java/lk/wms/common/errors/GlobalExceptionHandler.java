@@ -1,5 +1,7 @@
 package lk.wms.common.errors;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lk.wms.common.web.CorrelationIdFilter;
@@ -14,10 +16,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.csrf.CsrfException;
+import org.springframework.validation.method.ParameterErrors;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -31,7 +36,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     ResponseEntity<Object> handleApi(ApiException ex, WebRequest request) {
-        return problem(ex.getStatus(), ex.getCode(), ex.getMessage(), request);
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage());
+        pd.setProperty("code", ex.getCode());
+        if (ex.getIssues() != null) {
+            pd.setProperty("issues", ex.getIssues());
+        }
+        return createResponseEntity(pd, new HttpHeaders(), ex.getStatus(), request);
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -67,6 +77,31 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .map(f -> Map.of("field", f.getField(),
                         "message", Objects.requireNonNullElse(f.getDefaultMessage(), "invalid")))
                 .toList());
+        return createResponseEntity(body, headers, status, request);
+    }
+
+    /**
+     * Same {field, message} list when Spring validates the method as a whole, which it does as soon as
+     * any parameter (e.g. a path variable) carries a constraint. Without this, those endpoints answered
+     * a bare "Validation failure" with no field list. Nested fields keep their path (layout.racks[0].code).
+     */
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        List<Map<String, String>> errors = new ArrayList<>();
+        for (ParameterValidationResult result : ex.getParameterValidationResults()) {
+            if (result instanceof ParameterErrors body) {
+                body.getFieldErrors().forEach(f -> errors.add(Map.of("field", f.getField(),
+                        "message", Objects.requireNonNullElse(f.getDefaultMessage(), "invalid"))));
+            } else {
+                String name = Objects.requireNonNullElse(result.getMethodParameter().getParameterName(), "parameter");
+                result.getResolvableErrors().forEach(e -> errors.add(Map.of("field", name,
+                        "message", Objects.requireNonNullElse(e.getDefaultMessage(), "invalid"))));
+            }
+        }
+        ProblemDetail body = ex.getBody();
+        body.setProperty("code", "VALIDATION_FAILED");
+        body.setProperty("errors", errors);
         return createResponseEntity(body, headers, status, request);
     }
 
