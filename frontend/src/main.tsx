@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 import { router } from '@/app/router'
+import { ME_KEY } from '@/features/auth/session'
 import { ApiError, setSessionExpiredHandler } from '@/lib/api'
 import './index.css'
 
@@ -17,8 +18,12 @@ const queryClient = new QueryClient({
 })
 
 setSessionExpiredHandler(() => {
+  // Only say "your session ended" to someone who was signed in; a first visit just goes to sign-in.
+  // Never clear() for a first visit: that would drop the in-flight /auth/me query and leave the page
+  // waiting forever. Its 401 simply ends in an error, and AppLayout redirects to sign-in.
+  if (queryClient.getQueryData(ME_KEY) === undefined) return
   queryClient.clear()
-  void router.navigate('/login')
+  void router.navigate('/login?expired=1', { replace: true })
 })
 
 createRoot(document.getElementById('root')!).render(

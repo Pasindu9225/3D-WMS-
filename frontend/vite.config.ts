@@ -9,8 +9,10 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   // Same origin in dev as in production (Nginx): cookies and CSRF work without CORS.
   // Port 5180: 5173 is used by other projects on the dev PC.
-  server: { port: 5180, strictPort: true, proxy: { '/api': 'http://localhost:8080' } },
+  // changeOrigin: false keeps the browser's Host header, so Spring sees a same-origin request (as behind
+  // Nginx with proxy_set_header Host $host). The string shorthand would rewrite Host and fail CORS.
+  server: { port: 5180, strictPort: true, proxy: { '/api': { target: 'http://localhost:8080', changeOrigin: false } } },
   preview: { port: 5180, strictPort: true },
   build: { target: 'es2022' },
-  test: { environment: 'jsdom', globals: true },
+  test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
 })

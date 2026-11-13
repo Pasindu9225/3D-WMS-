@@ -36,3 +36,7 @@
 | 2026-11-13 | Dev server on port 5180 with /api proxied to :8080 | Same origin as production (cookies + CSRF need no CORS); 5173 is used by other projects on the dev PC |
 | 2026-11-13 | API client: one shared refresh for parallel 401s; one CSRF re-fetch on CSRF_INVALID | Two parallel refreshes would trip refresh-token reuse detection and log the user out |
 | 2026-11-13 | Theme set by an external `theme-init.js` before first paint | Inline scripts are blocked by the CSP |
+| 2026-11-13 | Reverse proxies must keep the browser's Host header (Vite `changeOrigin: false`; Nginx `proxy_set_header Host $host`) | With a rewritten Host, Spring sees Origin ≠ host and rejects every POST as an invalid CORS request |
+| 2026-11-13 | Signed-in state = the `/auth/me` query (TanStack Query); no Zustand yet | One source of truth; Zustand added when real client-only state appears |
+| 2026-11-13 | Invite page reads the token from `#fragment` and clears it from the address bar at once | Keeps the one-time token out of history, screenshots and shared links |
+| 2026-11-13 | Built-in roles shown as a read-only permission matrix | Roles are fixed (task 6); people get several roles instead of custom ones |
