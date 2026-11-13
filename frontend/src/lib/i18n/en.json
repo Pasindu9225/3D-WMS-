@@ -1,0 +1,22 @@
+{
+  "app.name": "3D WMS",
+  "app.tagline": "Warehouse management with a live 3D view",
+  "theme.toggle": "Switch theme",
+  "theme.light": "Light",
+  "theme.dark": "Dark",
+  "theme.system": "System",
+  "home.title": "Your warehouse, in 3D",
+  "home.body": "Sign in to manage users, layouts and stock.",
+  "home.signIn": "Sign in",
+  "home.backend": "Backend: {status}",
+  "home.backendOk": "connected",
+  "home.backendDown": "not reachable",
+  "login.title": "Sign in",
+  "login.comingSoon": "The sign-in form arrives in the next task.",
+  "invite.title": "Set your password",
+  "invite.comingSoon": "The invite form arrives in the next task.",
+  "notFound.title": "Page not found",
+  "notFound.back": "Back to start",
+  "error.network": "Cannot reach the server. Check your connection and try again.",
+  "error.sessionExpired": "Your session has ended. Please sign in again."
+}

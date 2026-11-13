@@ -77,7 +77,7 @@ class UserManagementTest extends IntegrationTest {
                 .andExpect(jsonPath("$.user.passwordHash").doesNotExist())
                 .andReturn().getResponse().getContentAsString();
         String url = JsonPath.read(body, "$.inviteUrl");
-        assertThat(url).startsWith("http://localhost:5173/invite#");
+        assertThat(url).startsWith("http://localhost:5180/invite#");
         String token = url.substring(url.indexOf('#') + 1);
 
         // only the hash is stored

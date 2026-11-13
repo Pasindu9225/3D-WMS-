@@ -10,7 +10,7 @@ Zustand, React Hook Form + Zod, three.js + React Three Fiber 9, react-konva.
 ## Commands
 backend:  ./mvnw verify            (tests + ArchUnit)
 backend:  ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-frontend: npm run dev | npm test | npm run build | npm run size
+frontend: npm run dev (port 5180, proxies /api to :8080) | npm test | npm run lint | npm run build && npm run size
 local db: docker compose -f deploy/docker-compose.yml up mysql
 
 ## Hard rules

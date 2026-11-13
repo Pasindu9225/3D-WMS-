@@ -31,3 +31,8 @@
 | 2026-11-13 | First company and admin via `--wms.bootstrap.*` command line run, link printed to console once | No public sign-up until v2.0; refuses to run twice for the same email |
 | 2026-11-13 | Email uniqueness enforced by the DB unique key (409 EMAIL_IN_USE) | The tenant filter hides other companies' emails; the key sees all and cannot race |
 | 2026-11-13 | Removing or disabling an admin locks all active admins first | Two admins removing each other at once can never leave a company without an admin |
+| 2026-11-13 | Frontend: Vite 7, React 19.1, React Router 7, TanStack Query 5, Tailwind 4, TypeScript 5.9, Vitest 4, ESLint 10 | Mature majors, not the newest (Vite 8, Router 8, TS 6/7 skipped); ESLint 9 is end-of-life so 10 is used |
+| 2026-11-13 | Zustand, React Hook Form and Zod added when first used (task 8), not in the skeleton | No unused dependencies |
+| 2026-11-13 | Dev server on port 5180 with /api proxied to :8080 | Same origin as production (cookies + CSRF need no CORS); 5173 is used by other projects on the dev PC |
+| 2026-11-13 | API client: one shared refresh for parallel 401s; one CSRF re-fetch on CSRF_INVALID | Two parallel refreshes would trip refresh-token reuse detection and log the user out |
+| 2026-11-13 | Theme set by an external `theme-init.js` before first paint | Inline scripts are blocked by the CSP |

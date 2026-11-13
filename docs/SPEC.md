@@ -220,7 +220,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] CSRF, CORS, security headers, rate limits, global error handler with correlation IDs (SEC-11, SEC-60 to SEC-65, SEC-67)
 - [x] Users and roles API: invite user, set roles, disable user; seed 8 built-in roles
 - [x] Audit log service used by every write (SEC-28)
-- [ ] Frontend skeleton: Vite, React 19, Tailwind, shadcn/ui, dark mode, router, `en.json`
+- [x] Frontend skeleton: Vite, React 19, Tailwind, shadcn/ui, dark mode, router, `en.json`
 - [ ] Login page, app layout (sidebar, top bar), users and roles pages
 - [ ] CI: build, tests, ArchUnit, gitleaks, dependency scan, bundle size check (SEC-80, SEC-81)
 
