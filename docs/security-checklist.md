@@ -12,7 +12,7 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-07** (v0.1): Generic error messages — task 4, AuthFlowTest
 - [x] **SEC-08** (v0.1): Logout revokes session and token family; clear both cookies — task 4, AuthFlowTest
 - [x] **SEC-09** (v0.1): Role and permission check on every endpoint; deny by default — task 6, UserManagementTest + ArchUnit
-- [ ] **SEC-10** (v0.1): No IDOR: every lookup by ID also checks tenant and warehouse access — tenant part done (TenantIsolationTest, UserManagementTest); warehouse access in v0.2
+- [x] **SEC-10** (v0.1): No IDOR: every lookup by ID also checks tenant and warehouse access — tenant (TenantIsolationTest) + warehouse access (WarehouseTest, v0.2 task 1); new warehouse data must go through WarehouseService.requireAccess
 - [x] **SEC-11** (v0.1): CSRF protection for cookie auth — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-20** (v0.1): Validate all input on the server — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-21** (v0.1): Unknown JSON fields rejected — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit

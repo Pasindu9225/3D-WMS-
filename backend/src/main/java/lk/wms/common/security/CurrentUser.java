@@ -18,6 +18,11 @@ public record CurrentUser(
         List<String> roles,
         Set<String> permissions) {
 
+    /** Tenant admins see every warehouse (SEC-10); everyone else only assigned ones. */
+    public boolean isTenantAdmin() {
+        return roles.contains("TENANT_ADMIN");
+    }
+
     public static Optional<CurrentUser> get() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.getPrincipal() instanceof CurrentUser u ? Optional.of(u) : Optional.empty();

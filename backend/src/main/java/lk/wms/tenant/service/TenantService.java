@@ -22,6 +22,12 @@ public class TenantService {
         return tenants.save(new Tenant(name, "PILOT", 1)).getId();
     }
 
+    /** Plan limit on warehouses (per-warehouse pricing). Locks the company row until the transaction ends. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public int lockMaxWarehouses(long tenantId) {
+        return tenants.lockMaxWarehouses(tenantId).orElseThrow();
+    }
+
     /** F8: a suspended (or unknown) company cannot sign in, refresh or use a live session. */
     @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
     public boolean isActive(long tenantId) {

@@ -23,6 +23,7 @@ import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
 import lk.wms.common.tenant.TenantContext;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -54,6 +55,10 @@ public class UserService {
     public record RoleView(String code, String name, List<String> permissions) {
     }
 
+    /** Published inside the invite transaction, so listeners (warehouse access) commit or roll back with it. */
+    public record UserInvited(long tenantId, long userId) {
+    }
+
     /** Audit snapshot: what changed, never secrets. */
     record Snapshot(String email, String fullName, String status, List<String> roles) {
     }
@@ -68,10 +73,12 @@ public class UserService {
     private final AuditService audit;
     private final String appBaseUrl;
     private final TransactionTemplate tx;
+    private final ApplicationEventPublisher events;
 
     public UserService(AppUserRepository users, RoleRepository roles, UserRoleRepository userRoles,
             UserInviteRepository invites, SessionService sessions, TokenService tokens, PasswordEncoder passwords,
-            AuditService audit, @Value("${wms.app.base-url}") String appBaseUrl, PlatformTransactionManager tm) {
+            AuditService audit, @Value("${wms.app.base-url}") String appBaseUrl, PlatformTransactionManager tm,
+            ApplicationEventPublisher events) {
         this.users = users;
         this.roles = roles;
         this.userRoles = userRoles;
@@ -82,6 +89,7 @@ public class UserService {
         this.audit = audit;
         this.appBaseUrl = appBaseUrl.replaceAll("/+$", "");
         this.tx = new TransactionTemplate(tm);
+        this.events = events;
     }
 
     // ---------------------------------------------------------------- reads
@@ -111,6 +119,12 @@ public class UserService {
                 .collect(Collectors.toMap(AppUser::getId, u -> view(u, List.of())));
     }
 
+    /** Every user of the caller's company (internal IDs), e.g. to give everyone the first warehouse. */
+    @Transactional(readOnly = true)
+    public List<Long> allUserIds() {
+        return users.findAll().stream().map(AppUser::getId).toList();
+    }
+
     @Transactional(readOnly = true)
     public Long internalId(String publicId) {
         return users.findByPublicId(publicId).map(AppUser::getId).orElse(null);
@@ -132,6 +146,7 @@ public class UserService {
             throw new ApiException(HttpStatus.CONFLICT, "EMAIL_IN_USE", "This email already has an account");
         }
         chosen.forEach(r -> userRoles.save(new UserRole(user.getId(), r.getId())));
+        events.publishEvent(new UserInvited(actor.tenantId(), user.getId()));
         Invite invite = newInvite(user, actor.userId(), codes(chosen));
         audit.record(actor.tenantId(), actor.userId(), "USER_INVITED", "app_user", user.getPublicId(),
                 null, snapshot(user, codes(chosen)));

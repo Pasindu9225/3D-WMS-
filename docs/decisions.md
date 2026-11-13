@@ -48,3 +48,8 @@
 | 2026-11-13 | Sessions end 30 days after login; Argon2 at 19 MiB / 2 iterations; IPv6 counted per /64 | Review F3, F4, F7 |
 | 2026-11-13 | `app_user.password_set_at` (V3) and a nightly cleanup (30-day retention, audit log excluded) | Review F6; cleanup also removes old client IPs (personal data) |
 | 2026-11-13 | Suspended companies refused at login, refresh and session check | Review F8; the suspend screen itself comes in v2.0 |
+| 2026-11-13 | v0.2 plan approved: tenant admins see all warehouses, others only assigned; first warehouse (and invites while only one exists) open to everyone; creator auto-assigned | One-warehouse pilot needs no setup; 404 (not 403) for warehouses you cannot see |
+| 2026-11-13 | Layout drafts are one JSON document per warehouse; publish applies it to the zone/rack/level/bin tables (the published layout that stock and 3D use) | Bins referenced by stock stay stable; the floor never sees half-finished edits |
+| 2026-11-13 | Bin labels with ZXing (QR) + OpenPDF, not bwip-js | bwip-js is a JavaScript library; the server is Java |
+| 2026-11-13 | Warehouse create locks the company row to check the plan limit; archive = soft delete that frees a slot | No race past the limit; archived warehouses keep their history |
+| 2026-11-13 | Assigning users to a warehouse needs `users:manage` | It decides who sees what: a user-management act, not a layout one |
