@@ -212,8 +212,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Tasks**
 
-- [ ] Create monorepo, `CLAUDE.md`, `docs/SPEC.md`, `.gitignore`, `.editorconfig`
-- [ ] Backend skeleton: Spring Boot 4.1, Java 21, module packages, ArchUnit rules
+- [x] Create monorepo, `CLAUDE.md`, `docs/SPEC.md`, `.gitignore`, `.editorconfig`
+- [x] Backend skeleton: Spring Boot 4.1, Java 17, module packages, ArchUnit rules
 - [ ] MySQL + Flyway: `tenant`, `app_user`, `role`, `permission`, `user_role`, `user_session`, `refresh_token`, `audit_log`, `login_attempt`
 - [ ] Tenant context from JWT + Hibernate `@TenantId` (SEC-24)
 - [ ] Auth: login, refresh with rotation and reuse detection, logout, logout-all, lockout (SEC-01 to SEC-08, SEC-29)
