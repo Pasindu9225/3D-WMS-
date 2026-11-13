@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import lk.wms.IntegrationTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -23,10 +23,10 @@ import org.springframework.test.web.servlet.MvcResult;
 import wmstest.ErrorProbeController;
 
 /** SEC-09 (deny by default), SEC-63 (generic ProblemDetail errors), SEC-67 (404 for unknown routes). */
-@SpringBootTest
+
 @AutoConfigureMockMvc
 @Import(ErrorProbeController.class)
-class ErrorHandlingTest {
+class ErrorHandlingTest extends IntegrationTest {
 
     private static final String ULID = "[0-9A-HJKMNP-TV-Z]{26}";
 

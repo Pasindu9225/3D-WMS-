@@ -13,3 +13,6 @@
 | 2026-11-13 | MySQL 8.4 LTS (not 9.7) in its own container `wms-mysql`, port 127.0.0.1:3308 | More mature; never share the bakery BMS test container |
 | 2026-11-13 | Own image `deploy/mysql/Dockerfile` (Debian 12 + Oracle APT MySQL 8.4) instead of `mysql:8.4` | Official 8.4 image needs x86-64-v2 CPU; server is a basic QEMU vCPU. 8.0-debian is EOL (Apr 2026) |
 | 2026-11-13 | DB users `wms_flyway` (schema) and `wms_app` (data only); ledger UPDATE/DELETE blocked by triggers | SEC-27; MySQL db-level grants cannot exclude single tables |
+| 2026-11-13 | Tenant via Hibernate `@TenantId` + `TenantContext`; no tenant = fail closed (-1), root (0) only via `callAsSystem` | Repos need no tenant parameter (`findByPublicId`); login/refresh lookups happen before the tenant is known |
+| 2026-11-13 | Built-in roles and permissions are global tables; `user_role` carries tenant_id | Spec has no per-tenant custom roles; keeps seeding simple |
+| 2026-11-13 | `login_attempt` stores SHA-256 of the email, not the email | Users sometimes type their password into the email field |

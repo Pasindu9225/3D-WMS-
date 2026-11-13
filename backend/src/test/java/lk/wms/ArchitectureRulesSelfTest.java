@@ -22,4 +22,10 @@ class ArchitectureRulesSelfTest {
         assertThrows(AssertionError.class,
                 () -> ArchitectureTest.SERVICES_DO_NOT_LOAD_BY_BARE_ID.check(classes));
     }
+
+    @Test
+    void stringBuiltSqlIsCaught() {
+        var classes = new ClassFileImporter().importClasses(archfixture.repo.StringSqlDao.class);
+        assertThrows(AssertionError.class, () -> ArchitectureTest.NO_STRING_BUILT_SQL.check(classes));
+    }
 }

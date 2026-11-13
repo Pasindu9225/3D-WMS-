@@ -148,7 +148,7 @@ Each rule has an ID. Claude Code must name the IDs it implements in each pull re
 | SEC-07 | Generic error messages | Always "Authentication failed"; never say whether the user exists | v0.1 |
 | SEC-08 | Logout revokes session and token family; clear both cookies | Also "log out all devices" | v0.1 |
 | SEC-09 | Role and permission check on every endpoint; deny by default | `@PreAuthorize` with permission names; ArchUnit test fails if a controller method has none | v0.1 |
-| SEC-10 | No IDOR: every lookup by ID also checks tenant and warehouse access | Repositories expose `findByIdAndTenant`; never plain `findById` in services | v0.1 |
+| SEC-10 | No IDOR: every lookup by ID also checks tenant and warehouse access | Tenant entities use `@TenantId` (auto filter); services load by `findByPublicId`; never plain `findById` (ArchUnit) | v0.1 |
 | SEC-11 | CSRF protection for cookie auth | SameSite plus Spring Security CSRF token (cookie `XSRF-TOKEN`, header `X-XSRF-TOKEN`) | v0.1 |
 
 ### Database
@@ -214,7 +214,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 - [x] Create monorepo, `CLAUDE.md`, `docs/SPEC.md`, `.gitignore`, `.editorconfig`
 - [x] Backend skeleton: Spring Boot 4.1, Java 17, module packages, ArchUnit rules
-- [ ] MySQL + Flyway: `tenant`, `app_user`, `role`, `permission`, `user_role`, `user_session`, `refresh_token`, `audit_log`, `login_attempt`
+- [x] MySQL + Flyway: `tenant`, `app_user`, `role`, `permission`, `user_role`, `user_session`, `refresh_token`, `audit_log`, `login_attempt`
 - [ ] Tenant context from JWT + Hibernate `@TenantId` (SEC-24)
 - [ ] Auth: login, refresh with rotation and reuse detection, logout, logout-all, lockout (SEC-01 to SEC-08, SEC-29)
 - [ ] CSRF, CORS, security headers, rate limits, global error handler with correlation IDs (SEC-11, SEC-60 to SEC-65, SEC-67)

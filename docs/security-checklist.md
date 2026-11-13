@@ -17,11 +17,11 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [ ] **SEC-20** (v0.1): Validate all input on the server
 - [ ] **SEC-21** (v0.1): Unknown JSON fields rejected
 - [ ] **SEC-22** (v0.1): No mass assignment
-- [ ] **SEC-23** (v0.1): Parameterised queries only
-- [ ] **SEC-24** (v0.1): Tenant isolation (replaces PostgreSQL RLS, which MySQL lacks)
+- [x] **SEC-23** (v0.1): Parameterised queries only — task 3, ArchUnit NO_STRING_BUILT_SQL + self-test
+- [x] **SEC-24** (v0.1): Tenant isolation (replaces PostgreSQL RLS, which MySQL lacks) — task 3, TenantIsolationTest (JWT wiring in task 4)
 - [ ] **SEC-25** (v0.1): Password and token hashes never leave the auth module
 - [ ] **SEC-26** (v0.4): Transactions for multi-step stock changes
-- [ ] **SEC-27** (v0.1): Least-privilege DB users
+- [x] **SEC-27** (v0.1): Least-privilege DB users — task 1+3, DatabasePrivilegesTest
 - [ ] **SEC-28** (v0.1): Audit log on all changes
 - [ ] **SEC-29** (v0.1): Passwords hashed with Argon2id (or BCrypt cost 12)
 - [ ] **SEC-40** (v0.4): Allow-list file types and size per type

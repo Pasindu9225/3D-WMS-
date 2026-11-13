@@ -15,8 +15,8 @@ local db: docker compose -f deploy/docker-compose.yml up mysql
 
 ## Hard rules
 - Plan first, code after approval. One task per session.
-- Every tenant table has tenant_id and uses @TenantId. Never findById in services;
-  use findByPublicIdAndTenant.
+- Every tenant entity extends TenantScoped (@TenantId: Hibernate filters and stamps tenant_id).
+  Never findById in services; use findByPublicId. Cross-tenant lookups only via TenantContext.callAsSystem.
 - Stock changes ONLY through StockMovementService, inside a transaction, with row locks.
 - Request bodies are Java records with Bean Validation. Never bind to entities.
 - No native SQL built with strings. No raw tokens or password hashes in responses or logs.

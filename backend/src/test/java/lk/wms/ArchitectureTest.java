@@ -1,6 +1,8 @@
 package lk.wms;
 
 import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -55,6 +57,19 @@ class ArchitectureTest {
 
     @ArchTest
     static final ArchRule CONSTRUCTOR_INJECTION_ONLY = NO_CLASSES_SHOULD_USE_FIELD_INJECTION;
+
+    /**
+     * SEC-23: no query is built from strings at runtime. Queries live in Spring Data derived
+     * methods or @Query annotations (compile-time constants with :params). Native/raw SQL also
+     * bypasses the @TenantId filter, which is a second reason to block it.
+     */
+    @ArchTest
+    static final ArchRule NO_STRING_BUILT_SQL = noClasses()
+            .should().callMethodWhere(target(nameMatching("create(Native|Stored)?\\w*Query"))
+                    .and(target(owner(assignableTo("jakarta.persistence.EntityManager")))))
+            .orShould().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework.jdbc.core..", "java.sql..")
+            .because("SEC-23: parameterised queries only; also keeps the tenant filter in force");
 
     /** Modules talk to each other only through service packages. */
     @ArchTest
