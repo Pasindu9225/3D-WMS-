@@ -13,6 +13,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -36,6 +37,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     ResponseEntity<Object> handleUnauthenticated(AuthenticationException ex, WebRequest request) {
         return problem(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Authentication required", request);
+    }
+
+    /** SEC-11: own code so the app knows to fetch a fresh token and retry once. */
+    @ExceptionHandler(CsrfException.class)
+    ResponseEntity<Object> handleCsrf(CsrfException ex, WebRequest request) {
+        return problem(HttpStatus.FORBIDDEN, "CSRF_INVALID", "Security token missing or expired. Reload and try again.",
+                request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

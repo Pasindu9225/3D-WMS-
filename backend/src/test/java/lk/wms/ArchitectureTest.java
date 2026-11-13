@@ -8,7 +8,19 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_USE_FIELD_INJECTION;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaField;
+import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
+import com.tngtech.archunit.core.domain.JavaParameter;
+import com.tngtech.archunit.lang.ArchCondition;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -70,6 +82,40 @@ class ArchitectureTest {
             .orShould().dependOnClassesThat().resideInAnyPackage(
                     "org.springframework.jdbc.core..", "java.sql..")
             .because("SEC-23: parameterised queries only; also keeps the tenant filter in force");
+
+    /**
+     * SEC-20 / SEC-22: a request body is a @Valid record (never an entity, so no mass assignment),
+     * and every String in it has a length limit.
+     */
+    @ArchTest
+    static final ArchRule REQUEST_BODIES_ARE_VALIDATED_RECORDS = methods()
+            .that().areDeclaredInClassesThat().areAnnotatedWith(RestController.class)
+            .should(new ArchCondition<JavaMethod>("take only @Valid record bodies with length limits") {
+                @Override
+                public void check(JavaMethod method, ConditionEvents events) {
+                    for (JavaParameter p : method.getParameters()) {
+                        if (!p.isAnnotatedWith(RequestBody.class)) {
+                            continue;
+                        }
+                        JavaClass body = p.getRawType();
+                        String where = method.getFullName() + " body " + body.getSimpleName();
+                        if (!p.isAnnotatedWith(Valid.class)) {
+                            events.add(SimpleConditionEvent.violated(method, where + " is not @Valid (SEC-20)"));
+                        }
+                        if (!body.getRawSuperclass().map(s -> s.isEquivalentTo(Record.class)).orElse(false)) {
+                            events.add(SimpleConditionEvent.violated(method, where + " is not a record (SEC-22)"));
+                        }
+                        for (JavaField f : body.getFields()) {
+                            if (!f.getModifiers().contains(JavaModifier.STATIC) && f.getRawType().isEquivalentTo(String.class)
+                                    && !f.isAnnotatedWith(Size.class) && !f.isAnnotatedWith(Pattern.class)) {
+                                events.add(SimpleConditionEvent.violated(method,
+                                        where + "." + f.getName() + " has no @Size/@Pattern limit (SEC-20)"));
+                            }
+                        }
+                    }
+                }
+            })
+            .allowEmptyShould(true);
 
     /** Modules talk to each other only through service packages. */
     @ArchTest

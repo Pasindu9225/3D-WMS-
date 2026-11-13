@@ -16,6 +16,16 @@ import lk.wms.auth.service.SessionService;
 import lk.wms.auth.service.TokenService;
 import lk.wms.common.security.CurrentUser;
 import lk.wms.common.tenant.TenantFilter;
+import lk.wms.common.web.RateLimiter;
+import lk.wms.common.web.UserRateLimitFilter;
+import org.springframework.security.authorization.AuthorizationManagers;
+import org.springframework.security.web.access.IpAddressAuthorizationManager;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -59,20 +69,43 @@ import org.springframework.web.util.WebUtils;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    static final String CSRF_PATH = "/api/v1/auth/csrf";
+    static final String[] PUBLIC_POSTS = {"/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout"};
+
     /** Public auth endpoints. The access cookie is ignored here so a stale one cannot block login. */
-    static final Set<String> PUBLIC_AUTH = Set.of(
-            "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout");
+    static final Set<String> PUBLIC_AUTH = Set.of(PUBLIC_POSTS[0], PUBLIC_POSTS[1], PUBLIC_POSTS[2], CSRF_PATH);
+
+    /** SEC-61. React sets styles through the DOM, which CSP allows, so no 'unsafe-inline' is needed. */
+    static final String CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:;"
+            + " font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none';"
+            + " base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
     @Bean
     SecurityFilterChain apiSecurity(HttpSecurity http, SessionService sessions, JwtDecoder decoder,
+            RateLimiter rateLimiter, @Value("${wms.cors.allowed-origins:}") List<String> allowedOrigins,
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) throws Exception {
         AuthenticationEntryPoint entryPoint = (req, res, ex) -> resolver.resolveException(req, res, null, ex);
         AccessDeniedHandler denied = (req, res, ex) -> resolver.resolveException(req, res, null, ex);
         http
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // SEC-11: SPA mode = readable XSRF-TOKEN cookie, sent back as the X-XSRF-TOKEN header.
+                .csrf(c -> c.spa().csrfTokenRepository(csrfCookie()))
+                .cors(c -> c.configurationSource(cors(allowedOrigins)))
+                .headers(h -> h
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(CSP))
+                        .httpStrictTransportSecurity(hsts -> hsts.maxAgeInSeconds(31_536_000).includeSubDomains(true))
+                        .referrerPolicy(r -> r.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .frameOptions(f -> f.deny())
+                        .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                                "camera=(self), microphone=(), geolocation=(), payment=()")))
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers("/actuator/health", "/error").permitAll()
-                        .requestMatchers(HttpMethod.POST, PUBLIC_AUTH.toArray(String[]::new)).permitAll()
+                        // SEC-64: health only from the server itself (Nginx never forwards /actuator)
+                        .requestMatchers("/actuator/health").access(AuthorizationManagers.anyOf(
+                                IpAddressAuthorizationManager.hasIpAddress("127.0.0.1"),
+                                IpAddressAuthorizationManager.hasIpAddress("::1")))
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.POST, PUBLIC_POSTS).permitAll()
+                        .requestMatchers(HttpMethod.GET, CSRF_PATH).permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o
                         .bearerTokenResolver(cookieTokenResolver())
@@ -80,8 +113,33 @@ public class SecurityConfig {
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(denied))
                 .exceptionHandling(e -> e.authenticationEntryPoint(entryPoint).accessDeniedHandler(denied))
-                .addFilterAfter(new TenantFilter(), BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(new TenantFilter(), BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(new UserRateLimitFilter(rateLimiter), TenantFilter.class);
         return http.build();
+    }
+
+    private static CookieCsrfTokenRepository csrfCookie() {
+        CookieCsrfTokenRepository repo = CookieCsrfTokenRepository.withHttpOnlyFalse(); // JS must read it
+        repo.setCookieCustomizer(c -> c.secure(true).sameSite("Strict").path("/"));
+        return repo;
+    }
+
+    /** SEC-62: exact origins only, credentials allowed. Empty list = no cross-origin access at all. */
+    public static CorsConfigurationSource cors(List<String> allowedOrigins) {
+        List<String> origins = allowedOrigins.stream().map(String::trim).filter(o -> !o.isEmpty()).toList();
+        if (origins.stream().anyMatch(o -> o.contains("*"))) {
+            throw new IllegalStateException("wms.cors.allowed-origins must list exact origins, no wildcards");
+        }
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(origins);
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE"));
+        config.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "Idempotency-Key"));
+        config.setExposedHeaders(List.of("X-Correlation-Id", "Retry-After"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", config);
+        return source;
     }
 
     private static BearerTokenResolver cookieTokenResolver() {

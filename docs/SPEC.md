@@ -217,7 +217,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] MySQL + Flyway: `tenant`, `app_user`, `role`, `permission`, `user_role`, `user_session`, `refresh_token`, `audit_log`, `login_attempt`
 - [x] Tenant context from JWT + Hibernate `@TenantId` (SEC-24)
 - [x] Auth: login, refresh with rotation and reuse detection, logout, logout-all, lockout (SEC-01 to SEC-08, SEC-29)
-- [ ] CSRF, CORS, security headers, rate limits, global error handler with correlation IDs (SEC-11, SEC-60 to SEC-65, SEC-67)
+- [x] CSRF, CORS, security headers, rate limits, global error handler with correlation IDs (SEC-11, SEC-60 to SEC-65, SEC-67)
 - [ ] Users and roles API: invite user, set roles, disable user; seed 8 built-in roles
 - [ ] Audit log service used by every write (SEC-28)
 - [ ] Frontend skeleton: Vite, React 19, Tailwind, shadcn/ui, dark mode, router, `en.json`

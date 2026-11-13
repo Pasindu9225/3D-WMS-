@@ -44,6 +44,10 @@ public abstract class IntegrationTest {
         registry.add("spring.flyway.password", () -> FLYWAY_PASSWORD);
         registry.add("wms.jwt.private-key", () -> KEYS.resolve("jwt.key").toUri().toString());
         registry.add("wms.jwt.public-key", () -> KEYS.resolve("jwt.pub").toUri().toString());
+        // high limits so suites do not trip each other; RateLimitTest checks the limiter directly
+        registry.add("wms.rate-limit.global-per-minute", () -> "100000");
+        registry.add("wms.rate-limit.login-per-minute", () -> "100000");
+        registry.add("wms.rate-limit.user-per-minute", () -> "100000");
     }
 
     /** Fresh RS256 key pair per test run, so tests never depend on real keys. */

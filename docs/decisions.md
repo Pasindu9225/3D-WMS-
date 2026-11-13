@@ -21,3 +21,8 @@
 | 2026-11-13 | Lockout: 5 failures per account (15 min, doubling, max 24 h); 20 failures per IP per 15 min | Offices share one NAT IP, so the IP limit must be higher than the account limit |
 | 2026-11-13 | Argon2id via BouncyCastle 1.86 (`bcprov-jdk18on`) | Spec names Argon2PasswordEncoder; library only, no new server |
 | 2026-11-13 | Logout accepts either cookie; never fails | A user with an expired access token can still log out |
+| 2026-11-13 | CSRF via Spring Security `csrf().spa()`: readable `XSRF-TOKEN` cookie (Secure, SameSite=Strict) + `X-XSRF-TOKEN` header; `GET /api/v1/auth/csrf` primes it | Standard double-submit for a cookie-auth SPA; failures return `CSRF_INVALID` so the app can refetch |
+| 2026-11-13 | Login limit applies to `POST /auth/login` only; refresh counts toward the global per-IP limit | Each open tab refreshes every 15 min; counting refreshes as logins would lock out shared office IPs |
+| 2026-11-13 | `/actuator/health` allowed only from 127.0.0.1 / ::1 (same port) | SEC-64 without a second management port; Nginx must not forward /actuator and must set forwarded headers |
+| 2026-11-13 | JSON bodies capped at 1 MB; chunked bodies without Content-Length refused (411) | The cap must be checked before reading; browsers always send a length |
+| 2026-11-13 | Bucket4j 8.21.0 (local buckets in Caffeine) | SEC-60 without Redis; per-JVM counts are fine for one server |

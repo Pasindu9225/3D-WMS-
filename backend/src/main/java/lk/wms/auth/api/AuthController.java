@@ -14,6 +14,7 @@ import lk.wms.common.web.RequestInfo;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,6 +40,14 @@ public class AuthController {
 
     public AuthController(AuthService auth) {
         this.auth = auth;
+    }
+
+    /** SEC-11: the app calls this once on start so the XSRF-TOKEN cookie exists before the first POST. */
+    @GetMapping("/csrf")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<Void> csrf(CsrfToken token) {
+        token.getToken(); // loading the deferred token writes the cookie
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/login")

@@ -13,10 +13,10 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-08** (v0.1): Logout revokes session and token family; clear both cookies — task 4, AuthFlowTest
 - [ ] **SEC-09** (v0.1): Role and permission check on every endpoint; deny by default
 - [ ] **SEC-10** (v0.1): No IDOR: every lookup by ID also checks tenant and warehouse access
-- [ ] **SEC-11** (v0.1): CSRF protection for cookie auth
-- [ ] **SEC-20** (v0.1): Validate all input on the server
-- [ ] **SEC-21** (v0.1): Unknown JSON fields rejected
-- [ ] **SEC-22** (v0.1): No mass assignment
+- [x] **SEC-11** (v0.1): CSRF protection for cookie auth — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
+- [x] **SEC-20** (v0.1): Validate all input on the server — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
+- [x] **SEC-21** (v0.1): Unknown JSON fields rejected — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
+- [x] **SEC-22** (v0.1): No mass assignment — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-23** (v0.1): Parameterised queries only — task 3, ArchUnit NO_STRING_BUILT_SQL + self-test
 - [x] **SEC-24** (v0.1): Tenant isolation (replaces PostgreSQL RLS, which MySQL lacks) — task 3, TenantIsolationTest (JWT wiring in task 4)
 - [x] **SEC-25** (v0.1): Password and token hashes never leave the auth module — task 4, AuthFlowTest
@@ -31,12 +31,12 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [ ] **SEC-44** (v0.4): Random file names, stored outside the web root
 - [ ] **SEC-45** (v0.4): Upload rate limit per user
 - [ ] **SEC-46** (v0.4): CSV import safety
-- [ ] **SEC-60** (v0.1): Rate limits
-- [ ] **SEC-61** (v0.1): Security headers
-- [ ] **SEC-62** (v0.1): CORS allow-list, no wildcard
+- [x] **SEC-60** (v0.1): Rate limits — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
+- [x] **SEC-61** (v0.1): Security headers — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
+- [x] **SEC-62** (v0.1): CORS allow-list, no wildcard — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-63** (v0.1): Global exception handler: generic errors, no stack traces — task 2, ErrorHandlingTest
-- [ ] **SEC-64** (v0.1): Hide server information
-- [ ] **SEC-65** (v0.1): Request limits
+- [x] **SEC-64** (v0.1): Hide server information — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
+- [x] **SEC-65** (v0.1): Request limits — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [ ] **SEC-66** (v1.0): HTTPS everywhere
 - [x] **SEC-67** (v0.1): Graceful shutdown and 404 for unknown routes — task 2, ErrorHandlingTest
 - [ ] **SEC-80** (v0.1): Secrets only in environment variables or files outside Git; `.env` in `.gitignore`; gitleaks in CI
