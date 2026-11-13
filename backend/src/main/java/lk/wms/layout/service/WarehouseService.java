@@ -79,6 +79,16 @@ public class WarehouseService {
         return new WarehouseRef(w.getId(), w.getPublicId(), w.getCode());
     }
 
+    /** Same check by internal ID, for records that point at a warehouse (bins, later stock). */
+    @Transactional(readOnly = true)
+    public void requireAccess(CurrentUser cu, long warehouseId) {
+        boolean ok = warehouses.existsActive(warehouseId) // a query: the tenant filter applies
+                && (cu.isTenantAdmin() || warehouses.isAssigned(warehouseId, cu.userId()));
+        if (!ok) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "WAREHOUSE_NOT_FOUND", "Warehouse not found");
+        }
+    }
+
     // ---------------------------------------------------------------- changes
 
     @Transactional

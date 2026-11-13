@@ -82,6 +82,13 @@ public class RackTemplateService {
                 .collect(Collectors.toMap(RackTemplate::getPublicId, t -> new Footprint(t.getWidthMm(), t.getDepthMm())));
     }
 
+    /** Entities by public ID, for publish (same module). */
+    @Transactional(readOnly = true)
+    public Map<String, RackTemplate> entities(Collection<String> publicIds) {
+        return templates.findByPublicIdIn(publicIds).stream()
+                .collect(Collectors.toMap(RackTemplate::getPublicId, Function.identity()));
+    }
+
     @Transactional(readOnly = true)
     public Map<String, TemplateView> views(Collection<String> publicIds) {
         return templates.findByPublicIdIn(publicIds).stream().map(RackTemplateService::view)

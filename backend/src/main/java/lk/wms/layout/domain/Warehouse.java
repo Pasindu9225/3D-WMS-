@@ -94,6 +94,13 @@ public class Warehouse extends TenantScoped {
         this.updatedAt = Instant.now();
     }
 
+    /** The published floor becomes the warehouse outline. */
+    public void publish(String floorPolygonJson) {
+        this.floorPolygon = floorPolygonJson;
+        this.layoutStatus = LayoutStatus.PUBLISHED;
+        this.updatedAt = Instant.now();
+    }
+
     public void archive() {
         this.deletedAt = Instant.now();
         this.updatedAt = deletedAt;

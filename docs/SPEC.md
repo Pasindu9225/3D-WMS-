@@ -240,9 +240,9 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [ ] Draw zones with type (receiving, storage, picking, dispatch, quarantine, cold)
 - [ ] Rack templates: size, levels, bins per level, max weight per level
 - [ ] Place racks: drag, snap, rotate 90°, duplicate row, aisle-width warning, overlap check
-- [ ] Auto-generate levels and bins with a naming pattern (`{zone}-{rack}-{level}-{bin}`)
+- [x] Auto-generate levels and bins with a naming pattern (`{zone}-{rack}-{level}-{bin}`)
 - [ ] Edit single bin: capacity, blocked, pick face
-- [ ] Draft → publish layout; cannot delete racks or bins that hold stock (checked again in v0.4)
+- [x] Draft → publish layout; cannot delete racks or bins that hold stock (checked again in v0.4)
 - [ ] Bin label PDF (QR code + human-readable code), A4 sheets and single labels
 
 **Deliverables:** layout editor, rack template library, label printing, layout saved as data (no images).
@@ -597,8 +597,8 @@ REST over JSON under `/api/v1`, cookie-authenticated, documented by springdoc in
 | Auth | `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all`, `GET /auth/me`, `POST /auth/password/change` | v0.1 |
 | Users and roles | `GET/POST /users`, `PATCH /users/{id}`, `POST /users/{id}/disable`, `GET /roles`, `PUT /users/{id}/roles` | v0.1 |
 | Audit | `GET /audit-logs?entity=&user=&from=&to=` | v0.1 |
-| Warehouses | `GET/POST /warehouses`, `GET/PATCH /warehouses/{id}`, `POST /warehouses/{id}/publish` | v0.2 |
-| Layout | `GET/PUT /warehouses/{id}/layout` (zones + racks in one draft save), `GET/POST /rack-templates`, `POST /warehouses/{id}/bins/generate`, `PATCH /bins/{id}`, `GET /warehouses/{id}/labels.pdf` | v0.2 |
+| Warehouses | `GET/POST /warehouses`, `GET/PATCH /warehouses/{id}`, `POST /warehouses/{id}/archive`, `GET/PUT /warehouses/{id}/users` (access) | v0.2 |
+| Layout | `GET/PUT /warehouses/{id}/layout` (whole draft, with `baseRevision`), `POST /warehouses/{id}/layout/publish` (generates levels and bins), `GET/POST /rack-templates`, `PUT /rack-templates/{id}`, `GET /warehouses/{id}/bins`, `PATCH /bins/{id}`, `GET /warehouses/{id}/labels.pdf` | v0.2 |
 | 3D data | `GET /warehouses/{id}/scene` (compact arrays for instancing), `GET /warehouses/{id}/bin-status` | v0.3 |
 | Catalog | `GET/POST /products`, `PATCH /products/{id}`, `POST /products/import`, `POST /products/{id}/image`, `GET/POST /partners` | v0.4 |
 | Inbound | `GET/POST /purchase-orders`, `POST /purchase-orders/{id}/approve`, `POST /receipts`, `POST /receipts/{id}/lines` (scan), `POST /receipts/{id}/close` | v0.4 |

@@ -79,6 +79,12 @@ public class LayoutVersion extends TenantScoped {
         this.updatedAt = Instant.now();
     }
 
+    public void markPublished(long userId) {
+        this.status = Status.PUBLISHED;
+        this.publishedBy = userId;
+        this.publishedAt = Instant.now();
+    }
+
     public Status getStatus() {
         return status;
     }

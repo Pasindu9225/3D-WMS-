@@ -57,3 +57,7 @@
 | 2026-11-13 | Layout checks: errors (outline crosses itself, outside floor/zone, overlaps, duplicate codes, unknown type/zone, door not on wall) refuse the save; narrow aisles only warn (minimum per layout, default 1.2 m; back-to-back racks not flagged) | Planners may want tight aisles for hand picking; overlaps are never valid |
 | 2026-11-13 | Draft saves carry `baseRevision`; a stale save gets 409 LAYOUT_CHANGED | Two planners editing at once cannot silently overwrite each other |
 | 2026-11-13 | Validation errors list `{field, message}` also when Spring validates the whole method (constrained path variable) | Bug found in task 2: those endpoints (incl. PATCH /users/{id}) returned no field list |
+| 2026-11-13 | Publish matches zones/racks by code, levels by number, bins by position: an existing bin keeps its id (and later its stock) when its rack moves; only its code changes | Stock and history must survive layout edits; labels are reprinted after a rename |
+| 2026-11-13 | Bin capacity from the rack type: level weight / bins per level; volume = bin width x depth x level height. A hand-edited bin keeps its values on later publishes | Sensible defaults with room for real-world exceptions |
+| 2026-11-13 | Publish parks changing bin codes on a temporary value first | Codes can move between bins without breaking the unique key mid-publish |
+| 2026-11-13 | Measured: 100 racks / 5,000 bins first publish 3.9 s, republish 0.2 s, draft check 0.1 s (local MySQL) | IDENTITY keys mean one insert per new bin; fine at this size |

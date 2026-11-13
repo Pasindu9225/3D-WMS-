@@ -28,6 +28,10 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Long> {
     @Query("select count(uw) > 0 from UserWarehouse uw where uw.warehouseId = :warehouseId and uw.userId = :userId")
     boolean isAssigned(@Param("warehouseId") long warehouseId, @Param("userId") long userId);
 
+    /** Not archived and in the caller's company (HQL, so @TenantId and @SQLRestriction apply). */
+    @Query("select count(w) > 0 from Warehouse w where w.id = :id")
+    boolean existsActive(@Param("id") long id);
+
     /** Active (not archived) warehouses: what the plan limit counts. */
     @Query("select count(w) from Warehouse w")
     long countActive();
