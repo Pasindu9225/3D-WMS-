@@ -17,6 +17,7 @@
 	<properties>
 		<java.version>17</java.version>
 		<archunit.version>1.4.1</archunit.version>
+		<bouncycastle.version>1.86</bouncycastle.version>
 	</properties>
 
 	<dependencies>
@@ -35,6 +36,24 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-resource-server</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-jose</artifactId>
+		</dependency>
+		<dependency>
+			<!-- Argon2PasswordEncoder needs it (SEC-29) -->
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>${bouncycastle.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

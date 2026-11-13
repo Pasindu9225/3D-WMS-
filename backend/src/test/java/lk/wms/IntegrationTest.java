@@ -1,5 +1,10 @@
 package lk.wms;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.util.Base64;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -26,6 +31,8 @@ public abstract class IntegrationTest {
             .withCommand("--skip-log-bin", "--character-set-server=utf8mb4",
                     "--collation-server=utf8mb4_0900_ai_ci");
 
+    private static final Path KEYS = testKeys();
+
     static {
         MYSQL.start(); // stopped by Testcontainers' Ryuk when the JVM exits
     }
@@ -35,5 +42,28 @@ public abstract class IntegrationTest {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
         registry.add("spring.datasource.password", () -> APP_PASSWORD);
         registry.add("spring.flyway.password", () -> FLYWAY_PASSWORD);
+        registry.add("wms.jwt.private-key", () -> KEYS.resolve("jwt.key").toUri().toString());
+        registry.add("wms.jwt.public-key", () -> KEYS.resolve("jwt.pub").toUri().toString());
+    }
+
+    /** Fresh RS256 key pair per test run, so tests never depend on real keys. */
+    private static Path testKeys() {
+        try {
+            KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
+            gen.initialize(2048);
+            KeyPair kp = gen.generateKeyPair();
+            Path dir = Files.createTempDirectory("wms-test-keys");
+            Files.writeString(dir.resolve("jwt.key"), pem("PRIVATE KEY", kp.getPrivate().getEncoded()));
+            Files.writeString(dir.resolve("jwt.pub"), pem("PUBLIC KEY", kp.getPublic().getEncoded()));
+            return dir;
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static String pem(String type, byte[] der) {
+        return "-----BEGIN " + type + "-----\n"
+                + Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(der)
+                + "\n-----END " + type + "-----\n";
     }
 }

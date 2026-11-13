@@ -16,3 +16,8 @@
 | 2026-11-13 | Tenant via Hibernate `@TenantId` + `TenantContext`; no tenant = fail closed (-1), root (0) only via `callAsSystem` | Repos need no tenant parameter (`findByPublicId`); login/refresh lookups happen before the tenant is known |
 | 2026-11-13 | Built-in roles and permissions are global tables; `user_role` carries tenant_id | Spec has no per-tenant custom roles; keeps seeding simple |
 | 2026-11-13 | `login_attempt` stores SHA-256 of the email, not the email | Users sometimes type their password into the email field |
+| 2026-11-13 | JWT `tid` = internal tenant ID; permissions NOT in the JWT, loaded with the session check (60 s cache) | No extra lookup per request; role changes apply within 60 s instead of 15 min |
+| 2026-11-13 | Cookies `__Host-wms_at` (Path=/) and `__Secure-wms_rt` (Path=/api/v1/auth) | Browser-enforced Secure/no-Domain; refresh token never sent to normal API calls |
+| 2026-11-13 | Lockout: 5 failures per account (15 min, doubling, max 24 h); 20 failures per IP per 15 min | Offices share one NAT IP, so the IP limit must be higher than the account limit |
+| 2026-11-13 | Argon2id via BouncyCastle 1.86 (`bcprov-jdk18on`) | Spec names Argon2PasswordEncoder; library only, no new server |
+| 2026-11-13 | Logout accepts either cookie; never fails | A user with an expired access token can still log out |

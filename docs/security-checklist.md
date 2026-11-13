@@ -3,14 +3,14 @@
 Source: docs/SPEC.md, section "Security requirements" (based on The Secure Backend Master-Vault).
 Tick a rule only when it is implemented AND covered by a test. Note the PR or commit.
 
-- [ ] **SEC-01** (v0.1): Tokens only in HTTP-only cookies, never localStorage or sessionStorage
-- [ ] **SEC-02** (v0.1): Access token: RS256 JWT, 15 minutes, minimal claims
-- [ ] **SEC-03** (v0.1): Refresh token: random opaque string, 7 days, stored hashed (SHA-256)
-- [ ] **SEC-04** (v0.1): Rotate refresh token on every use; reuse of an old token revokes the whole family
-- [ ] **SEC-05** (v0.1): Session check on every request
-- [ ] **SEC-06** (v0.1): Lockout after 5 failed logins, 15 minutes, growing backoff
-- [ ] **SEC-07** (v0.1): Generic error messages
-- [ ] **SEC-08** (v0.1): Logout revokes session and token family; clear both cookies
+- [x] **SEC-01** (v0.1): Tokens only in HTTP-only cookies, never localStorage or sessionStorage — task 4, AuthFlowTest
+- [x] **SEC-02** (v0.1): Access token: RS256 JWT, 15 minutes, minimal claims — task 4, AuthFlowTest
+- [x] **SEC-03** (v0.1): Refresh token: random opaque string, 7 days, stored hashed (SHA-256) — task 4, AuthFlowTest
+- [x] **SEC-04** (v0.1): Rotate refresh token on every use; reuse of an old token revokes the whole family — task 4, AuthFlowTest
+- [x] **SEC-05** (v0.1): Session check on every request — task 4, AuthFlowTest
+- [x] **SEC-06** (v0.1): Lockout after 5 failed logins, 15 minutes, growing backoff — task 4, AuthFlowTest
+- [x] **SEC-07** (v0.1): Generic error messages — task 4, AuthFlowTest
+- [x] **SEC-08** (v0.1): Logout revokes session and token family; clear both cookies — task 4, AuthFlowTest
 - [ ] **SEC-09** (v0.1): Role and permission check on every endpoint; deny by default
 - [ ] **SEC-10** (v0.1): No IDOR: every lookup by ID also checks tenant and warehouse access
 - [ ] **SEC-11** (v0.1): CSRF protection for cookie auth
@@ -19,11 +19,11 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [ ] **SEC-22** (v0.1): No mass assignment
 - [x] **SEC-23** (v0.1): Parameterised queries only — task 3, ArchUnit NO_STRING_BUILT_SQL + self-test
 - [x] **SEC-24** (v0.1): Tenant isolation (replaces PostgreSQL RLS, which MySQL lacks) — task 3, TenantIsolationTest (JWT wiring in task 4)
-- [ ] **SEC-25** (v0.1): Password and token hashes never leave the auth module
+- [x] **SEC-25** (v0.1): Password and token hashes never leave the auth module — task 4, AuthFlowTest
 - [ ] **SEC-26** (v0.4): Transactions for multi-step stock changes
 - [x] **SEC-27** (v0.1): Least-privilege DB users — task 1+3, DatabasePrivilegesTest
 - [ ] **SEC-28** (v0.1): Audit log on all changes
-- [ ] **SEC-29** (v0.1): Passwords hashed with Argon2id (or BCrypt cost 12)
+- [x] **SEC-29** (v0.1): Passwords hashed with Argon2id (or BCrypt cost 12) — task 4, AuthFlowTest
 - [ ] **SEC-40** (v0.4): Allow-list file types and size per type
 - [ ] **SEC-41** (v0.4): Check magic bytes and match them with Content-Type and extension
 - [ ] **SEC-42** (v0.4): Block SVG and HTML

@@ -36,6 +36,17 @@ public final class TenantContext {
         return id != null ? id : NONE;
     }
 
+    /** For TenantFilter, which wraps a servlet chain that throws checked exceptions. */
+    static Long swap(Long tenantId) {
+        Long previous = CURRENT.get();
+        if (tenantId == null) {
+            CURRENT.remove();
+        } else {
+            CURRENT.set(tenantId);
+        }
+        return previous;
+    }
+
     private static <T> T run(Long tenantId, Supplier<T> work) {
         Long previous = CURRENT.get();
         CURRENT.set(tenantId);

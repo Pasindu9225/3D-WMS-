@@ -139,7 +139,7 @@ Each rule has an ID. Claude Code must name the IDs it implements in each pull re
 
 | ID | Rule | How we build it | From |
 | --- | --- | --- | --- |
-| SEC-01 | Tokens only in HTTP-only cookies, never localStorage or sessionStorage | Access cookie `HttpOnly; Secure; SameSite=Lax; Path=/`; refresh cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/auth` | v0.1 |
+| SEC-01 | Tokens only in HTTP-only cookies, never localStorage or sessionStorage | Access cookie `HttpOnly; Secure; SameSite=Lax; Path=/`; refresh cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | v0.1 |
 | SEC-02 | Access token: RS256 JWT, 15 minutes, minimal claims | Claims: `sub` (userId), `tid` (tenantId), `sid` (sessionId), `roles`. Keys from files, never in Git | v0.1 |
 | SEC-03 | Refresh token: random opaque string, 7 days, stored hashed (SHA-256) | Table `refresh_token` with `family_id`, `session_id`, `expires_at`, `revoked_at` | v0.1 |
 | SEC-04 | Rotate refresh token on every use; reuse of an old token revokes the whole family | Detect reuse → revoke family → audit log `TOKEN_REUSE` | v0.1 |
@@ -215,8 +215,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Create monorepo, `CLAUDE.md`, `docs/SPEC.md`, `.gitignore`, `.editorconfig`
 - [x] Backend skeleton: Spring Boot 4.1, Java 17, module packages, ArchUnit rules
 - [x] MySQL + Flyway: `tenant`, `app_user`, `role`, `permission`, `user_role`, `user_session`, `refresh_token`, `audit_log`, `login_attempt`
-- [ ] Tenant context from JWT + Hibernate `@TenantId` (SEC-24)
-- [ ] Auth: login, refresh with rotation and reuse detection, logout, logout-all, lockout (SEC-01 to SEC-08, SEC-29)
+- [x] Tenant context from JWT + Hibernate `@TenantId` (SEC-24)
+- [x] Auth: login, refresh with rotation and reuse detection, logout, logout-all, lockout (SEC-01 to SEC-08, SEC-29)
 - [ ] CSRF, CORS, security headers, rate limits, global error handler with correlation IDs (SEC-11, SEC-60 to SEC-65, SEC-67)
 - [ ] Users and roles API: invite user, set roles, disable user; seed 8 built-in roles
 - [ ] Audit log service used by every write (SEC-28)
