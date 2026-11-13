@@ -39,8 +39,8 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-65** (v0.1): Request limits — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [ ] **SEC-66** (v1.0): HTTPS everywhere
 - [x] **SEC-67** (v0.1): Graceful shutdown and 404 for unknown routes — task 2, ErrorHandlingTest
-- [ ] **SEC-80** (v0.1): Secrets only in environment variables or files outside Git; `.env` in `.gitignore`; gitleaks in CI
-- [ ] **SEC-81** (v0.1): Dependency scan in CI (OWASP Dependency-Check, `npm audit`), fail on high severity
+- [x] **SEC-80** (v0.1): Secrets only in environment variables or files outside Git; `.env` in `.gitignore`; gitleaks in CI — task 9 (history scanned: no leaks)
+- [x] **SEC-81** (v0.1): Dependency scan in CI (OSV-Scanner instead of OWASP Dependency-Check, `npm audit`), fail on high severity — task 9
 - [ ] **SEC-82** (Every version): Pre-release AI security review of the whole diff, then a manual check against this list
 - [ ] **SEC-83** (v1.0): Daily encrypted MySQL backups kept 30 days; restore tested monthly
 - [ ] **SEC-84** (v1.0): Incident response notes: how to revoke all sessions, rotate keys, restore backup

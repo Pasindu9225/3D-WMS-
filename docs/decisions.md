@@ -40,3 +40,7 @@
 | 2026-11-13 | Signed-in state = the `/auth/me` query (TanStack Query); no Zustand yet | One source of truth; Zustand added when real client-only state appears |
 | 2026-11-13 | Invite page reads the token from `#fragment` and clears it from the address bar at once | Keeps the one-time token out of history, screenshots and shared links |
 | 2026-11-13 | Built-in roles shown as a read-only permission matrix | Roles are fixed (task 6); people get several roles instead of custom ones |
+| 2026-11-13 | Dependency scan with OSV-Scanner (backend CycloneDX SBOM + npm lockfile) and `npm audit --audit-level=high`, not OWASP Dependency-Check | Dependency-Check needs an NVD API key or downloads the whole NVD database on every run (slow, rate-limited); OSV needs no key. Switch back if an NVD key is provided |
+| 2026-11-13 | CI actions pinned to commit SHAs; versions about a month old | A moved or hijacked tag cannot run new code in CI; stable over newest |
+| 2026-11-13 | `backend/mvnw` stored with the executable bit (git update-index --chmod=+x) | Commits from Windows drop it; Linux CI could not run the Maven wrapper |
+| 2026-11-13 | npm `overrides`: minimatch ^11.0.1 | Fixes GHSA-g3hv-75wg-m249 (ReDoS) in ESLint's dependency chain; lint verified working; npm audit now 0 findings |

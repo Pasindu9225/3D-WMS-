@@ -222,7 +222,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Audit log service used by every write (SEC-28)
 - [x] Frontend skeleton: Vite, React 19, Tailwind, shadcn/ui, dark mode, router, `en.json`
 - [x] Login page, app layout (sidebar, top bar), users and roles pages
-- [ ] CI: build, tests, ArchUnit, gitleaks, dependency scan, bundle size check (SEC-80, SEC-81)
+- [x] CI: build, tests, ArchUnit, gitleaks, dependency scan, bundle size check (SEC-80, SEC-81)
 
 **Deliverables:** running app on `localhost` with login, user management, role management, audit log screen; CI green; security tests for every SEC rule above.
 
