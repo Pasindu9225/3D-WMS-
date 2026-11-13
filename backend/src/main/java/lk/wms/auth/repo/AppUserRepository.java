@@ -1,7 +1,10 @@
 package lk.wms.auth.repo;
 
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.Optional;
 import lk.wms.auth.domain.AppUser;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,6 +24,21 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     /** Login lookup: call inside TenantContext.callAsSystem, since the tenant is not known yet. */
     Optional<AppUser> findByEmail(String email);
+
+    /** Spring escapes % and _ in "Containing", so the search text is matched literally. */
+    Page<AppUser> findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(String name, String email,
+            Pageable pageable);
+
+    List<AppUser> findByIdIn(Collection<Long> ids);
+
+    /**
+     * Locks every active holder of a role, so two admins cannot remove each other at the same moment
+     * and leave the company with none.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from AppUser u, UserRole ur where ur.userId = u.id and ur.roleId = :roleId"
+            + " and u.status = lk.wms.auth.domain.AppUser.Status.ACTIVE")
+    List<AppUser> lockActiveWithRole(@Param("roleId") long roleId);
 
     // Role tables are global (not tenant data), so native SQL with :params is fine here.
     // ponytail: replace with entity queries if roles become per-tenant.

@@ -141,4 +141,28 @@ public class AppUser extends TenantScoped {
         this.passwordHash = newHash;
         this.updatedAt = Instant.now();
     }
+
+    /** The invited user set their password through the invite link. */
+    public void acceptInvite(String newHash) {
+        this.passwordHash = newHash;
+        this.status = Status.ACTIVE;
+        this.updatedAt = Instant.now();
+    }
+
+    public void disable() {
+        this.status = Status.DISABLED;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Back to ACTIVE, or to INVITED if they never set a password. Also clears any lockout. */
+    public void enable(boolean hasSetPassword) {
+        this.status = hasSetPassword ? Status.ACTIVE : Status.INVITED;
+        this.failedLogins = 0;
+        this.lockedUntil = null;
+        this.updatedAt = Instant.now();
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
 }

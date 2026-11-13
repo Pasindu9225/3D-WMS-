@@ -11,8 +11,8 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-06** (v0.1): Lockout after 5 failed logins, 15 minutes, growing backoff — task 4, AuthFlowTest
 - [x] **SEC-07** (v0.1): Generic error messages — task 4, AuthFlowTest
 - [x] **SEC-08** (v0.1): Logout revokes session and token family; clear both cookies — task 4, AuthFlowTest
-- [ ] **SEC-09** (v0.1): Role and permission check on every endpoint; deny by default
-- [ ] **SEC-10** (v0.1): No IDOR: every lookup by ID also checks tenant and warehouse access
+- [x] **SEC-09** (v0.1): Role and permission check on every endpoint; deny by default — task 6, UserManagementTest + ArchUnit
+- [ ] **SEC-10** (v0.1): No IDOR: every lookup by ID also checks tenant and warehouse access — tenant part done (TenantIsolationTest, UserManagementTest); warehouse access in v0.2
 - [x] **SEC-11** (v0.1): CSRF protection for cookie auth — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-20** (v0.1): Validate all input on the server — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-21** (v0.1): Unknown JSON fields rejected — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
@@ -22,7 +22,7 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-25** (v0.1): Password and token hashes never leave the auth module — task 4, AuthFlowTest
 - [ ] **SEC-26** (v0.4): Transactions for multi-step stock changes
 - [x] **SEC-27** (v0.1): Least-privilege DB users — task 1+3, DatabasePrivilegesTest
-- [ ] **SEC-28** (v0.1): Audit log on all changes
+- [x] **SEC-28** (v0.1): Audit log on all changes — task 6, UserManagementTest + ArchUnit
 - [x] **SEC-29** (v0.1): Passwords hashed with Argon2id (or BCrypt cost 12) — task 4, AuthFlowTest
 - [ ] **SEC-40** (v0.4): Allow-list file types and size per type
 - [ ] **SEC-41** (v0.4): Check magic bytes and match them with Content-Type and extension

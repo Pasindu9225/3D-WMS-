@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import lk.wms.auth.service.AuthService;
 import lk.wms.auth.service.AuthService.LoginResult;
 import lk.wms.auth.service.AuthService.Me;
+import lk.wms.auth.service.UserService;
 import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
 import lk.wms.common.web.RequestInfo;
@@ -36,10 +37,25 @@ public class AuthController {
             @NotBlank @Size(min = 10, max = 128) String newPassword) {
     }
 
-    private final AuthService auth;
+    public record AcceptInviteRequest(
+            @NotBlank @Size(max = 100) String token,
+            @NotBlank @Size(min = 10, max = 128) String password) {
+    }
 
-    public AuthController(AuthService auth) {
+    private final AuthService auth;
+    private final UserService users;
+
+    public AuthController(AuthService auth, UserService users) {
         this.auth = auth;
+        this.users = users;
+    }
+
+    /** Public: the invited person sets their password from the one-time link. */
+    @PostMapping("/invite/accept")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<Void> acceptInvite(@Valid @RequestBody AcceptInviteRequest body) {
+        users.acceptInvite(body.token(), body.password());
+        return ResponseEntity.noContent().build();
     }
 
     /** SEC-11: the app calls this once on start so the XSRF-TOKEN cookie exists before the first POST. */

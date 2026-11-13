@@ -3,9 +3,15 @@ package lk.wms.auth.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import lk.wms.auth.repo.RefreshTokenRepository;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import lk.wms.auth.domain.AppUser;
 import lk.wms.auth.domain.UserSession;
 import lk.wms.auth.repo.AppUserRepository;
@@ -30,11 +36,14 @@ public class SessionService {
             .build();
 
     private final UserSessionRepository sessions;
+    private final RefreshTokenRepository refreshTokens;
     private final AppUserRepository users;
     private final TransactionTemplate readTx;
 
-    public SessionService(UserSessionRepository sessions, AppUserRepository users, PlatformTransactionManager tm) {
+    public SessionService(UserSessionRepository sessions, RefreshTokenRepository refreshTokens,
+            AppUserRepository users, PlatformTransactionManager tm) {
         this.sessions = sessions;
+        this.refreshTokens = refreshTokens;
         this.users = users;
         this.readTx = new TransactionTemplate(tm);
         this.readTx.setReadOnly(true);
@@ -46,6 +55,47 @@ public class SessionService {
 
     public void evict(Collection<String> sessionIds) {
         cache.invalidateAll(sessionIds);
+    }
+
+    /**
+     * Evicts once the current transaction commits, so a parallel request cannot re-cache the old
+     * state in between. Outside a transaction it evicts at once.
+     */
+    public void evictAfterCommit(Collection<String> sessionIds) {
+        if (sessionIds.isEmpty()) {
+            return;
+        }
+        List<String> ids = List.copyOf(sessionIds);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            evict(ids);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                evict(ids);
+            }
+        });
+    }
+
+    /** Must run in a transaction in the user's tenant. Revokes sessions and their refresh tokens. */
+    public List<String> revokeAll(long userId, String keepSessionId) {
+        Instant now = Instant.now();
+        List<String> ids = new ArrayList<>();
+        for (UserSession s : sessions.findActiveByUserId(userId)) {
+            if (!s.getId().equals(keepSessionId)) {
+                s.revoke(now);
+                refreshTokens.revokeBySession(s.getId(), now);
+                ids.add(s.getId());
+            }
+        }
+        evictAfterCommit(ids);
+        return ids;
+    }
+
+    /** Role change: keep the sessions, but drop their cached permissions so the change applies now. */
+    public void refreshPermissions(long userId) {
+        evictAfterCommit(sessions.findActiveByUserId(userId).stream().map(UserSession::getId).toList());
     }
 
     private Optional<CurrentUser> load(String sessionId) {

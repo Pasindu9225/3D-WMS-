@@ -26,3 +26,8 @@
 | 2026-11-13 | `/actuator/health` allowed only from 127.0.0.1 / ::1 (same port) | SEC-64 without a second management port; Nginx must not forward /actuator and must set forwarded headers |
 | 2026-11-13 | JSON bodies capped at 1 MB; chunked bodies without Content-Length refused (411) | The cap must be checked before reading; browsers always send a length |
 | 2026-11-13 | Bucket4j 8.21.0 (local buckets in Caffeine) | SEC-60 without Redis; per-JVM counts are fine for one server |
+| 2026-11-13 | 8 built-in roles and 28 permissions seeded in V2 (matrix approved by owner) | Stable role definitions; later versions only use the permissions, no reseeding |
+| 2026-11-13 | Invites are one-time links (72 h, token hashed, token in the URL #fragment) that the admin sends; no email server | Fragments never reach servers, logs or Referer; email comes with v2.0 sign-up |
+| 2026-11-13 | First company and admin via `--wms.bootstrap.*` command line run, link printed to console once | No public sign-up until v2.0; refuses to run twice for the same email |
+| 2026-11-13 | Email uniqueness enforced by the DB unique key (409 EMAIL_IN_USE) | The tenant filter hides other companies' emails; the key sees all and cannot race |
+| 2026-11-13 | Removing or disabling an admin locks all active admins first | Two admins removing each other at once can never leave a company without an admin |

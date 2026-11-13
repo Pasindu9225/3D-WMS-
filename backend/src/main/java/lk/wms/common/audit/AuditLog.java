@@ -18,7 +18,7 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Immutable
 @Table(name = "audit_log")
-class AuditLog {
+public class AuditLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,6 +39,14 @@ class AuditLog {
     @Column(name = "entity_id", length = 40)
     private String entityId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "before_json")
+    private String beforeJson;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "after_json")
+    private String afterJson;
+
     @Column(length = 45)
     private String ip;
 
@@ -56,15 +64,22 @@ class AuditLog {
     }
 
     AuditLog(Long tenantId, Long userId, String action, String entity, String entityId,
-            String ip, String userAgent, String correlationId) {
+            String beforeJson, String afterJson, String ip, String userAgent, String correlationId) {
         this.tenantId = tenantId;
         this.userId = userId;
         this.action = action;
         this.entity = entity;
         this.entityId = entityId;
+        this.beforeJson = beforeJson;
+        this.afterJson = afterJson;
         this.ip = ip;
         this.userAgent = userAgent;
         this.correlationId = correlationId;
         this.createdAt = Instant.now();
+    }
+
+    AuditService.Entry toEntry() {
+        return new AuditService.Entry(id, userId, action, entity, entityId, beforeJson, afterJson, ip, correlationId,
+                createdAt);
     }
 }

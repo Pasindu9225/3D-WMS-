@@ -256,15 +256,7 @@ public class AuthService {
 
     /** Revokes every active session of the user except {@code keepSessionId}; must run in a tenant tx. */
     private List<String> revokeSessions(CurrentUser cu, String keepSessionId, String action) {
-        Instant now = Instant.now();
-        List<String> ids = new ArrayList<>();
-        for (UserSession s : sessions.findActiveByUserId(cu.userId())) {
-            if (!s.getId().equals(keepSessionId)) {
-                s.revoke(now);
-                refreshTokens.revokeBySession(s.getId(), now);
-                ids.add(s.getId());
-            }
-        }
+        List<String> ids = sessionService.revokeAll(cu.userId(), keepSessionId);
         audit.record(cu.tenantId(), cu.userId(), action, "app_user", cu.userPublicId());
         return ids;
     }
