@@ -1,14 +1,15 @@
 import { OrbitControls } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { ZoneType } from '@/features/warehouses/api'
+import { nearestOnOutline } from '@/features/layout/geometry'
 import type { Scene } from './api'
+import { buildInstances, floorBox, type BoxSpec } from './sceneLayout'
 
-/** Plan millimetres (x right, y down) to scene metres (x right, z towards the viewer, y up). */
 const M = 1 / 1000
 
-const ZONE_COLOR: Record<ZoneType, string> = {
+export const ZONE_COLOR: Record<ZoneType, string> = {
   RECEIVING: '#3b82f6',
   STORAGE: '#64748b',
   PICKING: '#10b981',
@@ -21,34 +22,76 @@ const ZONE_COLOR: Record<ZoneType, string> = {
 function shapeOf(flat: number[]): THREE.Shape {
   const shape = new THREE.Shape()
   for (let i = 0; i < flat.length; i += 2) {
-    const x = flat[i]! * M
-    const y = flat[i + 1]! * M
-    if (i === 0) shape.moveTo(x, y)
-    else shape.lineTo(x, y)
+    if (i === 0) shape.moveTo(flat[i]! * M, flat[i + 1]! * M)
+    else shape.lineTo(flat[i]! * M, flat[i + 1]! * M)
   }
   return shape
 }
 
+const unitBox = new THREE.BoxGeometry(1, 1, 1)
+
+/**
+ * Many boxes, one draw call: a single InstancedMesh whose instances are scaled unit cubes. colors (optional)
+ * gives one colour per instance; otherwise the material colour is used.
+ */
+function Boxes({ specs, color, colors }: { specs: BoxSpec[]; color: string; colors?: THREE.Color[] }) {
+  const mesh = useRef<THREE.InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const m = mesh.current
+    if (!m) return
+    const o = new THREE.Object3D()
+    specs.forEach((s, i) => {
+      o.position.set(s.x, s.y, s.z)
+      o.rotation.set(0, s.rotY, 0)
+      o.scale.set(s.w, s.h, s.d)
+      o.updateMatrix()
+      m.setMatrixAt(i, o.matrix)
+      if (colors) m.setColorAt(i, colors[i]!)
+    })
+    m.instanceMatrix.needsUpdate = true
+    if (m.instanceColor) m.instanceColor.needsUpdate = true
+    m.computeBoundingSphere()
+  }, [specs, colors])
+  if (specs.length === 0) return null
+  return (
+    <instancedMesh ref={mesh} args={[unitBox, undefined, specs.length]} frustumCulled={false}>
+      <meshStandardMaterial color={colors ? '#ffffff' : color} />
+    </instancedMesh>
+  )
+}
+
 /**
  * The 3D warehouse. Renders on demand only (no animation loop), no shadows, pixel ratio capped at 1.5, so it
- * stays light on office laptops (SPEC: performance rules for 3D).
+ * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
+ * draw call each, whatever the number of racks.
  */
 export function SceneCanvas({ scene }: { scene: Scene }) {
   const floor = useMemo(() => new THREE.ShapeGeometry(shapeOf(scene.floor)), [scene.floor])
   const zones = useMemo(() => scene.zones.map((z) => ({ ...z, geometry: new THREE.ShapeGeometry(shapeOf(z.polygon)) })),
     [scene.zones])
-  const box = useMemo(() => {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (let i = 0; i < scene.floor.length; i += 2) {
-      minX = Math.min(minX, scene.floor[i]!); maxX = Math.max(maxX, scene.floor[i]!)
-      minY = Math.min(minY, scene.floor[i + 1]!); maxY = Math.max(maxY, scene.floor[i + 1]!)
-    }
-    return { cx: ((minX + maxX) / 2) * M, cz: ((minY + maxY) / 2) * M, size: Math.max(maxX - minX, maxY - minY) * M }
-  }, [scene.floor])
+  const box = useMemo(() => floorBox(scene.floor), [scene.floor])
+  const parts = useMemo(() => buildInstances(scene), [scene])
+  const binColors = useMemo(() => {
+    const byZone = new Map(scene.zones.map((z) => [z.code, new THREE.Color(ZONE_COLOR[z.type])]))
+    const fallback = new THREE.Color('#94a3b8')
+    return scene.bins.rack.map((r) => byZone.get(scene.racks[r]!.zone) ?? fallback)
+  }, [scene])
+  const doors = useMemo<BoxSpec[]>(() => {
+    const outline: { x: number; y: number }[] = []
+    for (let i = 0; i < scene.floor.length; i += 2) outline.push({ x: scene.floor[i]!, y: scene.floor[i + 1]! })
+    return scene.openings.map((o) => {
+      const wall = nearestOnOutline(outline, o) // doors lie along their wall
+      const tall = o.kind === 'DOCK' ? 3 : 2.1
+      return { x: o.x * M, y: tall / 2, z: o.y * M, w: o.widthMm * M, h: tall, d: 0.15, rotY: (-wall.angle * Math.PI) / 180 }
+    })
+  }, [scene.openings, scene.floor])
 
   return (
-    <Canvas frameloop="demand" dpr={[1, 1.5]} camera={{ position: [box.cx + box.size * 0.6, box.size * 0.7, box.cz + box.size * 0.9], fov: 45, near: 0.1, far: box.size * 10 }}
-      gl={{ antialias: true, powerPreference: 'low-power' }} data-testid="scene-canvas">
+    <Canvas frameloop="demand" dpr={[1, 1.5]} data-testid="scene-canvas"
+      camera={{ position: [box.cx + box.size * 0.6, box.size * 0.7, box.cz + box.size * 0.9], fov: 45, near: 0.1, far: box.size * 10 }}
+      gl={{ antialias: true, powerPreference: 'low-power' }}
+      // Dev builds only: lets the browser checks read draw calls and frame times (renderer.info).
+      onCreated={({ gl }) => { if (import.meta.env.DEV) (window as unknown as { __wmsRenderer?: THREE.WebGLRenderer }).__wmsRenderer = gl }}>
       <color attach="background" args={['#0f172a']} />
       <hemisphereLight args={['#ffffff', '#334155', 1.2]} />
       <directionalLight position={[box.cx + 30, 60, box.cz + 20]} intensity={1.4} />
@@ -59,10 +102,14 @@ export function SceneCanvas({ scene }: { scene: Scene }) {
         </mesh>
         {zones.map((z) => (
           <mesh key={z.code} geometry={z.geometry} position={[0, 0, -0.01]}>
-            <meshStandardMaterial color={ZONE_COLOR[z.type]} transparent opacity={0.35} side={THREE.DoubleSide} />
+            <meshStandardMaterial color={ZONE_COLOR[z.type]} transparent opacity={0.3} side={THREE.DoubleSide} />
           </mesh>
         ))}
       </group>
+      <Boxes specs={parts.posts} color="#1e3a8a" />
+      <Boxes specs={parts.shelves} color="#f97316" />
+      <Boxes specs={parts.bins} color="#94a3b8" colors={binColors} />
+      <Boxes specs={doors} color="#facc15" />
       <OrbitControls makeDefault target={[box.cx, 0, box.cz]} maxPolarAngle={Math.PI / 2.05} />
     </Canvas>
   )
