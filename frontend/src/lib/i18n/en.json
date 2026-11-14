@@ -348,5 +348,10 @@
   "view3d.editLayout": "Edit layout",
   "view3d.notPublished": "This warehouse has no published layout yet. Publish it in the layout editor to see it in 3D.",
   "view3d.loading3d": "Loading 3D…",
-  "warehouses.view3d": "3D"
+  "warehouses.view3d": "3D",
+  "view3d.zoomIn": "Zoom in (+)",
+  "view3d.zoomOut": "Zoom out (−)",
+  "view3d.top": "Top view (T)",
+  "view3d.reset": "Reset view (R)",
+  "view3d.keys": "Drag to turn · right-drag or arrows to move · scroll or +/− to zoom · T top · R reset"
 }

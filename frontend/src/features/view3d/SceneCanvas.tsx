@@ -1,10 +1,11 @@
-import { OrbitControls } from '@react-three/drei'
+import { CameraControls } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { ZoneType } from '@/features/warehouses/api'
 import { nearestOnOutline } from '@/features/layout/geometry'
 import type { Scene } from './api'
+import type { CameraApi } from './camera'
 import { buildInstances, floorBox, type BoxSpec } from './sceneLayout'
 
 const M = 1 / 1000
@@ -65,7 +66,7 @@ function Boxes({ specs, color, colors }: { specs: BoxSpec[]; color: string; colo
  * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
  * draw call each, whatever the number of racks.
  */
-export function SceneCanvas({ scene }: { scene: Scene }) {
+export function SceneCanvas({ scene, onCamera }: { scene: Scene; onCamera?: (api: CameraApi) => void }) {
   const floor = useMemo(() => new THREE.ShapeGeometry(shapeOf(scene.floor)), [scene.floor])
   const zones = useMemo(() => scene.zones.map((z) => ({ ...z, geometry: new THREE.ShapeGeometry(shapeOf(z.polygon)) })),
     [scene.zones])
@@ -110,7 +111,45 @@ export function SceneCanvas({ scene }: { scene: Scene }) {
       <Boxes specs={parts.shelves} color="#f97316" />
       <Boxes specs={parts.bins} color="#94a3b8" colors={binColors} />
       <Boxes specs={doors} color="#facc15" />
-      <OrbitControls makeDefault target={[box.cx, 0, box.cz]} maxPolarAngle={Math.PI / 2.05} />
+      <Rig box={box} onCamera={onCamera} />
     </Canvas>
+  )
+}
+
+/** Camera with smooth moves; hands the page a small API for its buttons and keyboard shortcuts. */
+function Rig({ box, onCamera }: { box: { cx: number; cz: number; size: number }; onCamera?: (api: CameraApi) => void }) {
+  const controls = useRef<CameraControls>(null)
+  // Start looking at the middle of the floor (the controls would otherwise aim at the plan origin).
+  useEffect(() => {
+    void controls.current?.setLookAt(box.cx + box.size * 0.6, box.size * 0.7, box.cz + box.size * 0.9, box.cx, 0, box.cz, false)
+  }, [box])
+  useEffect(() => {
+    const c = controls.current
+    if (!c || !onCamera) return
+    const home = () => c.setLookAt(box.cx + box.size * 0.6, box.size * 0.7, box.cz + box.size * 0.9, box.cx, 0, box.cz, true)
+    const pos = new THREE.Vector3()
+    const target = new THREE.Vector3()
+    onCamera({
+      reset: () => void home(),
+      // Straight down, nudged a hair south so "up" on screen stays plan-up (north).
+      top: () => void c.setLookAt(box.cx, box.size * 1.25, box.cz + 0.001, box.cx, 0, box.cz, true),
+      zoom: (direction) => void c.dolly(direction * Math.max(1, c.distance * 0.2), true),
+      pan: (right, forward) => {
+        c.getPosition(pos)
+        c.getTarget(target)
+        const ahead = new THREE.Vector3(target.x - pos.x, 0, target.z - pos.z)
+        if (ahead.lengthSq() < 1e-6) ahead.set(0, 0, -1) // top view: "ahead" is plan-up
+        ahead.normalize()
+        const side = new THREE.Vector3(-ahead.z, 0, ahead.x)
+        const dx = side.x * right + ahead.x * forward
+        const dz = side.z * right + ahead.z * forward
+        void c.setLookAt(pos.x + dx, pos.y, pos.z + dz, target.x + dx, target.y, target.z + dz, true)
+      },
+      flyTo: (x, y, z) => void c.setLookAt(x + 4, y + 3, z + 6, x, y, z, true),
+    })
+  }, [box, onCamera])
+  return (
+    <CameraControls ref={controls} makeDefault maxPolarAngle={Math.PI / 2.05} minDistance={1.5} maxDistance={box.size * 4}
+      smoothTime={0.25} />
   )
 }
