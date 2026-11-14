@@ -21,6 +21,8 @@ export const router = createBrowserRouter([
             path: 'warehouses/:id/layout',
             lazy: () => import('@/features/layout/LayoutEditorPage').then((m) => ({ Component: m.LayoutEditorPage })),
           },
+          { path: 'rack-types', lazy: () => import('@/features/rack-types/RackTypesPage').then((m) => ({ Component: m.RackTypesPage })) },
+          { path: 'warehouses/:id/bins', lazy: () => import('@/features/bins/BinsPage').then((m) => ({ Component: m.BinsPage })) },
           { path: 'users', lazy: () => import('@/features/users/UsersPage').then((m) => ({ Component: m.UsersPage })) },
           { path: 'roles', lazy: () => import('@/features/roles/RolesPage').then((m) => ({ Component: m.RolesPage })) },
           { path: 'audit', lazy: () => import('@/features/audit/AuditPage').then((m) => ({ Component: m.AuditPage })) },

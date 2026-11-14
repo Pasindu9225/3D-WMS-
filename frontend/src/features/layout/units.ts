@@ -33,3 +33,22 @@ export function parse(text: string, unit: Unit): number | null {
 export function formatArea(mm2: number, unit: Unit): string {
   return String(Math.round((mm2 / UNITS[unit] / UNITS[unit]) * 100) / 100)
 }
+
+/** Weights are stored in grams; typed in kg by default, or with a unit ("2t", "4400 lb", "500kg"). */
+export const WEIGHTS = { g: 1, kg: 1000, t: 1_000_000, lb: 453.59237 } as const
+const WEIGHT_ALIASES: Record<string, keyof typeof WEIGHTS> = {
+  g: 'g', kg: 'kg', kgs: 'kg', t: 't', ton: 't', tons: 't', tonne: 't', tonnes: 't', lb: 'lb', lbs: 'lb',
+}
+
+export function parseWeight(text: string): number | null {
+  const m = /^\s*(\d+(?:\.\d+)?|\.\d+)\s*([a-z]*)\s*$/i.exec(text)
+  if (!m) return null
+  const u = m[2] ? WEIGHT_ALIASES[m[2].toLowerCase()] : 'kg'
+  if (!u) return null
+  return Math.round(Number(m[1]) * WEIGHTS[u])
+}
+
+/** "1,000 kg" style, from grams. */
+export function formatKg(g: number): string {
+  return `${(Math.round(g / 10) / 100).toLocaleString('en')} kg`
+}

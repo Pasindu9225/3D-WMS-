@@ -1,4 +1,4 @@
-import { ArrowLeft, Box, DoorOpen, Maximize, PenLine, Save, Shapes, SquareDashed, Truck, Trash2 } from 'lucide-react'
+import { ArrowLeft, Box, Boxes, DoorOpen, Rocket, Maximize, PenLine, Save, Shapes, SquareDashed, Truck, Trash2 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useBlocker, useParams } from 'react-router'
 import { Badge } from '@/components/ui/badge'
@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Field, FormMessage, Input } from '@/components/ui/input'
 import { can, useMe } from '@/features/auth/session'
-import { useLayout, useRackTypes, useSaveLayout, useWarehouse } from '@/features/warehouses/api'
+import { usePublishLayout, useLayout, useRackTypes, useSaveLayout, useWarehouse } from '@/features/warehouses/api'
+import { Dialog } from '@/components/ui/dialog'
 import { ApiError, type Issue } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { t } from '@/lib/i18n'
@@ -27,6 +28,8 @@ export function LayoutEditorPage() {
   const warehouse = useWarehouse(id)
   const layout = useLayout(id)
   const save = useSaveLayout(id)
+  const publish = usePublishLayout(id)
+  const [publishing, setPublishing] = useState(false)
   const doc = useEditor((s) => s.doc)
   const dirty = useEditor((s) => s.dirty)
   const baseRevision = useEditor((s) => s.baseRevision)
@@ -95,9 +98,12 @@ export function LayoutEditorPage() {
   }, [drawing, finishDrawing, cancelDrawing])
 
   const onSave = () => {
+    publish.reset() // an older publish result no longer describes this draft
     if (doc) save.mutate({ baseRevision, layout: doc }, { onSuccess: (view) => load(view) })
   }
-  const errors: Issue[] = save.error instanceof ApiError ? save.error.issues : []
+  const errors: Issue[] = save.error instanceof ApiError ? save.error.issues
+    : publish.error instanceof ApiError ? publish.error.issues : []
+  const published = layout.data?.status === 'PUBLISHED'
   const conflict = save.error instanceof ApiError && save.error.code === 'LAYOUT_CHANGED'
   const warnings = save.data?.warnings ?? layout.data?.warnings ?? []
   const opening = selection?.kind === 'opening' ? doc?.openings[selection.index] : undefined
@@ -160,6 +166,18 @@ export function LayoutEditorPage() {
             <Save /> {save.isPending ? t('common.saving') : t('layout.save')}
           </Button>
         )}
+        {editable && (
+          <Button size="sm" variant="outline" onClick={() => setPublishing(true)}
+            disabled={dirty || layout.data?.status !== 'DRAFT' || publish.isPending}
+            title={dirty ? t('layout.publish.saveFirst') : undefined}>
+            <Rocket /> {t('layout.publish')}
+          </Button>
+        )}
+        {published && (
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/app/warehouses/${id}/bins`}><Boxes /> {t('layout.binsLink')}</Link>
+          </Button>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -178,7 +196,12 @@ export function LayoutEditorPage() {
             </FormMessage>
           )}
           {save.isError && !conflict && errors.length === 0 && <FormMessage tone="error">{errorMessage(save.error)}</FormMessage>}
-          {save.isSuccess && !dirty && <FormMessage tone="success">{t('layout.saved')}</FormMessage>}
+          {save.isSuccess && !dirty && !publish.isSuccess && <FormMessage tone="success">{t('layout.saved')}</FormMessage>}
+          {publish.isSuccess && !dirty && (
+            <FormMessage tone="success">{t('layout.publish.done', { bins: publish.data.bins, added: publish.data.binsAdded,
+              removed: publish.data.binsRemoved, renamed: publish.data.binsRenamed, racks: publish.data.racks })}</FormMessage>
+          )}
+          {publish.isError && errors.length === 0 && <FormMessage tone="error">{errorMessage(publish.error)}</FormMessage>}
 
           {opening && selection?.kind === 'opening' && editable && (
             <section className="space-y-3 rounded-lg border p-3">
@@ -214,6 +237,20 @@ export function LayoutEditorPage() {
       </div>
 
       {shaping && <ShapeDialog onClose={() => setShaping(false)} />}
+      {publishing && (
+        <Dialog open onOpenChange={(o) => !o && setPublishing(false)} title={t('layout.publish.title')}
+          description={t('layout.publish.confirm')}>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPublishing(false)}>{t('common.cancel')}</Button>
+            <Button disabled={publish.isPending} onClick={() => {
+              save.reset()
+              publish.mutate(baseRevision, { onSettled: () => setPublishing(false) })
+            }}>
+              <Rocket /> {publish.isPending ? t('layout.publish.working') : t('layout.publish')}
+            </Button>
+          </div>
+        </Dialog>
+      )}
       {blocker.state === 'blocked' && (
         <div role="alertdialog" aria-modal="true" className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
           <div className="max-w-sm space-y-4 rounded-lg border bg-card p-6">

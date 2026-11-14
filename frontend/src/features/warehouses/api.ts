@@ -126,3 +126,84 @@ export function useSaveLayout(warehouseId: string) {
 export function useRackTypes() {
   return useQuery({ queryKey: ['rack-types'], queryFn: () => api<Page<RackType>>('/rack-templates?size=100') })
 }
+
+export type RackTypeInput = Omit<RackType, 'id' | 'code'> & { code?: string }
+
+export function useSaveRackType() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: RackTypeInput & { id?: string }) =>
+      id ? api<RackType>(`/rack-templates/${id}`, { method: 'PUT', body }) : api<RackType>('/rack-templates', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rack-types'] }),
+  })
+}
+
+export function useArchiveRackType() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/rack-templates/${id}/archive`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rack-types'] }),
+  })
+}
+
+export interface PublishResult {
+  zones: number
+  racks: number
+  levels: number
+  bins: number
+  binsAdded: number
+  binsRemoved: number
+  binsRenamed: number
+}
+
+export function usePublishLayout(warehouseId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (baseRevision: number) =>
+      api<PublishResult>(`/warehouses/${warehouseId}/layout/publish`, { method: 'POST', body: { baseRevision } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['layout', warehouseId] })
+      void qc.invalidateQueries({ queryKey: ['warehouses'] })
+      void qc.invalidateQueries({ queryKey: ['warehouse', warehouseId] })
+      void qc.invalidateQueries({ queryKey: ['bins', warehouseId] })
+    },
+  })
+}
+
+export interface Bin {
+  id: string
+  code: string
+  maxWeightG: number
+  maxVolumeCm3: number
+  customCapacity: boolean
+  pickFace: boolean
+  blocked: boolean
+}
+
+export const BIN_PAGE_SIZE = 50
+
+export function useBins(warehouseId: string, code: string, page: number) {
+  const params = new URLSearchParams({ page: String(page), size: String(BIN_PAGE_SIZE) })
+  if (code) params.set('code', code)
+  return useQuery({
+    queryKey: ['bins', warehouseId, code, page],
+    queryFn: () => api<Page<Bin>>(`/warehouses/${warehouseId}/bins?${params}`),
+    placeholderData: (prev) => prev,
+  })
+}
+
+export function useEditBin(warehouseId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; maxWeightG?: number; maxVolumeCm3?: number; pickFace?: boolean; blocked?: boolean }) =>
+      api<Bin>(`/bins/${id}`, { method: 'PATCH', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bins', warehouseId] }),
+  })
+}
+
+/** Label PDF link: a plain same-origin GET, so the session cookie goes with it and the browser downloads it. */
+export function labelsUrl(warehouseId: string, code: string, format: 'sheet' | 'single') {
+  const params = new URLSearchParams({ format })
+  if (code) params.set('code', code)
+  return `/api/v1/warehouses/${warehouseId}/labels.pdf?${params}`
+}

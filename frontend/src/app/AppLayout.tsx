@@ -25,6 +25,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/app/warehouses', label: 'nav.warehouses', icon: Warehouse, permission: 'warehouses:read' },
+  { to: '/app/rack-types', label: 'nav.rackTypes', icon: Boxes, permission: 'warehouses:read' },
   { to: '/app/3d', label: 'nav.view3d', icon: Cuboid, soon: true },
   { to: '/app/stock', label: 'nav.stock', icon: Package, soon: true },
   { to: '/app/users', label: 'nav.users', icon: Users, permission: 'users:read' },

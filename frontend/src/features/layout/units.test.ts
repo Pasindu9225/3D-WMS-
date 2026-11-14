@@ -22,3 +22,12 @@ it('shows areas in square units', () => {
   expect(formatArea(15_000 * 9_000, 'ft')).toBe('1453.13')
   expect(formatArea(15_000 * 9_000, 'm')).toBe('135')
 })
+
+it('converts typed weights to grams', async () => {
+  const { parseWeight, formatKg } = await import('./units')
+  expect(parseWeight('1000')).toBe(1_000_000)
+  expect(parseWeight('2t')).toBe(2_000_000)
+  expect(parseWeight('4400 lb')).toBe(1_995_806)
+  expect(parseWeight('heavy')).toBeNull()
+  expect(formatKg(1_500_000)).toBe('1,500 kg')
+})

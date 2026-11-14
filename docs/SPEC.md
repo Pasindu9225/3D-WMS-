@@ -239,11 +239,11 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] 2D editor (react-konva): draw floor polygon on a metre grid, doors and docks
 - [x] Non-rectangular floors: L / U / T presets, click-to-draw outline, exact corner table (metres)
 - [x] Draw zones with type (receiving, storage, picking, dispatch, quarantine, cold)
-- [ ] Rack templates: size, levels, bins per level, max weight per level
+- [x] Rack templates: size, levels, bins per level, max weight per level (library page, any unit)
 - [x] Place racks: drag, snap, rotate (any angle since 7b), duplicate row, aisle-width warning, overlap check
 - [x] Measurements and shapes (task 7b): unit converter, typed lengths while drawing, triangle/oval tools, edge lengths + scale bar, move/resize/copy areas and racks, racks at any angle
 - [x] Auto-generate levels and bins with a naming pattern (`{zone}-{rack}-{level}-{bin}`)
-- [ ] Edit single bin: capacity, blocked, pick face
+- [x] Edit single bin: capacity, blocked, pick face (bins page; labels printed from there)
 - [x] Draft → publish layout; cannot delete racks or bins that hold stock (checked again in v0.4)
 - [x] Bin label PDF (QR code + human-readable code), A4 sheets and single labels
 
