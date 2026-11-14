@@ -18,3 +18,8 @@ frontend/dist/
 *.iml
 .DS_Store
 Thumbs.db
+
+# local dev run files
+.pids
+.run.log
+.vite.log
