@@ -96,6 +96,20 @@ class LayoutPublishTest extends ApiTest {
     }
 
     @Test
+    void aResizedAngledRackKeepsItsOwnSizeAndBinVolume() throws Exception {
+        save(0, "{\"code\":\"R01\",\"templateId\":\"" + type + "\",\"zone\":\"A\",\"x\":8000,\"y\":8000,\"rotation\":30,"
+                + "\"widthMm\":3600,\"depthMm\":1200,\"heightMm\":4000}");
+        publish(1).andExpect(status().isOk());
+        assertThat(jdbc.queryForMap("SELECT rotation_deg, width_mm, depth_mm, height_mm FROM rack WHERE code = 'R01'"
+                + " AND warehouse_id = " + warehouseId()))
+                .containsEntry("rotation_deg", 30).containsEntry("width_mm", 3600).containsEntry("depth_mm", 1200)
+                .containsEntry("height_mm", 4000);
+        // 3 bins per level across 3.6 m, 1.2 m deep, 4 m / 4 levels high: 1.2 x 1.2 x 1.0 m = 1,440,000 cm³
+        assertThat(jdbc.queryForObject("SELECT MAX(max_volume_cm3) FROM bin WHERE warehouse_id = " + warehouseId(),
+                Long.class)).isEqualTo(1_440_000L);
+    }
+
+    @Test
     void publishNeedsTheCurrentValidDraft() throws Exception {
         publish(1).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NO_DRAFT"));
         save(0, rack("R01", "A", 5000, 5000));

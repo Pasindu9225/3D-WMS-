@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { LayoutDocument, LayoutView, Opening, Point, Rack, RackType, Zone } from '@/features/warehouses/api'
 import {
-  bounds, floorPreset, insertOnEdge, nearestOnOutline, nextCode, pointInPolygon, rackRect, selfIntersects, snap,
+  bounds, floorPreset, insertOnEdge, nearestOnOutline, nextCode, pointInPolygon, selfIntersects, snap,
   type FloorShape,
 } from './geometry'
 import { UNITS, type Unit } from './units'
@@ -77,9 +77,11 @@ interface EditorState {
   paste: () => void
   addRack: (type: RackType) => void
   moveRack: (index: number, p: Point) => void
-  rotateRack: (index: number) => void
+  /** Turns clockwise by step degrees (default 90). */
+  rotateRack: (index: number, step?: number) => void
   repeatRack: (index: number, count: number, fp: Footprint) => void
-  updateRack: (index: number, patch: Partial<Pick<Rack, 'code' | 'templateId'>>) => void
+  /** Code, type, exact angle or this rack's own size (null size = back to the type size). */
+  updateRack: (index: number, patch: Partial<Pick<Rack, 'code' | 'templateId' | 'rotation' | 'widthMm' | 'depthMm' | 'heightMm'>>) => void
   removeRack: (index: number) => void
   removeSelected: () => void
   select: (selection: Selection) => void
@@ -359,21 +361,28 @@ export const useEditor = create<EditorState>((set, get) => {
           racks: d.racks.map((r, i) => (i === index ? { ...r, ...at, zone: zoneAt(d, at, r.zone) } : r)),
         }
       }),
-    rotateRack: (index) =>
-      change((d) => ({ ...d, racks: d.racks.map((r, i) => (i === index ? { ...r, rotation: (r.rotation + 90) % 360 } : r)) })),
+    rotateRack: (index, step = 90) =>
+      change((d) => ({
+        ...d,
+        racks: d.racks.map((r, i) => (i === index ? { ...r, rotation: (((r.rotation + step) % 360) + 360) % 360 } : r)),
+      })),
     repeatRack: (index, count, fp) =>
       change((d) => {
         // Copies side by side along the rack's length (no gap): one action builds a whole row.
         const base = d.racks[index]!
-        const rect = rackRect(base, fp.widthMm, fp.depthMm)
-        const alongX = base.rotation === 0 || base.rotation === 180
+        // Along its length at its own angle, so angled rows work too; whole mm keeps rows exact.
+        const length = base.widthMm ?? fp.widthMm
+        const a = (base.rotation * Math.PI) / 180
+        const step = base.rotation % 90 === 0
+          ? { x: Math.round(Math.cos(a)) * length, y: Math.round(Math.sin(a)) * length }
+          : { x: Math.cos(a) * length, y: Math.sin(a) * length }
         const used = d.racks.map((r) => r.code)
         const copies: Rack[] = []
         for (let n = 1; n <= count; n++) {
           const code = nextCode('R', used, 2)
           used.push(code)
-          const at = alongX ? { x: base.x + n * rect.width, y: base.y } : { x: base.x, y: base.y + n * rect.height }
-          if (at.x > 1_000_000 || at.y > 1_000_000) break
+          const at = { x: Math.round(base.x + n * step.x), y: Math.round(base.y + n * step.y) }
+          if (at.x < 0 || at.y < 0 || at.x > 1_000_000 || at.y > 1_000_000) break
           copies.push({ ...base, ...at, code, zone: zoneAt(d, at, base.zone) })
         }
         return { ...d, racks: [...d.racks, ...copies] }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { areaM2, floorPreset, insertOnEdge, nearestOnOutline, nextCode, rackRect, rackStatuses, rectInPolygon, selfIntersects, snap } from './geometry'
+import { areaM2, floorPreset, insertOnEdge, nearestOnOutline, nextCode, rackPolygon, rackRect, rackStatuses, rectInPolygon, selfIntersects, snap } from './geometry'
 
 const square = [
   { x: 0, y: 0 },
@@ -89,5 +89,30 @@ describe('live rack checks (same rules as the server)', () => {
   it('picks the next free code', () => {
     expect(nextCode('R', ['R01', 'R03'], 2)).toBe('R02')
     expect(nextCode('Z', [])).toBe('Z1')
+  })
+})
+
+describe('angled and resized racks (same cases as the server test)', () => {
+  const t = { T: { widthMm: 2700, depthMm: 1100 } }
+  const zone = { code: 'A', polygon: [{ x: 0, y: 0 }, { x: 40_000, y: 0 }, { x: 40_000, y: 20_000 }, { x: 0, y: 20_000 }] }
+  const rack = (code: string, x: number, y: number, rotation: number, widthMm?: number) =>
+    ({ code, templateId: 'T', zone: 'A', x, y, rotation, widthMm })
+  const check = (racks: ReturnType<typeof rack>[]) => rackStatuses({ zones: [zone], racks, settings: { minAisleMm: 1200 } }, t)
+
+  it('turns corners clockwise around the centre', () => {
+    const p = rackPolygon({ x: 0, y: 0, rotation: 90 }, 2000, 1000)
+    expect(p.map((c) => [Math.round(c.x), Math.round(c.y)])).toEqual([[500, -1000], [500, 1000], [-500, 1000], [-500, -1000]])
+  })
+
+  it('checks angled racks by their real outline', () => {
+    expect(check([rack('R1', 10_000, 10_000, 45)])).toEqual([undefined])
+    expect(check([rack('R1', 10_000, 10_000, 45), rack('R2', 12_400, 12_400, 45)])).toEqual(['warn', 'warn'])
+    expect(check([rack('R1', 10_000, 10_000, 45), rack('R3', 11_000, 11_000, 45)])).toEqual(['bad', 'bad'])
+    expect(check([rack('R4', 1200, 5000, 30)])).toEqual(['bad'])
+  })
+
+  it('uses a resized rack’s own width', () => {
+    expect(check([rack('R1', 5000, 5000, 0, 4000), rack('R2', 8300, 5000, 0)])).toEqual(['bad', 'bad'])
+    expect(check([rack('R1', 5000, 5000, 0), rack('R2', 8300, 5000, 0)])).toEqual(['warn', 'warn'])
   })
 })

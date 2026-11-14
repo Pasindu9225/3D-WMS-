@@ -239,8 +239,6 @@
   "layout.rack": "Rack",
   "layout.inZone": "zone {zone}",
   "layout.rackType": "Rack type",
-  "layout.rackSize": "{w} m × {d} m, {levels} levels × {bins} bins",
-  "layout.rotate": "Turn 90° (now {deg}°)",
   "layout.repeat": "Copies in a row",
   "layout.repeatGo": "Add row",
   "layout.live.bad": "{n} racks overlap or are outside their zone.",
@@ -265,5 +263,13 @@
   "layout.sizeW": "Width ({unit})",
   "layout.sizeL": "Length ({unit})",
   "layout.zone.area": "Area {area} sq {unit}",
-  "layout.duplicate": "Duplicate"
+  "layout.duplicate": "Duplicate",
+  "layout.rackW": "Width ({unit})",
+  "layout.rackD": "Depth ({unit})",
+  "layout.rackH": "Height ({unit})",
+  "layout.rackLevels": "{levels} levels × {bins} bins per level (from the rack type)",
+  "layout.rackReset": "Use rack type size",
+  "layout.angle": "Angle (°)",
+  "layout.rotate90": "Turn 90°",
+  "layout.rack.hint": "Drag to move. Drag the side handles to resize this rack only, or the round handle above it to turn it (snaps at 45°). R turns 90°, Shift+R 15°. Ctrl+C / Ctrl+V copies."
 }

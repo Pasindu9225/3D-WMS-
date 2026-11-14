@@ -132,14 +132,17 @@ public class LayoutPublisher {
         for (LayoutDocument.Rack dr : doc.racks()) {
             RackTemplate t = types.get(dr.templateId());
             Rack rack = rackByCode.computeIfAbsent(dr.code(), code -> new Rack(w.getId(), code));
-            rack.place(zoneByCode.get(dr.zone()).getId(), t, dr.x(), dr.y(), dr.rotation());
+            int width = dr.width(t.getWidthMm());
+            int depth = dr.depth(t.getDepthMm());
+            int height = dr.height(t.getHeightMm());
+            rack.place(zoneByCode.get(dr.zone()).getId(), t, dr.x(), dr.y(), dr.rotation(), width, depth, height);
             racks.save(rack);
 
             Map<Integer, RackLevel> existingLevels = levelsByRack.getOrDefault(rack.getId(), List.of()).stream()
                     .collect(Collectors.toMap(RackLevel::getLevelNo, Function.identity()));
-            int levelHeight = t.getHeightMm() / t.getLevels();
+            int levelHeight = height / t.getLevels();
             long binWeight = t.getMaxWeightPerLevelG() / t.getBinsPerLevel();
-            long binVolumeCm3 = (long) t.getWidthMm() / t.getBinsPerLevel() * t.getDepthMm() * levelHeight / 1000;
+            long binVolumeCm3 = (long) width / t.getBinsPerLevel() * depth * levelHeight / 1000;
             for (int n = 1; n <= t.getLevels(); n++) {
                 RackLevel level = existingLevels.remove(n);
                 if (level == null) {

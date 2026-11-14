@@ -42,7 +42,12 @@ export interface Rack {
   zone: string
   x: number
   y: number
+  /** Clockwise degrees, 0-359. */
   rotation: number
+  /** This rack resized; absent = its rack type size. */
+  widthMm?: number | null
+  depthMm?: number | null
+  heightMm?: number | null
 }
 
 export interface LayoutDocument {

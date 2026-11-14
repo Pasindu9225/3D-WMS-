@@ -58,7 +58,7 @@ export function LayoutEditorPage() {
       if (e.key === 'Delete' || e.key === 'Backspace') removeSelected()
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') useEditor.getState().copySelection()
       else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') useEditor.getState().paste()
-      else if ((e.key === 'r' || e.key === 'R') && sel?.kind === 'rack') rotateRack(sel.index)
+      else if ((e.key === 'r' || e.key === 'R') && sel?.kind === 'rack') rotateRack(sel.index, e.shiftKey ? 15 : 90)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

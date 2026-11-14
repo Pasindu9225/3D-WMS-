@@ -55,15 +55,17 @@ public class Rack extends TenantScoped {
         this.code = code;
     }
 
-    public void place(long zoneId, RackTemplate template, int xMm, int yMm, int rotationDeg) {
+    /** Size is the rack type size unless this rack was resized in the layout. */
+    public void place(long zoneId, RackTemplate template, int xMm, int yMm, int rotationDeg, int widthMm, int depthMm,
+            int heightMm) {
         this.zoneId = zoneId;
         this.templateId = template.getId();
         this.posXMm = xMm;
         this.posYMm = yMm;
         this.rotationDeg = (short) rotationDeg;
-        this.widthMm = template.getWidthMm();
-        this.depthMm = template.getDepthMm();
-        this.heightMm = template.getHeightMm();
+        this.widthMm = widthMm;
+        this.depthMm = depthMm;
+        this.heightMm = heightMm;
     }
 
     public Long getId() {

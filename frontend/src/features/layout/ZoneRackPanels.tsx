@@ -67,10 +67,15 @@ export function ZonePanel({ index }: { index: number }) {
 
 export function RackPanel({ index, types }: { index: number; types: Record<string, RackType> }) {
   const rack = useEditor((s) => s.doc?.racks[index])
-  const { updateRack, rotateRack, repeatRack, removeRack } = useEditor.getState()
+  const unit = useEditor((s) => s.unit)
+  const { updateRack, rotateRack, repeatRack, removeRack, duplicateRack } = useEditor.getState()
   const [count, setCount] = useState(5)
   if (!rack) return null
   const type = types[rack.templateId]
+  const resized = rack.widthMm != null || rack.depthMm != null || rack.heightMm != null
+  /** Size typed equal to the type size is stored as "no override", so the rack follows later type edits. */
+  const size = (key: 'widthMm' | 'depthMm' | 'heightMm', mm: number) =>
+    updateRack(index, { [key]: type && mm === type[key] ? null : mm })
   return (
     <section className="space-y-3 rounded-lg border p-3">
       <h2 className="text-sm font-semibold">{t('layout.rack')} · {t('layout.inZone', { zone: rack.zone })}</h2>
@@ -85,12 +90,40 @@ export function RackPanel({ index, types }: { index: number; types: Record<strin
         )}
       </Field>
       {type && (
-        <p className="text-xs text-muted-foreground">
-          {t('layout.rackSize', { w: type.widthMm / 1000, d: type.depthMm / 1000, levels: type.levels, bins: type.binsPerLevel })}
-        </p>
+        <>
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <label className="grid gap-1">{t('layout.rackW', { unit })}
+              <LengthInput label={t('layout.rackW', { unit })} mm={rack.widthMm ?? type.widthMm} min={300} className="w-full"
+                onCommit={(mm) => size('widthMm', Math.min(30_000, mm))} />
+            </label>
+            <label className="grid gap-1">{t('layout.rackD', { unit })}
+              <LengthInput label={t('layout.rackD', { unit })} mm={rack.depthMm ?? type.depthMm} min={300} className="w-full"
+                onCommit={(mm) => size('depthMm', Math.min(5_000, mm))} />
+            </label>
+            <label className="grid gap-1">{t('layout.rackH', { unit })}
+              <LengthInput label={t('layout.rackH', { unit })} mm={rack.heightMm ?? type.heightMm} min={500} className="w-full"
+                onCommit={(mm) => size('heightMm', Math.min(40_000, mm))} />
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t('layout.rackLevels', { levels: type.levels, bins: type.binsPerLevel })}
+            {resized && <> · <button type="button" className="underline" onClick={() => updateRack(index, { widthMm: null, depthMm: null, heightMm: null })}>{t('layout.rackReset')}</button></>}
+          </p>
+        </>
       )}
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="grid gap-1 text-sm">{t('layout.angle')}
+          <input aria-label={t('layout.angle')} type="number" min={0} max={359} value={rack.rotation}
+            onChange={(e) => {
+              const deg = Math.round(Number(e.target.value))
+              if (Number.isFinite(deg)) updateRack(index, { rotation: ((deg % 360) + 360) % 360 })
+            }}
+            className="h-8 w-20 rounded-md border border-input bg-background px-2 text-sm tabular-nums" />
+        </label>
+        <Button variant="outline" size="sm" onClick={() => rotateRack(index)}><RotateCw /> {t('layout.rotate90')}</Button>
+      </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={() => rotateRack(index)}><RotateCw /> {t('layout.rotate', { deg: rack.rotation })}</Button>
+        {type && <Button variant="outline" size="sm" onClick={() => duplicateRack(index, type)}><Copy /> {t('layout.duplicate')}</Button>}
         <Button variant="outline" size="sm" className="text-destructive" onClick={() => removeRack(index)}><Trash2 /> {t('layout.remove')}</Button>
       </div>
       {type && (
@@ -102,6 +135,7 @@ export function RackPanel({ index, types }: { index: number; types: Record<strin
           <Button variant="outline" size="sm" className="mb-1" onClick={() => repeatRack(index, count, type)}><Copy /> {t('layout.repeatGo')}</Button>
         </div>
       )}
+      <p className="text-xs text-muted-foreground">{t('layout.rack.hint')}</p>
     </section>
   )
 }

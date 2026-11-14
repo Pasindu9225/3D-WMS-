@@ -154,45 +154,135 @@ export function rectInPolygon(r: Box, polygon: Point[]): boolean {
 
 export type RackStatus = 'bad' | 'warn'
 
+type PlacedRack = { code: string; templateId: string; zone: string; x: number; y: number; rotation: number;
+  widthMm?: number | null; depthMm?: number | null }
+
+/** The rack's own size if it was resized, otherwise its type's. */
+export function rackSize(r: PlacedRack, t: { widthMm: number; depthMm: number }) {
+  return { widthMm: r.widthMm ?? t.widthMm, depthMm: r.depthMm ?? t.depthMm }
+}
+
+/** Four corners of a rack turned clockwise by rotation degrees around its centre (same maths as the server). */
+export function rackPolygon(r: { x: number; y: number; rotation: number }, widthMm: number, depthMm: number): Point[] {
+  const a = (r.rotation * Math.PI) / 180
+  const cos = r.rotation % 90 === 0 ? Math.round(Math.cos(a)) : Math.cos(a)
+  const sin = r.rotation % 90 === 0 ? Math.round(Math.sin(a)) : Math.sin(a)
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => {
+    const lx = (sx! * widthMm) / 2
+    const ly = (sy! * depthMm) / 2
+    return { x: r.x + lx * cos - ly * sin, y: r.y + lx * sin + ly * cos }
+  })
+}
+
+/** Separating-axis test for two convex quadrilaterals: true when they overlap by more than 1 mm. */
+function polygonsOverlap(a: Point[], b: Point[]): boolean {
+  for (const poly of [a, b]) {
+    for (let i = 0; i < poly.length; i++) {
+      const p1 = poly[i]!
+      const p2 = poly[(i + 1) % poly.length]!
+      const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1
+      const nx = -(p2.y - p1.y) / len
+      const ny = (p2.x - p1.x) / len
+      const project = (q: Point[]) => q.map((v) => v.x * nx + v.y * ny)
+      const pa = project(a)
+      const pb = project(b)
+      if (Math.min(Math.max(...pa), Math.max(...pb)) - Math.max(Math.min(...pa), Math.min(...pb)) <= 1) return false
+    }
+  }
+  return true
+}
+
+function segmentDistance(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len2 = dx * dx + dy * dy
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2))
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+
+/** Shortest corner-to-edge distance between two outlines that do not overlap. */
+function polygonDistance(a: Point[], b: Point[]): number {
+  let best = Infinity
+  for (const [from, to] of [[a, b], [b, a]] as const) {
+    for (const p of from) {
+      for (let i = 0; i < to.length; i++) best = Math.min(best, segmentDistance(p, to[i]!, to[(i + 1) % to.length]!))
+    }
+  }
+  return best
+}
+
 /**
  * Live rack checks, same rules as the server: overlapping racks and racks outside their zone are
  * errors; racks facing each other closer than the minimum aisle are warnings (0 gap = back-to-back, fine).
+ * Straight racks use exact box maths; angled ones their real outline and edge-to-edge distance.
  * ponytail: O(n²) pairs, fine for the 2,000-rack cap.
  */
 export function rackStatuses(
-  doc: { zones: { code: string; polygon: Point[] }[]; racks: { code: string; templateId: string; zone: string; x: number; y: number; rotation: number }[]; settings: { minAisleMm: number } },
+  doc: { zones: { code: string; polygon: Point[] }[]; racks: PlacedRack[]; settings: { minAisleMm: number } },
   templates: Record<string, { widthMm: number; depthMm: number }>,
 ): (RackStatus | undefined)[] {
   const status: (RackStatus | undefined)[] = doc.racks.map(() => undefined)
-  const rects = doc.racks.map((r) => {
+  const shapes = doc.racks.map((r) => {
     const t = templates[r.templateId]
-    return t ? rackRect(r, t.widthMm, t.depthMm) : null
+    if (!t) return null
+    const { widthMm, depthMm } = rackSize(r, t)
+    const polygon = rackPolygon(r, widthMm, depthMm)
+    return { polygon, box: polygonBox(polygon), straight: r.rotation % 90 === 0 }
   })
   const zones = new Map(doc.zones.map((z) => [z.code, z.polygon]))
-  rects.forEach((rect, i) => {
+  shapes.forEach((sh, i) => {
     const zone = zones.get(doc.racks[i]!.zone)
-    if (!rect || !zone || !rectInPolygon(rect, zone)) status[i] = 'bad'
+    if (!sh || !zone || !(sh.straight ? rectInPolygon(sh.box, zone) : quadInPolygon(sh.polygon, zone))) status[i] = 'bad'
   })
-  for (let i = 0; i < rects.length; i++) {
-    const a = rects[i]
+  const aisle = doc.settings.minAisleMm
+  for (let i = 0; i < shapes.length; i++) {
+    const a = shapes[i]
     if (!a) continue
-    for (let j = i + 1; j < rects.length; j++) {
-      const b = rects[j]
+    for (let j = i + 1; j < shapes.length; j++) {
+      const b = shapes[j]
       if (!b) continue
-      const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
-      const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
-      if (overlapX > 0 && overlapY > 0) {
-        status[i] = status[j] = 'bad'
-        continue
+      let gap: number
+      if (a.straight && b.straight) {
+        const overlapX = Math.min(a.box.x + a.box.width, b.box.x + b.box.width) - Math.max(a.box.x, b.box.x)
+        const overlapY = Math.min(a.box.y + a.box.height, b.box.y + b.box.height) - Math.max(a.box.y, b.box.y)
+        if (overlapX > 0 && overlapY > 0) {
+          status[i] = status[j] = 'bad'
+          continue
+        }
+        gap = overlapY > 0 ? -overlapX : overlapX > 0 ? -overlapY : -1
+      } else {
+        if (a.box.x + a.box.width + aisle < b.box.x || b.box.x + b.box.width + aisle < a.box.x
+          || a.box.y + a.box.height + aisle < b.box.y || b.box.y + b.box.height + aisle < a.box.y) continue
+        if (polygonsOverlap(a.polygon, b.polygon)) {
+          status[i] = status[j] = 'bad'
+          continue
+        }
+        gap = polygonDistance(a.polygon, b.polygon)
+        if (gap < 1) continue
       }
-      const gap = overlapY > 0 ? -overlapX : overlapX > 0 ? -overlapY : -1
-      if (gap > 0 && gap < doc.settings.minAisleMm) {
+      if (gap > 0 && gap < aisle) {
         status[i] ??= 'warn'
         status[j] ??= 'warn'
       }
     }
   }
   return status
+}
+
+function polygonBox(polygon: Point[]): Box {
+  const b = bounds(polygon)
+  return { x: b.minX, y: b.minY, width: b.maxX - b.minX, height: b.maxY - b.minY }
+}
+
+/** Angled rack inside a zone: corners nudged 1 mm inward are inside, and no zone corner pokes into the rack. */
+function quadInPolygon(quad: Point[], polygon: Point[]): boolean {
+  const c = { x: quad.reduce((s, p) => s + p.x, 0) / 4, y: quad.reduce((s, p) => s + p.y, 0) / 4 }
+  const nudged = quad.map((p) => {
+    const d = Math.hypot(p.x - c.x, p.y - c.y) || 1
+    return { x: p.x + ((c.x - p.x) / d) * 1, y: p.y + ((c.y - p.y) / d) * 1 }
+  })
+  if (!nudged.every((p) => pointInPolygon(p, polygon))) return false
+  return !polygon.some((p) => pointInPolygon(p, nudged))
 }
 
 /** Next free code like Z1 or R01: prefix plus the lowest unused number. */

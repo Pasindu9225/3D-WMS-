@@ -1,8 +1,10 @@
 package lk.wms.layout.service;
 
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Area;
 import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
+import java.awt.geom.PathIterator;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -78,15 +80,12 @@ public final class LayoutValidator {
 
         // ---- racks
         Set<String> rackCodes = new HashSet<>();
-        List<Rectangle2D> placed = new ArrayList<>();
+        List<Path2D> placed = new ArrayList<>();
         List<String> placedCodes = new ArrayList<>();
+        List<Boolean> placedStraight = new ArrayList<>();
         for (Rack r : doc.racks()) {
             if (!rackCodes.add(r.code())) {
                 issues.add(error("DUPLICATE_RACK_CODE", "Rack code " + r.code() + " is used twice", r.code()));
-                continue;
-            }
-            if (r.rotation() % 90 != 0) {
-                issues.add(error("RACK_ROTATION", "Rack " + r.code() + " must be turned in steps of 90°", r.code()));
                 continue;
             }
             Footprint fp = templates.get(r.templateId());
@@ -101,45 +100,79 @@ public final class LayoutValidator {
                         + ", which does not exist", r.code()));
                 continue;
             }
-            Rectangle2D rect = footprint(r, fp);
-            if (!zone.contains(rect)) {
+            Path2D rect = footprint(r, fp);
+            if (!inside(new Area(rect), zone)) {
                 issues.add(error("RACK_OUTSIDE_ZONE", "Rack " + r.code() + " is not fully inside zone " + r.zone(),
                         r.code()));
             }
             placed.add(rect);
             placedCodes.add(r.code());
+            placedStraight.add(straight(r));
         }
-        checkRackPairs(placed, placedCodes, doc.settings().minAisleMm(), issues);
+        checkRackPairs(placed, placedStraight, placedCodes, doc.settings().minAisleMm(), issues);
         return issues;
     }
 
-    /** Footprint on the floor: width x depth, swapped when turned 90° or 270°; (x, y) is the centre. */
-    static Rectangle2D footprint(Rack r, Footprint fp) {
-        boolean turned = r.rotation() == 90 || r.rotation() == 270;
-        double w = turned ? fp.depthMm() : fp.widthMm();
-        double d = turned ? fp.widthMm() : fp.depthMm();
-        return new Rectangle2D.Double(r.x() - w / 2, r.y() - d / 2, w, d);
+    /**
+     * Footprint on the floor: width x depth (the rack's own size if resized) centred on (x, y), turned
+     * clockwise by rotation degrees. Multiples of 90° turn exactly, so straight racks stay exact.
+     */
+    static Path2D footprint(Rack r, Footprint fp) {
+        double w = r.width(fp.widthMm());
+        double d = r.depth(fp.depthMm());
+        Path2D.Double rect = new Path2D.Double(new Rectangle2D.Double(-w / 2, -d / 2, w, d));
+        AffineTransform at = AffineTransform.getTranslateInstance(r.x(), r.y());
+        if (r.rotation() % 90 == 0) {
+            at.quadrantRotate(r.rotation() / 90);
+        } else {
+            at.rotate(Math.toRadians(r.rotation()));
+        }
+        rect.transform(at);
+        return rect;
+    }
+
+    /** Axis-aligned footprint: exact box maths apply. */
+    private static boolean straight(Rack r) {
+        return r.rotation() % 90 == 0;
     }
 
     /**
      * Overlaps are errors. Two racks facing each other with a gap smaller than the minimum aisle get a
-     * warning; a gap of 0 is back-to-back (normal) and is not flagged.
+     * warning; a gap of 0 is back-to-back (normal) and is not flagged. Straight racks use exact box maths;
+     * angled racks use their real outline, and their aisle is the shortest edge-to-edge distance.
      * ponytail: O(n²) over ≤2,000 racks (≤2 M cheap pairs); add a sweep line if layouts grow far beyond that.
      */
-    private static void checkRackPairs(List<Rectangle2D> racks, List<String> codes, int minAisleMm, List<Issue> issues) {
+    private static void checkRackPairs(List<Path2D> racks, List<Boolean> straight, List<String> codes, int minAisleMm,
+            List<Issue> issues) {
         int warnings = 0;
+        List<Rectangle2D> boxes = racks.stream().map(Path2D::getBounds2D).toList();
         for (int i = 0; i < racks.size(); i++) {
-            Rectangle2D a = racks.get(i);
+            Rectangle2D a = boxes.get(i);
             for (int j = i + 1; j < racks.size(); j++) {
-                Rectangle2D b = racks.get(j);
-                double overlapX = Math.min(a.getMaxX(), b.getMaxX()) - Math.max(a.getMinX(), b.getMinX());
-                double overlapY = Math.min(a.getMaxY(), b.getMaxY()) - Math.max(a.getMinY(), b.getMinY());
-                if (overlapX > 0 && overlapY > 0) {
-                    issues.add(error("RACKS_OVERLAP", "Racks " + codes.get(i) + " and " + codes.get(j) + " overlap",
-                            codes.get(j)));
-                    continue;
+                Rectangle2D b = boxes.get(j);
+                double gap;
+                if (straight.get(i) && straight.get(j)) {
+                    double overlapX = Math.min(a.getMaxX(), b.getMaxX()) - Math.max(a.getMinX(), b.getMinX());
+                    double overlapY = Math.min(a.getMaxY(), b.getMaxY()) - Math.max(a.getMinY(), b.getMinY());
+                    if (overlapX > 0 && overlapY > 0) {
+                        issues.add(overlap(codes.get(i), codes.get(j)));
+                        continue;
+                    }
+                    gap = overlapY > 0 ? -overlapX : overlapX > 0 ? -overlapY : -1; // facing across x or y
+                } else {
+                    if (a.getMaxX() + minAisleMm < b.getMinX() || b.getMaxX() + minAisleMm < a.getMinX()
+                            || a.getMaxY() + minAisleMm < b.getMinY() || b.getMaxY() + minAisleMm < a.getMinY()) {
+                        continue; // far apart: skip the exact check
+                    }
+                    if (overlaps(new Area(racks.get(i)), new Area(racks.get(j)))) {
+                        issues.add(overlap(codes.get(i), codes.get(j)));
+                        continue;
+                    }
+                    gap = distance(racks.get(i), racks.get(j));
+                    if (gap < 1) {
+                        continue; // touching (back to back)
+                    }
                 }
-                double gap = overlapY > 0 ? -overlapX : overlapX > 0 ? -overlapY : -1; // facing across x or y
                 if (gap > 0 && gap < minAisleMm && warnings < MAX_WARNINGS) {
                     warnings++;
                     issues.add(new Issue(Severity.WARNING, "AISLE_TOO_NARROW", "Aisle between " + codes.get(i) + " and "
@@ -148,6 +181,40 @@ public final class LayoutValidator {
                 }
             }
         }
+    }
+
+    private static Issue overlap(String a, String b) {
+        return error("RACKS_OVERLAP", "Racks " + a + " and " + b + " overlap", b);
+    }
+
+    /** Shortest distance between two non-overlapping outlines: corner of one to edge of the other, both ways. */
+    private static double distance(Path2D a, Path2D b) {
+        List<double[]> pa = corners(a);
+        List<double[]> pb = corners(b);
+        double best = Double.MAX_VALUE;
+        for (int pass = 0; pass < 2; pass++) {
+            List<double[]> from = pass == 0 ? pa : pb;
+            List<double[]> to = pass == 0 ? pb : pa;
+            for (double[] p : from) {
+                for (int k = 0; k < to.size(); k++) {
+                    double[] s1 = to.get(k);
+                    double[] s2 = to.get((k + 1) % to.size());
+                    best = Math.min(best, Line2D.ptSegDist(s1[0], s1[1], s2[0], s2[1], p[0], p[1]));
+                }
+            }
+        }
+        return best;
+    }
+
+    private static List<double[]> corners(Path2D shape) {
+        List<double[]> out = new ArrayList<>();
+        double[] c = new double[6];
+        for (PathIterator it = shape.getPathIterator(null); !it.isDone(); it.next()) {
+            if (it.currentSegment(c) != PathIterator.SEG_CLOSE) {
+                out.add(new double[] {c[0], c[1]});
+            }
+        }
+        return out;
     }
 
     static boolean selfIntersects(List<Point> polygon) {
@@ -192,13 +259,19 @@ public final class LayoutValidator {
     private static boolean inside(Area inner, Area outer) {
         Area rest = new Area(inner);
         rest.subtract(outer);
-        return rest.isEmpty();
+        return negligible(rest);
     }
 
     private static boolean overlaps(Area a, Area b) {
         Area both = new Area(a);
         both.intersect(b);
-        return !both.isEmpty();
+        return !negligible(both);
+    }
+
+    /** Empty, or a sliver under 1 mm thick left by rounding along an angled edge. */
+    private static boolean negligible(Area area) {
+        Rectangle2D b = area.getBounds2D();
+        return area.isEmpty() || b.getWidth() < 1 || b.getHeight() < 1;
     }
 
     private static Issue error(String code, String message, String ref) {

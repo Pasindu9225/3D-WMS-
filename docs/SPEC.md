@@ -240,8 +240,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Non-rectangular floors: L / U / T presets, click-to-draw outline, exact corner table (metres)
 - [x] Draw zones with type (receiving, storage, picking, dispatch, quarantine, cold)
 - [ ] Rack templates: size, levels, bins per level, max weight per level
-- [x] Place racks: drag, snap, rotate 90°, duplicate row, aisle-width warning, overlap check
-- [ ] Measurements and shapes (task 7b): unit converter, typed lengths while drawing, triangle/oval tools, edge lengths + scale bar, move/resize/copy areas and racks, racks at any angle
+- [x] Place racks: drag, snap, rotate (any angle since 7b), duplicate row, aisle-width warning, overlap check
+- [x] Measurements and shapes (task 7b): unit converter, typed lengths while drawing, triangle/oval tools, edge lengths + scale bar, move/resize/copy areas and racks, racks at any angle
 - [x] Auto-generate levels and bins with a naming pattern (`{zone}-{rack}-{level}-{bin}`)
 - [ ] Edit single bin: capacity, blocked, pick face
 - [x] Draft → publish layout; cannot delete racks or bins that hold stock (checked again in v0.4)
@@ -479,7 +479,7 @@ CREATE TABLE rack (
   template_id BIGINT UNSIGNED NOT NULL,
   code VARCHAR(10) NOT NULL,
   pos_x_mm INT NOT NULL, pos_y_mm INT NOT NULL,
-  rotation_deg SMALLINT NOT NULL DEFAULT 0,   -- 0, 90, 180, 270
+  rotation_deg SMALLINT NOT NULL DEFAULT 0,   -- 0..359, clockwise (v0.2 task 7b: any angle)
   width_mm INT NOT NULL, depth_mm INT NOT NULL, height_mm INT NOT NULL,
   UNIQUE KEY uk_rack (tenant_id, warehouse_id, code)
 );

@@ -45,19 +45,42 @@ class LayoutValidatorTest {
     @Test
     void rotationSwapsWidthAndDepth() {
         // Turned 90°, R1 is 1.1 m wide x 2.7 m deep, so a rack 1.2 m to its right no longer overlaps.
-        Rack turned = new Rack("R1", T, "A", 5000, 5000, 90);
-        Rack neighbour = new Rack("R2", T, "A", 6200, 5000, 90);
+        Rack turned = new Rack("R1", T, "A", 5000, 5000, 90, null, null, null);
+        Rack neighbour = new Rack("R2", T, "A", 6200, 5000, 90, null, null, null);
         assertThat(validate(List.of(turned, neighbour))).extracting(Issue::code).containsOnly("AISLE_TOO_NARROW");
-        assertThat(validate(List.of(new Rack("R1", T, "A", 5000, 5000, 45)))).extracting(Issue::code)
-                .containsExactly("RACK_ROTATION");
+    }
+
+    @Test
+    void racksTurnToAnyAngleAndAreCheckedByTheirRealOutline() {
+        // 45°: 2.7 x 1.1 m turned has a 2.69 m square bounding box around (10, 10) m.
+        Rack angled = new Rack("R1", T, "A", 10_000, 10_000, 45, null, null, null);
+        assertThat(validate(List.of(angled))).isEmpty();
+        // End to end along the same 45° line, 0.69 m apart: not touching, but a narrow aisle.
+        Rack nearCorner = new Rack("R2", T, "A", 12_400, 12_400, 45, null, null, null);
+        assertThat(validate(List.of(angled, nearCorner))).extracting(Issue::code).containsExactly("AISLE_TOO_NARROW");
+        // Same centre line, overlapping for real.
+        Rack onTop = new Rack("R3", T, "A", 11_000, 11_000, 45, null, null, null);
+        assertThat(validate(List.of(angled, onTop))).extracting(Issue::code).containsExactly("RACKS_OVERLAP");
+        // Turned so a corner sticks out past the zone edge at x = 0.
+        assertThat(validate(List.of(new Rack("R4", T, "A", 1200, 5000, 30, null, null, null)))).extracting(Issue::code)
+                .containsExactly("RACK_OUTSIDE_ZONE");
+    }
+
+    @Test
+    void aResizedRackUsesItsOwnSize() {
+        // Type is 2.7 m wide; made 4 m wide, R1 reaches 0.65 m further and now overlaps R2 (centres 3.3 m apart).
+        Rack wide = new Rack("R1", T, "A", 5000, 5000, 0, 4000, null, null);
+        assertThat(validate(List.of(wide, rack("R2", 8300, 5000)))).extracting(Issue::code).containsExactly("RACKS_OVERLAP");
+        assertThat(validate(List.of(rack("R1", 5000, 5000), rack("R2", 8300, 5000)))).extracting(Issue::code)
+                .containsExactly("AISLE_TOO_NARROW"); // 600 mm gap at the type size
     }
 
     @Test
     void racksMustBeInsideAKnownZoneAndUseAKnownType() {
         assertThat(validate(List.of(rack("R1", 39_000, 5000)))).extracting(Issue::code).containsExactly("RACK_OUTSIDE_ZONE");
-        assertThat(validate(List.of(new Rack("R1", T, "Z", 5000, 5000, 0)))).extracting(Issue::code)
+        assertThat(validate(List.of(new Rack("R1", T, "Z", 5000, 5000, 0, null, null, null)))).extracting(Issue::code)
                 .containsExactly("RACK_UNKNOWN_ZONE");
-        assertThat(validate(List.of(new Rack("R1", "01OTHER0000000000000000000", "A", 5000, 5000, 0))))
+        assertThat(validate(List.of(new Rack("R1", "01OTHER0000000000000000000", "A", 5000, 5000, 0, null, null, null))))
                 .extracting(Issue::code).containsExactly("RACK_UNKNOWN_TEMPLATE");
         assertThat(validate(List.of(rack("R1", 5000, 5000), rack("R1", 20_000, 5000)))).extracting(Issue::code)
                 .containsExactly("DUPLICATE_RACK_CODE");
@@ -109,7 +132,7 @@ class LayoutValidatorTest {
     }
 
     private static Rack rack(String code, int x, int y) {
-        return new Rack(code, T, "A", x, y, 0);
+        return new Rack(code, T, "A", x, y, 0, null, null, null);
     }
 
     private static Zone zone(String code, List<Point> polygon) {

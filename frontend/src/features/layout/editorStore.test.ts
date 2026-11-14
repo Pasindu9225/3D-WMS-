@@ -217,3 +217,25 @@ describe('moving, resizing and copying areas', () => {
     expect(d.racks.slice(2).map((r) => [r.code, r.x, r.y])).toEqual([['R03', 11_000, 6000], ['R04', 12_000, 7000]])
   })
 })
+
+describe('angled and resized racks in the editor', () => {
+  const type = { id: '01ARZ3NDEKTSV4RRFFQ69G5FAV', code: 'P1', name: 'Pallet', widthMm: 2000, depthMm: 1000,
+    heightMm: 4000, levels: 4, binsPerLevel: 3, maxWeightPerLevelG: 1_000_000 }
+  beforeEach(() => {
+    useEditor.getState().load(view)
+    useEditor.getState().placeShape('RECT', 20_000, 10_000, 'zone')
+    useEditor.getState().addRack(type) // centre 10 m, 5 m
+  })
+
+  it('turns by any step and keeps the angle in 0..359', () => {
+    useEditor.getState().rotateRack(0, 15)
+    useEditor.getState().rotateRack(0, -30)
+    expect(useEditor.getState().doc!.racks[0]!.rotation).toBe(345)
+  })
+
+  it('builds a row along an angled rack, using its own width when resized', () => {
+    useEditor.getState().updateRack(0, { rotation: 60, widthMm: 3000 })
+    useEditor.getState().repeatRack(0, 1, type)
+    expect(useEditor.getState().doc!.racks[1]).toMatchObject({ x: 11_500, y: 7598, rotation: 60, widthMm: 3000 })
+  })
+})

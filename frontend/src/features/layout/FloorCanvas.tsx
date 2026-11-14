@@ -1,9 +1,9 @@
 import type Konva from 'konva'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva'
+import { Circle, Group, Label, Layer, Line, Rect, Stage, Tag, Text, Transformer } from 'react-konva'
 import type { RackType, ZoneType } from '@/features/warehouses/api'
 import { useEditor } from './editorStore'
-import { bounds, nearestOnOutline, rackRect, type RackStatus } from './geometry'
+import { bounds, nearestOnOutline, rackSize, type RackStatus } from './geometry'
 import { formatWith, UNITS, type Unit } from './units'
 
 /** Zone fills: soft, distinct, readable in light and dark mode (semi-transparent over the floor). */
@@ -42,7 +42,16 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
   const cursor = useEditor((s) => s.cursor)
   const unit = useEditor((s) => s.unit)
   const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select, addDrawPoint, finishDrawing,
-    moveZonePoint, moveRack, setCursor, moveZone } = useEditor.getState()
+    moveZonePoint, moveRack, setCursor, moveZone, updateRack } = useEditor.getState()
+  const rackNodes = useRef(new Map<number, Konva.Group>())
+  const transformer = useRef<Konva.Transformer>(null)
+  const [live, setLive] = useState<{ x: number; y: number; text: string } | null>(null)
+
+  // Rotate and resize handles follow the selected rack.
+  useEffect(() => {
+    const node = selection?.kind === 'rack' ? rackNodes.current.get(selection.index) : undefined
+    transformer.current?.nodes(node ? [node] : [])
+  }, [selection, doc, drawing])
   const box = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
   const [view, setView] = useState<View>({ scale: 0.02, x: 40, y: 40 })
@@ -147,10 +156,14 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
           {doc.racks.map((r, i) => {
             const t = templates[r.templateId]
             if (!t) return null
-            const rect = rackRect(r, t.widthMm, t.depthMm)
+            const { widthMm: w, depthMm: d } = rackSize(r, t)
             const selected = selection?.kind === 'rack' && selection.index === i
             return (
-              <Group key={i} x={r.x} y={r.y} draggable={editable}
+              <Group key={i} x={r.x} y={r.y} rotation={r.rotation} draggable={editable}
+                ref={(node) => {
+                  if (node) rackNodes.current.set(i, node)
+                  else rackNodes.current.delete(i)
+                }}
                 onMouseDown={(e) => {
                   e.cancelBubble = true // select the rack, not the zone underneath
                   select({ kind: 'rack', index: i })
@@ -159,15 +172,47 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
                 onDragEnd={(e) => {
                   const placed = useEditor.getState().doc?.racks[i]
                   if (placed) e.target.position({ x: placed.x, y: placed.y })
+                }}
+                onTransform={(e) => {
+                  // Live size and angle while dragging the handles: the length is worked out as you drag.
+                  const n = e.target
+                  const deg = ((Math.round(n.rotation()) % 360) + 360) % 360
+                  setLive({ x: n.x(), y: n.y(), text: `${formatWith(w * n.scaleX(), unit)} × ${formatWith(d * n.scaleY(), unit)} · ${deg}°` })
+                }}
+                onTransformEnd={(e) => {
+                  const n = e.target
+                  const widthMm = Math.min(30_000, Math.max(300, Math.round(w * n.scaleX())))
+                  const depthMm = Math.min(5_000, Math.max(300, Math.round(d * n.scaleY())))
+                  const rotation = ((Math.round(n.rotation()) % 360) + 360) % 360
+                  n.scale({ x: 1, y: 1 })
+                  setLive(null)
+                  updateRack(i, {
+                    rotation,
+                    widthMm: widthMm === t.widthMm ? null : widthMm,
+                    depthMm: depthMm === t.depthMm ? null : depthMm,
+                  })
+                  moveRack(i, { x: n.x(), y: n.y() })
                 }}>
-                <Rect x={-rect.width / 2} y={-rect.height / 2} width={rect.width} height={rect.height}
+                <Rect x={-w / 2} y={-d / 2} width={w} height={d}
                   fill={RACK_FILL[statuses[i] ?? 'ok']} stroke={selected ? '#2563eb' : '#475569'}
                   strokeWidth={selected ? 3 : 1} strokeScaleEnabled={false} />
-                <Text x={-rect.width / 2} y={-5 * px} width={rect.width} align="center" text={r.code}
+                <Text x={-w / 2} y={-5 * px} width={w} align="center" text={r.code}
                   fontSize={10 * px} fill="#1e293b" listening={false} />
               </Group>
             )
           })}
+          {editable && !drawing && (
+            <Transformer ref={transformer} rotateEnabled keepRatio={false} flipEnabled={false} ignoreStroke
+              rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]} rotationSnapTolerance={4}
+              enabledAnchors={['middle-left', 'middle-right', 'top-center', 'bottom-center']}
+              anchorSize={9} borderStroke="#2563eb" anchorStroke="#2563eb" />
+          )}
+          {live && (
+            <Label x={live.x} y={live.y} listening={false}>
+              <Tag fill="#0f172a" opacity={0.85} cornerRadius={3 * px} />
+              <Text text={live.text} fontSize={12 * px} padding={4 * px} fill="#fff" />
+            </Label>
+          )}
           {doc.openings.map((o, i) => {
             const wall = nearestOnOutline(doc.floor, o)
             const selected = selection?.kind === 'opening' && selection.index === i
