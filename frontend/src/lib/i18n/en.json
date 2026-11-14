@@ -201,5 +201,22 @@
   "error.LAYOUT_CHANGED": "Someone else saved this layout. Reload to see their changes.",
   "error.LAYOUT_INVALID": "The layout has problems that must be fixed first.",
   "error.NO_DRAFT": "There are no changes to publish.",
-  "error.WAREHOUSE_NOT_FOUND": "This warehouse does not exist or you do not have access to it."
+  "error.WAREHOUSE_NOT_FOUND": "This warehouse does not exist or you do not have access to it.",
+  "layout.shape": "Floor shape",
+  "layout.shape.RECT": "Rectangle",
+  "layout.shape.L": "L-shape",
+  "layout.shape.U": "U-shape (yard in the middle)",
+  "layout.shape.T": "T-shape",
+  "layout.draw": "Draw outline",
+  "layout.drawing.title": "Drawing the floor outline",
+  "layout.drawing.help": "Click to place each corner (snaps to 0.1 m). Double-click or press Enter to finish, Esc to cancel.",
+  "layout.drawing.count": "{n} corners placed",
+  "layout.drawing.finish": "Finish",
+  "layout.drawing.cancel": "Cancel",
+  "layout.drawing.TOO_FEW": "Place at least 3 corners.",
+  "layout.drawing.CROSSING": "The outline crosses itself. Cancel and draw it again, corner by corner around the building.",
+  "layout.corners": "Floor corners (metres)",
+  "layout.corners.hint": "Type measured positions for an exact outline. X runs right, Y runs down from the top-left.",
+  "layout.corners.add": "Add a corner after corner {n}",
+  "layout.corners.remove": "Remove corner {n}"
 }

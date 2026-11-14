@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { areaM2, insertOnEdge, nearestOnOutline, rackRect, snap } from './geometry'
+import { areaM2, floorPreset, insertOnEdge, nearestOnOutline, rackRect, selfIntersects, snap } from './geometry'
 
 const square = [
   { x: 0, y: 0 },
@@ -36,5 +36,27 @@ describe('geometry', () => {
   it('swaps width and depth when a rack is turned', () => {
     expect(rackRect({ x: 5000, y: 5000, rotation: 0 }, 2700, 1100)).toEqual({ x: 3650, y: 4450, width: 2700, height: 1100 })
     expect(rackRect({ x: 5000, y: 5000, rotation: 90 }, 2700, 1100)).toEqual({ x: 4450, y: 3650, width: 1100, height: 2700 })
+  })
+})
+
+describe('floor shapes', () => {
+  it('builds L, U and T outlines that never cross themselves', () => {
+    for (const shape of ['RECT', 'L', 'U', 'T'] as const) {
+      expect(selfIntersects(floorPreset(shape, 40_000, 20_000)), shape).toBe(false)
+    }
+    expect(floorPreset('L', 40_000, 20_000)).toHaveLength(6)
+    expect(areaM2(floorPreset('L', 40_000, 20_000))).toBe(640) // 800 m² minus the 16 x 10 m corner
+    expect(areaM2(floorPreset('U', 30_000, 20_000))).toBe(500) // minus the 10 x 10 m yard
+  })
+
+  it('spots crossing outlines', () => {
+    const bowTie = [
+      { x: 0, y: 0 },
+      { x: 10_000, y: 10_000 },
+      { x: 10_000, y: 0 },
+      { x: 0, y: 10_000 },
+    ]
+    expect(selfIntersects(bowTie)).toBe(true)
+    expect(selfIntersects(square)).toBe(false)
   })
 })

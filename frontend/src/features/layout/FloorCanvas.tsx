@@ -32,7 +32,10 @@ export function FloorCanvas({ templates, editable, fitSignal }: {
 }) {
   const doc = useEditor((s) => s.doc)
   const selection = useEditor((s) => s.selection)
-  const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select } = useEditor.getState()
+  const drawing = useEditor((s) => s.drawing)
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
+  const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select, addDrawPoint, finishDrawing } =
+    useEditor.getState()
   const box = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
   const [view, setView] = useState<View>({ scale: 0.02, x: 40, y: 40 })
@@ -83,7 +86,18 @@ export function FloorCanvas({ templates, editable, fitSignal }: {
         draggable
         onWheel={zoom}
         onDragEnd={(e) => e.target === e.target.getStage() && setView((v) => ({ ...v, x: e.target.x(), y: e.target.y() }))}
-        onMouseDown={(e) => e.target === e.target.getStage() && select(null)}
+        onMouseDown={(e) => !drawing && e.target === e.target.getStage() && select(null)}
+        onClick={(e) => {
+          if (!drawing || e.evt.button !== 0) return
+          const p = e.target.getStage()?.getRelativePointerPosition()
+          if (p) addDrawPoint(p)
+        }}
+        onDblClick={() => drawing && finishDrawing()}
+        onMouseMove={(e) => {
+          if (!drawing) return
+          const p = e.target.getStage()?.getRelativePointerPosition()
+          if (p) setCursor({ x: Math.round(p.x / 100) * 100, y: Math.round(p.y / 100) * 100 })
+        }}
       >
         <Layer listening={false}>
           {grid.map((g) => (
@@ -91,7 +105,8 @@ export function FloorCanvas({ templates, editable, fitSignal }: {
               opacity={g.major ? 0.7 : 0.45} strokeScaleEnabled={false} />
           ))}
         </Layer>
-        <Layer>
+        {/* While drawing, clicks must reach the stage, not select doors or add corners to the old outline. */}
+        <Layer listening={!drawing}>
           <Line points={floorFlat} closed fill="rgba(255,255,255,0.65)" stroke="#334155" strokeWidth={2}
             strokeScaleEnabled={false} hitStrokeWidth={12}
             onDblClick={(e) => {
@@ -146,7 +161,7 @@ export function FloorCanvas({ templates, editable, fitSignal }: {
                 offsetX={labelOffset(o.label, 11 * px, (c.x - o.x) / len)} offsetY={6 * px} />
             )
           })}
-          {editable && doc.floor.map((p, i) => (
+          {editable && !drawing && doc.floor.map((p, i) => (
             <Circle key={i} x={p.x} y={p.y} radius={6 * px} fill="#fff" stroke="#2563eb" strokeWidth={2}
               strokeScaleEnabled={false} draggable
               onDragMove={(e) => moveFloorPoint(i, { x: e.target.x(), y: e.target.y() })}
@@ -157,6 +172,16 @@ export function FloorCanvas({ templates, editable, fitSignal }: {
               }} />
           ))}
         </Layer>
+        {drawing && (
+          <Layer listening={false}>
+            <Line points={[...drawing.flatMap((p) => [p.x, p.y]), ...(cursor ? [cursor.x, cursor.y] : [])]}
+              stroke="#2563eb" strokeWidth={2} dash={[8, 6]} strokeScaleEnabled={false} />
+            {drawing.map((p, i) => (
+              <Circle key={i} x={p.x} y={p.y} radius={(i === 0 ? 8 : 5) * px} fill={i === 0 ? '#2563eb' : '#fff'}
+                stroke="#2563eb" strokeWidth={2} strokeScaleEnabled={false} />
+            ))}
+          </Layer>
+        )}
       </Stage>
     </div>
   )

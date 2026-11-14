@@ -69,3 +69,48 @@ export function rackRect(rack: { x: number; y: number; rotation: number }, width
   const d = turned ? widthMm : depthMm
   return { x: rack.x - w / 2, y: rack.y - d / 2, width: w, height: d }
 }
+
+export type FloorShape = 'RECT' | 'L' | 'U' | 'T'
+
+/**
+ * Common building outlines inside a width x length box (mm), snapped to 0.1 m. Real warehouses are
+ * rarely rectangles: L (corner cut away), U (loading yard in the middle), T (wide front, deep back).
+ */
+export function floorPreset(shape: FloorShape, w: number, l: number): Point[] {
+  const p = (x: number, y: number) => ({ x: snap(x), y: snap(y) })
+  switch (shape) {
+    case 'L':
+      return [p(0, 0), p(w * 0.6, 0), p(w * 0.6, l * 0.5), p(w, l * 0.5), p(w, l), p(0, l)]
+    case 'U':
+      return [p(0, 0), p(w / 3, 0), p(w / 3, l * 0.5), p((2 * w) / 3, l * 0.5), p((2 * w) / 3, 0), p(w, 0), p(w, l), p(0, l)]
+    case 'T':
+      return [p(0, 0), p(w, 0), p(w, l * 0.4), p(w * 0.65, l * 0.4), p(w * 0.65, l), p(w * 0.35, l), p(w * 0.35, l * 0.4),
+        p(0, l * 0.4)]
+    default:
+      return [p(0, 0), p(w, 0), p(w, l), p(0, l)]
+  }
+}
+
+/** True if any two non-neighbouring edges cross (the server refuses such outlines too). */
+export function selfIntersects(polygon: Point[]): boolean {
+  const n = polygon.length
+  const cross = (a: Point, b: Point, c: Point) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+  const onSegment = (a: Point, b: Point, c: Point) =>
+    Math.min(a.x, b.x) <= c.x && c.x <= Math.max(a.x, b.x) && Math.min(a.y, b.y) <= c.y && c.y <= Math.max(a.y, b.y)
+  const intersect = (p1: Point, p2: Point, p3: Point, p4: Point) => {
+    const d1 = cross(p3, p4, p1)
+    const d2 = cross(p3, p4, p2)
+    const d3 = cross(p1, p2, p3)
+    const d4 = cross(p1, p2, p4)
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true
+    return (d1 === 0 && onSegment(p3, p4, p1)) || (d2 === 0 && onSegment(p3, p4, p2))
+      || (d3 === 0 && onSegment(p1, p2, p3)) || (d4 === 0 && onSegment(p1, p2, p4))
+  }
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue // neighbours share a corner
+      if (intersect(polygon[i]!, polygon[(i + 1) % n]!, polygon[j]!, polygon[(j + 1) % n]!)) return true
+    }
+  }
+  return false
+}

@@ -1,16 +1,18 @@
-import { ArrowLeft, DoorOpen, Maximize, Save, Truck, Trash2 } from 'lucide-react'
+import { ArrowLeft, DoorOpen, Maximize, PenLine, Save, Shapes, Truck, Trash2 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useBlocker, useParams } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Field, FormMessage, Input } from '@/components/ui/input'
 import { can, useMe } from '@/features/auth/session'
 import { useLayout, useSaveLayout, useWarehouse } from '@/features/warehouses/api'
 import { ApiError, type Issue } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
-import { t } from '@/lib/i18n'
+import { t, type MessageKey } from '@/lib/i18n'
 import { useEditor } from './editorStore'
-import { areaM2 } from './geometry'
+import { CornerTable, DrawingPanel } from './FloorPanels'
+import { areaM2, type FloorShape } from './geometry'
 
 // Konva only loads here, never in the main bundle.
 const FloorCanvas = lazy(() => import('./FloorCanvas').then((m) => ({ default: m.FloorCanvas })))
@@ -26,7 +28,9 @@ export function LayoutEditorPage() {
   const dirty = useEditor((s) => s.dirty)
   const baseRevision = useEditor((s) => s.baseRevision)
   const selection = useEditor((s) => s.selection)
-  const { load, addOpening, updateOpening, removeOpening } = useEditor.getState()
+  const drawing = useEditor((s) => s.drawing)
+  const { load, addOpening, updateOpening, removeOpening, applyShape, startDrawing, finishDrawing, cancelDrawing } =
+    useEditor.getState()
   const [fitSignal, setFitSignal] = useState(0)
 
   useEffect(() => {
@@ -47,6 +51,17 @@ export function LayoutEditorPage() {
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [])
+
+  // Keyboard while drawing an outline: Enter finishes, Esc cancels.
+  useEffect(() => {
+    if (!drawing) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') finishDrawing()
+      if (e.key === 'Escape') cancelDrawing()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawing, finishDrawing, cancelDrawing])
 
   const onSave = () => {
     if (doc) save.mutate({ baseRevision, layout: doc }, { onSuccess: (view) => load(view) })
@@ -73,6 +88,18 @@ export function LayoutEditorPage() {
         </div>
         {editable && (
           <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={!doc || !!drawing}><Shapes /> {t('layout.shape')}</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {(['RECT', 'L', 'U', 'T'] as FloorShape[]).map((shape) => (
+                  <DropdownMenuItem key={shape} onSelect={() => applyShape(shape)}>{t(`layout.shape.${shape}` as MessageKey)}</DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant={drawing ? 'default' : 'outline'} size="sm" onClick={() => (drawing ? cancelDrawing() : startDrawing())}
+              disabled={!doc} aria-pressed={!!drawing}><PenLine /> {t('layout.draw')}</Button>
             <Button variant="outline" size="sm" onClick={() => addOpening('DOOR')} disabled={!doc}><DoorOpen /> {t('layout.addDoor')}</Button>
             <Button variant="outline" size="sm" onClick={() => addOpening('DOCK')} disabled={!doc}><Truck /> {t('layout.addDock')}</Button>
           </>
@@ -120,8 +147,10 @@ export function LayoutEditorPage() {
             </section>
           )}
 
+          <DrawingPanel />
           <IssueList title={t('layout.errors')} issues={errors} tone="bad" />
           <IssueList title={t('layout.warnings')} issues={warnings} tone="warn" />
+          {editable && !drawing && !opening && <CornerTable />}
           {editable && <p className="text-xs leading-relaxed text-muted-foreground">{t('layout.help')}</p>}
         </aside>
       </div>
