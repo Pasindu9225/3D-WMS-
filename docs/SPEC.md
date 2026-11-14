@@ -238,9 +238,9 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Warehouse CRUD with plan limit check (per-warehouse pricing)
 - [x] 2D editor (react-konva): draw floor polygon on a metre grid, doors and docks
 - [x] Non-rectangular floors: L / U / T presets, click-to-draw outline, exact corner table (metres)
-- [ ] Draw zones with type (receiving, storage, picking, dispatch, quarantine, cold)
+- [x] Draw zones with type (receiving, storage, picking, dispatch, quarantine, cold)
 - [ ] Rack templates: size, levels, bins per level, max weight per level
-- [ ] Place racks: drag, snap, rotate 90°, duplicate row, aisle-width warning, overlap check
+- [x] Place racks: drag, snap, rotate 90°, duplicate row, aisle-width warning, overlap check
 - [x] Auto-generate levels and bins with a naming pattern (`{zone}-{rack}-{level}-{bin}`)
 - [ ] Edit single bin: capacity, blocked, pick face
 - [x] Draft → publish layout; cannot delete racks or bins that hold stock (checked again in v0.4)

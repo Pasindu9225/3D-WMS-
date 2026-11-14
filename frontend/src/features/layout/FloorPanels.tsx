@@ -8,11 +8,12 @@ import { useEditor } from './editorStore'
 export function DrawingPanel() {
   const drawing = useEditor((s) => s.drawing)
   const drawError = useEditor((s) => s.drawError)
+  const zone = useEditor((s) => s.drawTarget === 'zone')
   const { finishDrawing, cancelDrawing } = useEditor.getState()
   if (!drawing) return null
   return (
     <section className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
-      <h2 className="text-sm font-semibold">{t('layout.drawing.title')}</h2>
+      <h2 className="text-sm font-semibold">{zone ? t('layout.drawing.zoneTitle') : t('layout.drawing.title')}</h2>
       <p className="text-sm text-muted-foreground">{t('layout.drawing.help')}</p>
       <p className="text-sm font-medium" aria-live="polite">{t('layout.drawing.count', { n: drawing.length })}</p>
       {drawError && <FormMessage tone="error">{t(`layout.drawing.${drawError}` as MessageKey)}</FormMessage>}

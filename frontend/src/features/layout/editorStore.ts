@@ -1,8 +1,17 @@
 import { create } from 'zustand'
-import type { LayoutDocument, LayoutView, Opening, Point } from '@/features/warehouses/api'
-import { bounds, floorPreset, insertOnEdge, nearestOnOutline, selfIntersects, snap, type FloorShape } from './geometry'
+import type { LayoutDocument, LayoutView, Opening, Point, Rack, RackType, Zone } from '@/features/warehouses/api'
+import {
+  bounds, floorPreset, insertOnEdge, nearestOnOutline, nextCode, pointInPolygon, rackRect, selfIntersects, snap,
+  type FloorShape,
+} from './geometry'
 
-export type Selection = { kind: 'opening'; index: number } | null
+export type Selection =
+  | { kind: 'opening'; index: number }
+  | { kind: 'zone'; index: number }
+  | { kind: 'rack'; index: number }
+  | null
+
+type Footprint = Pick<RackType, 'widthMm' | 'depthMm'>
 
 interface EditorState {
   doc: LayoutDocument | null
@@ -10,16 +19,18 @@ interface EditorState {
   baseRevision: number
   dirty: boolean
   selection: Selection
-  /** Corners placed so far in "draw outline" mode; null when not drawing. */
+  /** Corners placed so far in a drawing mode; null when not drawing. */
   drawing: Point[] | null
-  drawError: 'CROSSING' | 'TOO_FEW' | null
+  /** What the outline being drawn becomes: the floor, or a new zone. */
+  drawTarget: 'floor' | 'zone'
+  drawError: 'CROSSING' | 'TOO_FEW' | 'OUTSIDE' | null
   load: (view: LayoutView) => void
   moveFloorPoint: (index: number, p: Point) => void
   insertFloorPoint: (p: Point) => void
   removeFloorPoint: (index: number) => void
   insertCornerAfter: (index: number) => void
   applyShape: (shape: FloorShape) => void
-  startDrawing: () => void
+  startDrawing: (target?: 'floor' | 'zone') => void
   addDrawPoint: (p: Point) => void
   finishDrawing: () => void
   cancelDrawing: () => void
@@ -27,6 +38,16 @@ interface EditorState {
   moveOpening: (index: number, p: Point) => void
   updateOpening: (index: number, patch: Partial<Pick<Opening, 'label' | 'widthMm' | 'kind'>>) => void
   removeOpening: (index: number) => void
+  updateZone: (index: number, patch: Partial<Pick<Zone, 'code' | 'name' | 'type'>>) => void
+  moveZonePoint: (zone: number, point: number, p: Point) => void
+  removeZone: (index: number) => void
+  addRack: (type: RackType) => void
+  moveRack: (index: number, p: Point) => void
+  rotateRack: (index: number) => void
+  repeatRack: (index: number, count: number, fp: Footprint) => void
+  updateRack: (index: number, patch: Partial<Pick<Rack, 'code' | 'templateId'>>) => void
+  removeRack: (index: number) => void
+  removeSelected: () => void
   select: (selection: Selection) => void
 }
 
@@ -46,12 +67,23 @@ export const useEditor = create<EditorState>((set, get) => {
         return { ...o, x: at.x, y: at.y }
       }),
     }))
+  const addZone = (polygon: Point[]) =>
+    change((d) => {
+      const code = nextCode('Z', d.zones.map((z) => z.code))
+      set({ selection: { kind: 'zone', index: d.zones.length } })
+      return { ...d, zones: [...d.zones, { code, type: 'STORAGE', name: `Zone ${code.slice(1)}`, polygon }] }
+    })
+  /** The zone a rack centre falls in; racks keep their zone when dropped outside every zone (flagged red). */
+  const zoneAt = (d: LayoutDocument, p: Point, fallback: string) =>
+    d.zones.find((z) => pointInPolygon(p, z.polygon))?.code ?? fallback
+
   return {
     doc: null,
     baseRevision: 0,
     dirty: false,
     selection: null,
     drawing: null,
+    drawTarget: 'floor',
     drawError: null,
     load: (view) =>
       set({ doc: view.layout, baseRevision: view.revision, dirty: false, selection: null, drawing: null, drawError: null }),
@@ -73,7 +105,7 @@ export const useEditor = create<EditorState>((set, get) => {
       const b = bounds(doc.floor) // same overall size as now, new outline
       setFloor(floorPreset(shape, b.maxX - b.minX, b.maxY - b.minY).map((p) => ({ x: p.x + b.minX, y: p.y + b.minY })))
     },
-    startDrawing: () => set({ drawing: [], drawError: null, selection: null }),
+    startDrawing: (target = 'floor') => set({ drawing: [], drawTarget: target, drawError: null, selection: null }),
     addDrawPoint: (p) => {
       const drawing = get().drawing
       if (!drawing) return
@@ -83,11 +115,18 @@ export const useEditor = create<EditorState>((set, get) => {
       set({ drawing: [...drawing, point], drawError: null })
     },
     finishDrawing: () => {
-      const drawing = get().drawing
-      if (!drawing) return
+      const { drawing, drawTarget, doc } = get()
+      if (!drawing || !doc) return
       if (drawing.length < 3) return set({ drawError: 'TOO_FEW' })
       if (selfIntersects(drawing)) return set({ drawError: 'CROSSING' })
-      setFloor(drawing)
+      if (drawTarget === 'zone') {
+        // Corners on the wall count as inside; the server's exact check runs on save.
+        const onOrIn = (p: Point) => pointInPolygon(p, doc.floor) || nearestOnOutline(doc.floor, p).distance < 1
+        if (!drawing.every(onOrIn)) return set({ drawError: 'OUTSIDE' })
+        addZone(drawing)
+      } else {
+        setFloor(drawing)
+      }
       set({ drawing: null, drawError: null })
     },
     cancelDrawing: () => set({ drawing: null, drawError: null }),
@@ -117,6 +156,88 @@ export const useEditor = create<EditorState>((set, get) => {
     removeOpening: (index) => {
       change((d) => ({ ...d, openings: d.openings.filter((_, i) => i !== index) }))
       set({ selection: null })
+    },
+    updateZone: (index, patch) =>
+      change((d) => {
+        const old = d.zones[index]!.code
+        const renamed = patch.code !== undefined && patch.code !== old
+        return {
+          ...d,
+          zones: d.zones.map((z, i) => (i === index ? { ...z, ...patch } : z)),
+          racks: renamed ? d.racks.map((r) => (r.zone === old ? { ...r, zone: patch.code! } : r)) : d.racks,
+        }
+      }),
+    moveZonePoint: (zone, point, p) =>
+      change((d) => ({
+        ...d,
+        zones: d.zones.map((z, i) => (i !== zone ? z : {
+          ...z,
+          polygon: z.polygon.map((pt, j) => (j === point ? { x: snap(p.x), y: snap(p.y) } : pt)),
+        })),
+      })),
+    removeZone: (index) => {
+      // Racks cannot exist outside a zone, so they go with it (the panel says how many first).
+      change((d) => {
+        const code = d.zones[index]!.code
+        return { ...d, zones: d.zones.filter((_, i) => i !== index), racks: d.racks.filter((r) => r.zone !== code) }
+      })
+      set({ selection: null })
+    },
+    addRack: (type) =>
+      change((d) => {
+        const sel = get().selection
+        const zone = sel?.kind === 'zone' ? d.zones[sel.index] : d.zones[0]
+        if (!zone) return d
+        const b = bounds(zone.polygon)
+        const rack: Rack = {
+          code: nextCode('R', d.racks.map((r) => r.code), 2),
+          templateId: type.id,
+          zone: zone.code,
+          x: snap((b.minX + b.maxX) / 2),
+          y: snap((b.minY + b.maxY) / 2),
+          rotation: 0,
+        }
+        set({ selection: { kind: 'rack', index: d.racks.length } })
+        return { ...d, racks: [...d.racks, rack] }
+      }),
+    moveRack: (index, p) =>
+      change((d) => {
+        const at = { x: snap(p.x), y: snap(p.y) }
+        return {
+          ...d,
+          racks: d.racks.map((r, i) => (i === index ? { ...r, ...at, zone: zoneAt(d, at, r.zone) } : r)),
+        }
+      }),
+    rotateRack: (index) =>
+      change((d) => ({ ...d, racks: d.racks.map((r, i) => (i === index ? { ...r, rotation: (r.rotation + 90) % 360 } : r)) })),
+    repeatRack: (index, count, fp) =>
+      change((d) => {
+        // Copies side by side along the rack's length (no gap): one action builds a whole row.
+        const base = d.racks[index]!
+        const rect = rackRect(base, fp.widthMm, fp.depthMm)
+        const alongX = base.rotation === 0 || base.rotation === 180
+        const used = d.racks.map((r) => r.code)
+        const copies: Rack[] = []
+        for (let n = 1; n <= count; n++) {
+          const code = nextCode('R', used, 2)
+          used.push(code)
+          const at = alongX ? { x: base.x + n * rect.width, y: base.y } : { x: base.x, y: base.y + n * rect.height }
+          if (at.x > 1_000_000 || at.y > 1_000_000) break
+          copies.push({ ...base, ...at, code, zone: zoneAt(d, at, base.zone) })
+        }
+        return { ...d, racks: [...d.racks, ...copies] }
+      }),
+    updateRack: (index, patch) =>
+      change((d) => ({ ...d, racks: d.racks.map((r, i) => (i === index ? { ...r, ...patch } : r)) })),
+    removeRack: (index) => {
+      change((d) => ({ ...d, racks: d.racks.filter((_, i) => i !== index) }))
+      set({ selection: null })
+    },
+    removeSelected: () => {
+      const sel = get().selection
+      if (sel?.kind === 'rack') get().removeRack(sel.index)
+      if (sel?.kind === 'opening') get().removeOpening(sel.index)
+      // Zones are not removed by the Delete key: that would also remove their racks.
     },
     select: (selection) => set({ selection }),
   }

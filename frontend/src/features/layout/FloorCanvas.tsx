@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva'
 import type { RackType, ZoneType } from '@/features/warehouses/api'
 import { useEditor } from './editorStore'
-import { bounds, nearestOnOutline, rackRect } from './geometry'
+import { bounds, nearestOnOutline, rackRect, type RackStatus } from './geometry'
 
 /** Zone fills: soft, distinct, readable in light and dark mode (semi-transparent over the floor). */
 const ZONE_FILL: Record<ZoneType, string> = {
@@ -15,6 +15,9 @@ const ZONE_FILL: Record<ZoneType, string> = {
   COLD: 'rgba(14,165,233,0.22)',
 }
 
+/** Rack fill by live check: red = overlap or outside its zone, amber = aisle narrower than the minimum. */
+const RACK_FILL: Record<RackStatus | 'ok', string> = { ok: '#e2e8f0', warn: '#fde68a', bad: '#fca5a5' }
+
 interface View {
   scale: number // screen px per mm
   x: number
@@ -25,8 +28,10 @@ interface View {
  * The floor plan. World units are millimetres; the Konva stage scale turns them into pixels, so
  * zooming never rounds coordinates. Strokes and handles keep a constant on-screen size.
  */
-export function FloorCanvas({ templates, editable, fitSignal }: {
+export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
   templates: Record<string, RackType>
+  /** Live check result per rack (same index as doc.racks). */
+  statuses: (RackStatus | undefined)[]
   editable: boolean
   fitSignal: number
 }) {
@@ -34,8 +39,8 @@ export function FloorCanvas({ templates, editable, fitSignal }: {
   const selection = useEditor((s) => s.selection)
   const drawing = useEditor((s) => s.drawing)
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
-  const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select, addDrawPoint, finishDrawing } =
-    useEditor.getState()
+  const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select, addDrawPoint, finishDrawing,
+    moveZonePoint, moveRack } = useEditor.getState()
   const box = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
   const [view, setView] = useState<View>({ scale: 0.02, x: 40, y: 40 })
@@ -114,23 +119,39 @@ export function FloorCanvas({ templates, editable, fitSignal }: {
               const p = e.target.getStage()?.getRelativePointerPosition()
               if (p) insertFloorPoint(p)
             }} />
-          {doc.zones.map((z) => (
-            <Group key={z.code} listening={false}>
-              <Line points={z.polygon.flatMap((p) => [p.x, p.y])} closed fill={ZONE_FILL[z.type]} stroke="#64748b"
-                strokeWidth={1} dash={[6, 4]} strokeScaleEnabled={false} />
-              <Text x={bounds(z.polygon).minX + 8 * px} y={bounds(z.polygon).minY + 6 * px} text={`${z.code} · ${z.name}`}
-                fontSize={12 * px} fill="#475569" />
-            </Group>
-          ))}
-          {doc.racks.map((r) => {
+          {doc.zones.map((z, i) => {
+            const selected = selection?.kind === 'zone' && selection.index === i
+            return (
+              <Group key={i} onMouseDown={() => editable && select({ kind: 'zone', index: i })}>
+                <Line points={z.polygon.flatMap((p) => [p.x, p.y])} closed fill={ZONE_FILL[z.type]}
+                  stroke={selected ? '#2563eb' : '#64748b'} strokeWidth={selected ? 2 : 1} dash={selected ? undefined : [6, 4]}
+                  strokeScaleEnabled={false} />
+                <Text x={bounds(z.polygon).minX + 8 * px} y={bounds(z.polygon).minY + 6 * px} text={`${z.code} · ${z.name}`}
+                  fontSize={12 * px} fill="#475569" listening={false} />
+              </Group>
+            )
+          })}
+          {doc.racks.map((r, i) => {
             const t = templates[r.templateId]
             if (!t) return null
             const rect = rackRect(r, t.widthMm, t.depthMm)
+            const selected = selection?.kind === 'rack' && selection.index === i
             return (
-              <Group key={r.code} listening={false}>
-                <Rect {...rect} fill="#e2e8f0" stroke="#475569" strokeWidth={1} strokeScaleEnabled={false} />
-                <Text x={rect.x} y={rect.y + rect.height / 2 - 5 * px} width={rect.width} align="center" text={r.code}
-                  fontSize={10 * px} fill="#1e293b" />
+              <Group key={i} x={r.x} y={r.y} draggable={editable}
+                onMouseDown={(e) => {
+                  e.cancelBubble = true // select the rack, not the zone underneath
+                  select({ kind: 'rack', index: i })
+                }}
+                onDragMove={(e) => moveRack(i, { x: e.target.x(), y: e.target.y() })}
+                onDragEnd={(e) => {
+                  const placed = useEditor.getState().doc?.racks[i]
+                  if (placed) e.target.position({ x: placed.x, y: placed.y })
+                }}>
+                <Rect x={-rect.width / 2} y={-rect.height / 2} width={rect.width} height={rect.height}
+                  fill={RACK_FILL[statuses[i] ?? 'ok']} stroke={selected ? '#2563eb' : '#475569'}
+                  strokeWidth={selected ? 3 : 1} strokeScaleEnabled={false} />
+                <Text x={-rect.width / 2} y={-5 * px} width={rect.width} align="center" text={r.code}
+                  fontSize={10 * px} fill="#1e293b" listening={false} />
               </Group>
             )
           })}
@@ -170,6 +191,12 @@ export function FloorCanvas({ templates, editable, fitSignal }: {
                 e.evt.preventDefault()
                 removeFloorPoint(i)
               }} />
+          ))}
+          {editable && !drawing && selection?.kind === 'zone' && doc.zones[selection.index]?.polygon.map((p, j) => (
+            <Rect key={'zp' + j} x={p.x} y={p.y} width={10 * px} height={10 * px} offsetX={5 * px} offsetY={5 * px}
+              fill="#fff" stroke="#2563eb" strokeWidth={2} strokeScaleEnabled={false} draggable
+              onDragMove={(e) => moveZonePoint(selection.index, j, { x: e.target.x(), y: e.target.y() })}
+              onDragEnd={(e) => e.target.position(useEditor.getState().doc?.zones[selection.index]?.polygon[j] ?? p)} />
           ))}
         </Layer>
         {drawing && (

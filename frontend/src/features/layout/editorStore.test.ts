@@ -92,3 +92,64 @@ describe('floor shapes in the editor', () => {
     expect(useEditor.getState().doc!.floor).toHaveLength(3) // the earlier outline is untouched
   })
 })
+
+describe('zones and racks in the editor', () => {
+  const type = { id: '01ARZ3NDEKTSV4RRFFQ69G5FAV', code: 'P1', name: 'Pallet', widthMm: 2700, depthMm: 1100,
+    heightMm: 4000, levels: 4, binsPerLevel: 3, maxWeightPerLevelG: 1_000_000 }
+  const drawZone = (pts: { x: number; y: number }[]) => {
+    useEditor.getState().startDrawing('zone')
+    for (const p of pts) useEditor.getState().addDrawPoint(p)
+    useEditor.getState().finishDrawing()
+  }
+  beforeEach(() => useEditor.getState().load(view))
+
+  it('draws a zone inside the floor and refuses one that leaves it', () => {
+    drawZone([{ x: 0, y: 0 }, { x: 10_000, y: 0 }, { x: 10_000, y: 10_000 }, { x: 0, y: 10_000 }])
+    expect(useEditor.getState().doc!.zones).toEqual([
+      { code: 'Z1', type: 'STORAGE', name: 'Zone 1', polygon: [{ x: 0, y: 0 }, { x: 10_000, y: 0 }, { x: 10_000, y: 10_000 }, { x: 0, y: 10_000 }] },
+    ])
+    expect(useEditor.getState().selection).toEqual({ kind: 'zone', index: 0 })
+
+    drawZone([{ x: 15_000, y: 0 }, { x: 25_000, y: 0 }, { x: 25_000, y: 5000 }])
+    expect(useEditor.getState().drawError).toBe('OUTSIDE')
+    expect(useEditor.getState().doc!.zones).toHaveLength(1)
+  })
+
+  it('places racks in the selected zone, moves them between zones and renames follow the zone code', () => {
+    drawZone([{ x: 0, y: 0 }, { x: 10_000, y: 0 }, { x: 10_000, y: 10_000 }, { x: 0, y: 10_000 }])
+    drawZone([{ x: 10_000, y: 0 }, { x: 20_000, y: 0 }, { x: 20_000, y: 10_000 }, { x: 10_000, y: 10_000 }])
+    useEditor.getState().addRack(type) // zone Z2 is selected after drawing it
+    let rack = useEditor.getState().doc!.racks[0]!
+    expect(rack).toMatchObject({ code: 'R01', zone: 'Z2', x: 15_000, y: 5000, rotation: 0 })
+
+    useEditor.getState().moveRack(0, { x: 4_049, y: 3_020 })
+    rack = useEditor.getState().doc!.racks[0]!
+    expect(rack).toMatchObject({ x: 4000, y: 3000, zone: 'Z1' })
+
+    useEditor.getState().updateZone(0, { code: 'A' })
+    expect(useEditor.getState().doc!.racks[0]!.zone).toBe('A')
+  })
+
+  it('builds a row by repeating a rack along its length, turned racks along y', () => {
+    drawZone([{ x: 0, y: 0 }, { x: 20_000, y: 0 }, { x: 20_000, y: 10_000 }, { x: 0, y: 10_000 }])
+    useEditor.getState().addRack(type)
+    useEditor.getState().moveRack(0, { x: 2000, y: 2000 })
+    useEditor.getState().repeatRack(0, 3, type)
+    expect(useEditor.getState().doc!.racks.map((r) => [r.code, r.x, r.y])).toEqual([
+      ['R01', 2000, 2000], ['R02', 4700, 2000], ['R03', 7400, 2000], ['R04', 10_100, 2000],
+    ])
+    useEditor.getState().rotateRack(3)
+    useEditor.getState().repeatRack(3, 1, type)
+    expect(useEditor.getState().doc!.racks[4]).toMatchObject({ code: 'R05', x: 10_100, y: 4700, rotation: 90 })
+  })
+
+  it('removing a zone removes its racks; Delete removes the selected rack', () => {
+    drawZone([{ x: 0, y: 0 }, { x: 10_000, y: 0 }, { x: 10_000, y: 10_000 }, { x: 0, y: 10_000 }])
+    useEditor.getState().addRack(type)
+    useEditor.getState().addRack(type)
+    useEditor.getState().removeSelected()
+    expect(useEditor.getState().doc!.racks).toHaveLength(1)
+    useEditor.getState().removeZone(0)
+    expect(useEditor.getState().doc!).toMatchObject({ zones: [], racks: [] })
+  })
+})

@@ -116,3 +116,8 @@ export function useSaveLayout(warehouseId: string) {
     onSuccess: (view) => qc.setQueryData(['layout', warehouseId], view),
   })
 }
+
+/** The company's rack type library (max 100 types per page; enough for one picker). */
+export function useRackTypes() {
+  return useQuery({ queryKey: ['rack-types'], queryFn: () => api<Page<RackType>>('/rack-templates?size=100') })
+}

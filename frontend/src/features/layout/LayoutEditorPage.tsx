@@ -1,18 +1,19 @@
-import { ArrowLeft, DoorOpen, Maximize, PenLine, Save, Shapes, Truck, Trash2 } from 'lucide-react'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { ArrowLeft, Box, DoorOpen, Maximize, PenLine, Save, Shapes, SquareDashed, Truck, Trash2 } from 'lucide-react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useBlocker, useParams } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Field, FormMessage, Input } from '@/components/ui/input'
 import { can, useMe } from '@/features/auth/session'
-import { useLayout, useSaveLayout, useWarehouse } from '@/features/warehouses/api'
+import { useLayout, useRackTypes, useSaveLayout, useWarehouse } from '@/features/warehouses/api'
 import { ApiError, type Issue } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { t, type MessageKey } from '@/lib/i18n'
 import { useEditor } from './editorStore'
 import { CornerTable, DrawingPanel } from './FloorPanels'
-import { areaM2, type FloorShape } from './geometry'
+import { areaM2, rackStatuses, type FloorShape } from './geometry'
+import { RackPanel, ZonePanel } from './ZoneRackPanels'
 
 // Konva only loads here, never in the main bundle.
 const FloorCanvas = lazy(() => import('./FloorCanvas').then((m) => ({ default: m.FloorCanvas })))
@@ -29,9 +30,32 @@ export function LayoutEditorPage() {
   const baseRevision = useEditor((s) => s.baseRevision)
   const selection = useEditor((s) => s.selection)
   const drawing = useEditor((s) => s.drawing)
-  const { load, addOpening, updateOpening, removeOpening, applyShape, startDrawing, finishDrawing, cancelDrawing } =
-    useEditor.getState()
+  const drawTarget = useEditor((s) => s.drawTarget)
+  const { load, addOpening, updateOpening, removeOpening, applyShape, startDrawing, finishDrawing, cancelDrawing, addRack,
+    rotateRack, removeSelected } = useEditor.getState()
   const [fitSignal, setFitSignal] = useState(0)
+  const rackTypes = useRackTypes()
+  // Types used by the layout (even archived ones) plus the whole library for placing new racks.
+  const templates = useMemo(
+    () => ({ ...layout.data?.templates, ...Object.fromEntries((rackTypes.data?.items ?? []).map((rt) => [rt.id, rt])) }),
+    [layout.data, rackTypes.data],
+  )
+  const statuses = useMemo(() => (doc ? rackStatuses(doc, templates) : []), [doc, templates])
+  const badRacks = statuses.filter((s) => s === 'bad').length
+  const narrowRacks = statuses.filter((s) => s === 'warn').length
+
+  // Editing shortcuts (not while typing in a field): Delete removes the selected rack or door, R turns a rack.
+  useEffect(() => {
+    if (!editable) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || useEditor.getState().drawing) return
+      const sel = useEditor.getState().selection
+      if (e.key === 'Delete' || e.key === 'Backspace') removeSelected()
+      if ((e.key === 'r' || e.key === 'R') && sel?.kind === 'rack') rotateRack(sel.index)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [editable, removeSelected, rotateRack])
 
   useEffect(() => {
     if (layout.data) load(layout.data)
@@ -98,8 +122,30 @@ export function LayoutEditorPage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant={drawing ? 'default' : 'outline'} size="sm" onClick={() => (drawing ? cancelDrawing() : startDrawing())}
-              disabled={!doc} aria-pressed={!!drawing}><PenLine /> {t('layout.draw')}</Button>
+            <Button variant={drawing && drawTarget === 'floor' ? 'default' : 'outline'} size="sm"
+              onClick={() => (drawing ? cancelDrawing() : startDrawing('floor'))}
+              disabled={!doc || (!!drawing && drawTarget !== 'floor')} aria-pressed={!!drawing && drawTarget === 'floor'}>
+              <PenLine /> {t('layout.draw')}
+            </Button>
+            <Button variant={drawing && drawTarget === 'zone' ? 'default' : 'outline'} size="sm"
+              onClick={() => (drawing ? cancelDrawing() : startDrawing('zone'))}
+              disabled={!doc || (!!drawing && drawTarget !== 'zone')} aria-pressed={!!drawing && drawTarget === 'zone'}>
+              <SquareDashed /> {t('layout.drawZone')}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={!doc || !!drawing || doc.zones.length === 0}
+                  title={doc && doc.zones.length === 0 ? t('layout.rack.needZone') : undefined}><Box /> {t('layout.addRack')}</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {(rackTypes.data?.items ?? []).length === 0 && (
+                  <DropdownMenuItem disabled>{t('layout.rack.noTypes')}</DropdownMenuItem>
+                )}
+                {(rackTypes.data?.items ?? []).map((rt) => (
+                  <DropdownMenuItem key={rt.id} onSelect={() => addRack(rt)}>{rt.code} · {rt.name}</DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" size="sm" onClick={() => addOpening('DOOR')} disabled={!doc}><DoorOpen /> {t('layout.addDoor')}</Button>
             <Button variant="outline" size="sm" onClick={() => addOpening('DOCK')} disabled={!doc}><Truck /> {t('layout.addDock')}</Button>
           </>
@@ -115,7 +161,7 @@ export function LayoutEditorPage() {
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div className="min-h-[50vh] flex-1">
           <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">{t('app.loading')}</p>}>
-            <FloorCanvas templates={layout.data?.templates ?? {}} editable={editable} fitSignal={fitSignal} />
+            <FloorCanvas templates={templates} statuses={statuses} editable={editable} fitSignal={fitSignal} />
           </Suspense>
         </div>
 
@@ -147,10 +193,18 @@ export function LayoutEditorPage() {
             </section>
           )}
 
+          {editable && selection?.kind === 'zone' && <ZonePanel index={selection.index} />}
+          {editable && selection?.kind === 'rack' && <RackPanel index={selection.index} types={templates} />}
           <DrawingPanel />
+          {(badRacks > 0 || narrowRacks > 0) && (
+            <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+              {badRacks > 0 && t('layout.live.bad', { n: badRacks })}{' '}
+              {narrowRacks > 0 && t('layout.live.narrow', { n: narrowRacks })}
+            </p>
+          )}
           <IssueList title={t('layout.errors')} issues={errors} tone="bad" />
           <IssueList title={t('layout.warnings')} issues={warnings} tone="warn" />
-          {editable && !drawing && !opening && <CornerTable />}
+          {editable && !drawing && !selection && <CornerTable />}
           {editable && <p className="text-xs leading-relaxed text-muted-foreground">{t('layout.help')}</p>}
         </aside>
       </div>

@@ -114,3 +114,82 @@ export function selfIntersects(polygon: Point[]): boolean {
   }
   return false
 }
+
+/** Ray-casting point-in-polygon; points on an edge may go either way (good enough for live hints). */
+export function pointInPolygon(p: Point, polygon: Point[]): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i]!
+    const b = polygon[j]!
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside
+  }
+  return inside
+}
+
+type Box = { x: number; y: number; width: number; height: number }
+
+/**
+ * Rectangle fully inside the polygon: centre-of-edge samples and corners nudged 1 mm inward are inside,
+ * and no polygon corner pokes into the rectangle.
+ * ponytail: live hint only, the server's java.awt Area check is the authority on save.
+ */
+export function rectInPolygon(r: Box, polygon: Point[]): boolean {
+  const e = 1
+  const x0 = r.x + e, y0 = r.y + e, x1 = r.x + r.width - e, y1 = r.y + r.height - e
+  const samples = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 },
+    { x: (x0 + x1) / 2, y: y0 }, { x: x1, y: (y0 + y1) / 2 }, { x: (x0 + x1) / 2, y: y1 }, { x: x0, y: (y0 + y1) / 2 }]
+  if (!samples.every((s) => pointInPolygon(s, polygon))) return false
+  return !polygon.some((p) => p.x > r.x && p.x < r.x + r.width && p.y > r.y && p.y < r.y + r.height)
+}
+
+export type RackStatus = 'bad' | 'warn'
+
+/**
+ * Live rack checks, same rules as the server: overlapping racks and racks outside their zone are
+ * errors; racks facing each other closer than the minimum aisle are warnings (0 gap = back-to-back, fine).
+ * ponytail: O(n²) pairs, fine for the 2,000-rack cap.
+ */
+export function rackStatuses(
+  doc: { zones: { code: string; polygon: Point[] }[]; racks: { code: string; templateId: string; zone: string; x: number; y: number; rotation: number }[]; settings: { minAisleMm: number } },
+  templates: Record<string, { widthMm: number; depthMm: number }>,
+): (RackStatus | undefined)[] {
+  const status: (RackStatus | undefined)[] = doc.racks.map(() => undefined)
+  const rects = doc.racks.map((r) => {
+    const t = templates[r.templateId]
+    return t ? rackRect(r, t.widthMm, t.depthMm) : null
+  })
+  const zones = new Map(doc.zones.map((z) => [z.code, z.polygon]))
+  rects.forEach((rect, i) => {
+    const zone = zones.get(doc.racks[i]!.zone)
+    if (!rect || !zone || !rectInPolygon(rect, zone)) status[i] = 'bad'
+  })
+  for (let i = 0; i < rects.length; i++) {
+    const a = rects[i]
+    if (!a) continue
+    for (let j = i + 1; j < rects.length; j++) {
+      const b = rects[j]
+      if (!b) continue
+      const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
+      const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
+      if (overlapX > 0 && overlapY > 0) {
+        status[i] = status[j] = 'bad'
+        continue
+      }
+      const gap = overlapY > 0 ? -overlapX : overlapX > 0 ? -overlapY : -1
+      if (gap > 0 && gap < doc.settings.minAisleMm) {
+        status[i] ??= 'warn'
+        status[j] ??= 'warn'
+      }
+    }
+  }
+  return status
+}
+
+/** Next free code like Z1 or R01: prefix plus the lowest unused number. */
+export function nextCode(prefix: string, used: string[], pad = 1): string {
+  const taken = new Set(used)
+  for (let n = 1; ; n++) {
+    const code = prefix + String(n).padStart(pad, '0')
+    if (!taken.has(code)) return code
+  }
+}

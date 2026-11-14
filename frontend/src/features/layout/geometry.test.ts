@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { areaM2, floorPreset, insertOnEdge, nearestOnOutline, rackRect, selfIntersects, snap } from './geometry'
+import { areaM2, floorPreset, insertOnEdge, nearestOnOutline, nextCode, rackRect, rackStatuses, rectInPolygon, selfIntersects, snap } from './geometry'
 
 const square = [
   { x: 0, y: 0 },
@@ -58,5 +58,36 @@ describe('floor shapes', () => {
     ]
     expect(selfIntersects(bowTie)).toBe(true)
     expect(selfIntersects(square)).toBe(false)
+  })
+})
+
+describe('live rack checks (same rules as the server)', () => {
+  const t = { T: { widthMm: 2000, depthMm: 1000 } }
+  const zone = { code: 'Z1', polygon: [{ x: 0, y: 0 }, { x: 20_000, y: 0 }, { x: 20_000, y: 20_000 }, { x: 0, y: 20_000 }] }
+  const rack = (code: string, x: number, y: number, z = 'Z1') => ({ code, templateId: 'T', zone: z, x, y, rotation: 0 })
+  const check = (racks: ReturnType<typeof rack>[]) => rackStatuses({ zones: [zone], racks, settings: { minAisleMm: 1200 } }, t)
+
+  it('flags overlaps and narrow aisles, but not back-to-back racks', () => {
+    expect(check([rack('A', 2000, 2000), rack('B', 3000, 2000)])).toEqual(['bad', 'bad']) // overlap
+    expect(check([rack('A', 2000, 2000), rack('B', 2000, 3000)])).toEqual([undefined, undefined]) // back to back
+    expect(check([rack('A', 2000, 2000), rack('B', 2000, 4000)])).toEqual(['warn', 'warn']) // 1 m aisle
+    expect(check([rack('A', 2000, 2000), rack('B', 2000, 5000)])).toEqual([undefined, undefined]) // 2 m aisle
+  })
+
+  it('flags racks outside or partly outside their zone, or in a missing zone', () => {
+    expect(check([rack('A', 500, 2000)])).toEqual(['bad']) // sticks out on the left
+    expect(check([rack('A', 2000, 2000, 'NOPE')])).toEqual(['bad'])
+  })
+
+  it('knows a rectangle in the cut-away corner of an L-shaped zone is outside', () => {
+    const l = floorPreset('L', 20_000, 10_000) // top-right corner removed
+    expect(rectInPolygon({ x: 1000, y: 1000, width: 2000, height: 1000 }, l)).toBe(true)
+    expect(rectInPolygon({ x: 15_000, y: 1000, width: 2000, height: 1000 }, l)).toBe(false)
+    expect(rectInPolygon({ x: 11_000, y: 4000, width: 2000, height: 2000 }, l)).toBe(false) // across the inner corner
+  })
+
+  it('picks the next free code', () => {
+    expect(nextCode('R', ['R01', 'R03'], 2)).toBe('R02')
+    expect(nextCode('Z', [])).toBe('Z1')
   })
 })
