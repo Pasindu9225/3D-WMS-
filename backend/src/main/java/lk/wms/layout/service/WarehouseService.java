@@ -80,12 +80,19 @@ public class WarehouseService {
     }
 
     /** Same check by internal ID, for records that point at a warehouse (bins, later stock). */
+    /** Public id of a warehouse, or null once it is archived. */
     @Transactional(readOnly = true)
-    /** Public id of a warehouse already checked with requireAccess. */
     public String publicIdOf(long warehouseId) {
-        return warehouses.publicIdOf(warehouseId).orElseThrow();
+        return warehouses.publicIdOf(warehouseId).orElse(null);
     }
 
+    /** Warehouses this user may work in, or null for a company admin (all of them). For filtering lists. */
+    @Transactional(readOnly = true)
+    public List<Long> assignedIds(CurrentUser cu) {
+        return cu.isTenantAdmin() ? null : access.findWarehouseIds(cu.userId());
+    }
+
+    @Transactional(readOnly = true)
     public void requireAccess(CurrentUser cu, long warehouseId) {
         boolean ok = warehouses.existsActive(warehouseId) // a query: the tenant filter applies
                 && (cu.isTenantAdmin() || warehouses.isAssigned(warehouseId, cu.userId()));

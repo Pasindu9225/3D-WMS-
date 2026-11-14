@@ -45,6 +45,17 @@ public class PartnerService {
         return partners.search(type, ProductService.likeText(query), pageable).map(PartnerService::view);
     }
 
+    /** For orders: a live supplier by its (fixed) code, else 404. */
+    public record SupplierRef(long id, String code, String name) {
+    }
+
+    @Transactional(readOnly = true)
+    public SupplierRef supplierByCode(String code) {
+        Partner p = partners.findByTypeAndCodeIn(Partner.Type.SUPPLIER, List.of(code)).stream().findFirst()
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SUPPLIER_NOT_FOUND", "Supplier " + code + " not found"));
+        return new SupplierRef(p.getId(), p.getCode(), p.getName());
+    }
+
     @Transactional
     public PartnerView create(CurrentUser cu, Partner.Type type, String code, PartnerSpec s) {
         Partner p = new Partner(type, code);

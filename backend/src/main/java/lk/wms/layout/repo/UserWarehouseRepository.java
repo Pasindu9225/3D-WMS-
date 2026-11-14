@@ -12,6 +12,9 @@ public interface UserWarehouseRepository extends JpaRepository<UserWarehouse, Us
     @Query("select uw.userId from UserWarehouse uw where uw.warehouseId = :warehouseId")
     List<Long> findUserIds(@Param("warehouseId") long warehouseId);
 
+    @Query("select uw.warehouseId from UserWarehouse uw where uw.userId = :userId")
+    List<Long> findWarehouseIds(@Param("userId") long userId);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from UserWarehouse uw where uw.warehouseId = :warehouseId")
     int deleteAllForWarehouse(@Param("warehouseId") long warehouseId);

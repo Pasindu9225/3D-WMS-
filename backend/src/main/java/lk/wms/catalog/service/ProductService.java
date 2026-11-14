@@ -70,7 +70,7 @@ public class ProductService {
     }
 
     /** Search text for LIKE: trimmed, with ! % _ escaped (the queries use ESCAPE '!'), never a pattern. */
-    static String likeText(String query) {
+    public static String likeText(String query) {
         return query == null ? "" : query.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
@@ -152,6 +152,25 @@ public class ProductService {
         audit.record(cu.tenantId(), cu.userId(), "PRODUCTS_IMPORTED", "product", null, null,
                 java.util.Map.of("created", created, "updated", updated));
         return result;
+    }
+
+    /** What an order line needs from a product: ids, names, cost and the units it can be ordered in. */
+    public record OrderProduct(long id, String publicId, String sku, String name, String baseUom, Long costMinor,
+            java.util.Map<String, Integer> factors) {
+    }
+
+    /** Live products by SKU, with every unit (the base unit has factor 1); unknown or archived SKUs are left out. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, OrderProduct> forOrder(java.util.Collection<String> skus) {
+        java.util.Map<String, OrderProduct> out = new java.util.HashMap<>();
+        for (Product p : products.findBySkuInWithUnits(skus)) {
+            java.util.Map<String, Integer> factors = new java.util.HashMap<>();
+            factors.put(p.getBaseUom(), 1);
+            p.getUnits().forEach(u -> factors.put(u.getUom(), u.getFactor()));
+            out.put(p.getSku(), new OrderProduct(p.getId(), p.getPublicId(), p.getSku(), p.getName(), p.getBaseUom(),
+                    p.getCostMinor(), factors));
+        }
+        return out;
     }
 
     @Transactional(readOnly = true)

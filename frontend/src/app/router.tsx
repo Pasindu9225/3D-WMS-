@@ -25,6 +25,11 @@ export const router = createBrowserRouter([
           { path: '3d', lazy: () => import('@/features/view3d/View3DPage').then((m) => ({ Component: m.View3DIndexPage })) },
           { path: 'warehouses/:id/3d', lazy: () => import('@/features/view3d/View3DPage').then((m) => ({ Component: m.View3DPage })) },
           { path: 'suppliers', lazy: () => import('@/features/catalog/SuppliersPage').then((m) => ({ Component: m.SuppliersPage })) },
+          { path: 'purchase-orders', lazy: () => import('@/features/inbound/PurchaseOrdersPage').then((m) => ({ Component: m.PurchaseOrdersPage })) },
+          {
+            path: 'purchase-orders/:id',
+            lazy: () => import('@/features/inbound/PurchaseOrderPage').then((m) => ({ Component: m.PurchaseOrderPage })),
+          },
           { path: 'products', lazy: () => import('@/features/catalog/ProductsPage').then((m) => ({ Component: m.ProductsPage })) },
           { path: 'rack-types', lazy: () => import('@/features/rack-types/RackTypesPage').then((m) => ({ Component: m.RackTypesPage })) },
           { path: 'warehouses/:id/bins', lazy: () => import('@/features/bins/BinsPage').then((m) => ({ Component: m.BinsPage })) },

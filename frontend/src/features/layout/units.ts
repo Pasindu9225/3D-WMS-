@@ -66,6 +66,11 @@ export function parseVolume(text: string): number | null {
 }
 
 /** Money in cents from "450", "450.50" or "1,250.00"; null when it is not an amount. */
+/** Cents to "1,250.50". */
+export function formatMoney(minor: number): string {
+  return (minor / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 export function parseMoney(text: string): number | null {
   const t = text.trim().replace(/,/g, '')
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return null
