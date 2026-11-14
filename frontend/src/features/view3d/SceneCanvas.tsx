@@ -35,7 +35,13 @@ const unitBox = new THREE.BoxGeometry(1, 1, 1)
  * Many boxes, one draw call: a single InstancedMesh whose instances are scaled unit cubes. colors (optional)
  * gives one colour per instance; otherwise the material colour is used.
  */
-function Boxes({ specs, color, colors }: { specs: BoxSpec[]; color: string; colors?: THREE.Color[] }) {
+function Boxes({ specs, color, colors, onPick }: {
+  specs: BoxSpec[]
+  color: string
+  colors?: THREE.Color[]
+  /** Click on one instance (not a drag): its index. */
+  onPick?: (index: number) => void
+}) {
   const mesh = useRef<THREE.InstancedMesh>(null)
   useLayoutEffect(() => {
     const m = mesh.current
@@ -55,7 +61,12 @@ function Boxes({ specs, color, colors }: { specs: BoxSpec[]; color: string; colo
   }, [specs, colors])
   if (specs.length === 0) return null
   return (
-    <instancedMesh ref={mesh} args={[unitBox, undefined, specs.length]} frustumCulled={false}>
+    <instancedMesh ref={mesh} args={[unitBox, undefined, specs.length]} frustumCulled={false}
+      onClick={onPick && ((e) => {
+        if (e.delta > 4 || e.instanceId === undefined) return // a drag to turn the camera, not a pick
+        e.stopPropagation()
+        onPick(e.instanceId)
+      })}>
       <meshStandardMaterial color={colors ? '#ffffff' : color} />
     </instancedMesh>
   )
@@ -66,12 +77,19 @@ function Boxes({ specs, color, colors }: { specs: BoxSpec[]; color: string; colo
  * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
  * draw call each, whatever the number of racks.
  */
-export function SceneCanvas({ scene, onCamera }: { scene: Scene; onCamera?: (api: CameraApi) => void }) {
+export function SceneCanvas({ scene, parts, selected, onSelect, onCamera }: {
+  scene: Scene
+  /** Boxes from buildInstances(scene), worked out by the page so search and fly-to use the same positions. */
+  parts: ReturnType<typeof buildInstances>
+  /** Index of the selected bin, or null. */
+  selected: number | null
+  onSelect: (index: number | null) => void
+  onCamera?: (api: CameraApi) => void
+}) {
   const floor = useMemo(() => new THREE.ShapeGeometry(shapeOf(scene.floor)), [scene.floor])
   const zones = useMemo(() => scene.zones.map((z) => ({ ...z, geometry: new THREE.ShapeGeometry(shapeOf(z.polygon)) })),
     [scene.zones])
   const box = useMemo(() => floorBox(scene.floor), [scene.floor])
-  const parts = useMemo(() => buildInstances(scene), [scene])
   const binColors = useMemo(() => {
     const byZone = new Map(scene.zones.map((z) => [z.code, new THREE.Color(ZONE_COLOR[z.type])]))
     const fallback = new THREE.Color('#94a3b8')
@@ -98,7 +116,7 @@ export function SceneCanvas({ scene, onCamera }: { scene: Scene; onCamera?: (api
       <directionalLight position={[box.cx + 30, 60, box.cz + 20]} intensity={1.4} />
       {/* Plan y runs down the screen; turning the floor +90° about x maps plan (x, y) to scene (x, 0, y). */}
       <group rotation={[Math.PI / 2, 0, 0]}>
-        <mesh geometry={floor}>
+        <mesh geometry={floor} onClick={(e) => e.delta <= 4 && onSelect(null)}>
           <meshStandardMaterial color="#cbd5e1" side={THREE.DoubleSide} />
         </mesh>
         {zones.map((z) => (
@@ -109,7 +127,8 @@ export function SceneCanvas({ scene, onCamera }: { scene: Scene; onCamera?: (api
       </group>
       <Boxes specs={parts.posts} color="#1e3a8a" />
       <Boxes specs={parts.shelves} color="#f97316" />
-      <Boxes specs={parts.bins} color="#94a3b8" colors={binColors} />
+      <Boxes specs={parts.bins} color="#94a3b8" colors={binColors} onPick={onSelect} />
+      {selected !== null && parts.bins[selected] && <Highlight spec={parts.bins[selected]!} />}
       <Boxes specs={doors} color="#facc15" />
       <Rig box={box} onCamera={onCamera} />
     </Canvas>
@@ -145,11 +164,26 @@ function Rig({ box, onCamera }: { box: { cx: number; cz: number; size: number };
         const dz = side.z * right + ahead.z * forward
         void c.setLookAt(pos.x + dx, pos.y, pos.z + dz, target.x + dx, target.y, target.z + dz, true)
       },
-      flyTo: (x, y, z) => void c.setLookAt(x + 4, y + 3, z + 6, x, y, z, true),
+      flyTo: (at, from) => void c.setLookAt(from.x, from.y, from.z, at.x, at.y, at.z, true),
     })
   }, [box, onCamera])
   return (
     <CameraControls ref={controls} makeDefault maxPolarAngle={Math.PI / 2.05} minDistance={1.5} maxDistance={box.size * 4}
       smoothTime={0.25} />
+  )
+}
+
+/** Bright frame around the selected bin, a little larger so it shows from every side. */
+function Highlight({ spec }: { spec: BoxSpec }) {
+  return (
+    <group position={[spec.x, spec.y, spec.z]} rotation={[0, spec.rotY, 0]} scale={[spec.w + 0.08, spec.h + 0.08, spec.d + 0.08]}>
+      <lineSegments>
+        <edgesGeometry args={[unitBox]} />
+        <lineBasicMaterial color="#facc15" />
+      </lineSegments>
+      <mesh geometry={unitBox}>
+        <meshBasicMaterial color="#facc15" transparent opacity={0.35} depthWrite={false} />
+      </mesh>
+    </group>
   )
 }

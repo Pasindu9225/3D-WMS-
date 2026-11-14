@@ -353,5 +353,20 @@
   "view3d.zoomOut": "Zoom out (−)",
   "view3d.top": "Top view (T)",
   "view3d.reset": "Reset view (R)",
-  "view3d.keys": "Drag to turn · right-drag or arrows to move · scroll or +/− to zoom · T top · R reset"
+  "view3d.keys": "Click a bin for details · drag to turn · right-drag or arrows to move · scroll or +/− to zoom · T top · R reset · / find · Esc close",
+  "view3d.search": "Find bin",
+  "view3d.searchHint": "Find bin ( / )",
+  "view3d.notFound": "No bin starts with {code}.",
+  "view3d.bin.panel": "Bin {code}",
+  "view3d.bin.title": "Bin",
+  "view3d.bin.close": "Close",
+  "view3d.bin.rack": "Rack",
+  "view3d.bin.zone": "zone {zone}",
+  "view3d.bin.level": "Level",
+  "view3d.bin.slot": "Slot",
+  "view3d.bin.of": "{n} of {total}",
+  "view3d.bin.weight": "Max weight",
+  "view3d.bin.volume": "Max volume",
+  "view3d.bin.contentsSoon": "Contents (products and quantities) arrive with stock in the next version.",
+  "view3d.bin.edit": "Edit in bins page"
 }

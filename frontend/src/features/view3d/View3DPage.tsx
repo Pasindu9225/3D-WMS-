@@ -1,5 +1,5 @@
-import { ArrowLeft, Map, RotateCcw, Scan, ZoomIn, ZoomOut } from 'lucide-react'
-import { lazy, Suspense, useCallback, useEffect, useRef } from 'react'
+import { ArrowLeft, Map, RotateCcw, Scan, Search, ZoomIn, ZoomOut } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { FormMessage } from '@/components/ui/input'
@@ -9,8 +9,10 @@ import { ApiError } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { useScene } from './api'
-import { shortcut, type CameraApi } from './camera'
-import { floorBox } from './sceneLayout'
+import { shortcut, viewpoint, type CameraApi } from './camera'
+import { BinPanel } from './BinPanel'
+import { buildInstances, floorBox } from './sceneLayout'
+import { findBin, suggestions } from './search'
 
 // three.js and React Three Fiber load only here, never in the main bundle (SPEC v0.3).
 const SceneCanvas = lazy(() => import('./SceneCanvas').then((m) => ({ default: m.SceneCanvas })))
@@ -47,12 +49,37 @@ export function View3DPage() {
   const camera = useRef<CameraApi | null>(null)
   const onCamera = useCallback((api: CameraApi) => { camera.current = api }, [])
   const floor = scene.data?.floor
+  const parts = useMemo(() => (scene.data ? buildInstances(scene.data) : null), [scene.data])
+  const [selected, setSelected] = useState<number | null>(null)
+  const [query, setQuery] = useState('')
+  const [notFound, setNotFound] = useState<string | null>(null)
+  const searchBox = useRef<HTMLInputElement>(null)
+  const codes = useMemo(() => scene.data?.bins.codes ?? [], [scene.data])
+  const hints = useMemo(() => suggestions(codes, query), [codes, query])
+
+  const find = (text: string) => {
+    const i = findBin(codes, text)
+    setNotFound(i === null ? text.trim().toUpperCase() : null)
+    if (i === null || !parts) return
+    setSelected(i)
+    const b = parts.bins[i]!
+    camera.current?.flyTo(b, viewpoint(b))
+  }
 
   // Keyboard: + / - zoom, T top view, R or Home reset, arrows pan (Shift: faster). Not while typing.
   useEffect(() => {
     if (!floor) return
     const step = floorBox(floor).size * 0.05
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelected(null)
+        return
+      }
+      if (e.key === '/' && !(e.target instanceof HTMLInputElement)) {
+        e.preventDefault()
+        searchBox.current?.focus()
+        return
+      }
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.ctrlKey || e.metaKey || e.altKey) return
       const action = camera.current && shortcut(e.key, e.shiftKey, camera.current, step)
       if (action) {
@@ -77,6 +104,21 @@ export function View3DPage() {
             </p>
           )}
         </div>
+        {scene.data && (
+          <form role="search" className="relative" onSubmit={(e) => {
+            e.preventDefault()
+            find(query)
+          }}>
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input ref={searchBox} aria-label={t('view3d.search')} placeholder={t('view3d.searchHint')} value={query} list="bin-codes"
+              maxLength={40} onChange={(e) => {
+                setQuery(e.target.value)
+                setNotFound(null)
+              }}
+              className="h-9 w-56 rounded-md border border-input bg-background pr-2 pl-8 font-mono text-sm uppercase placeholder:font-sans placeholder:normal-case" />
+            <datalist id="bin-codes">{hints.map((c) => <option key={c} value={c} />)}</datalist>
+          </form>
+        )}
         {can(me.data, 'warehouses:manage') && (
           <Button asChild variant="outline" size="sm"><Link to={`/app/warehouses/${id}/layout`}><Map /> {t('view3d.editLayout')}</Link></Button>
         )}
@@ -86,8 +128,15 @@ export function View3DPage() {
         {scene.isError && !notPublished && <div className="p-6"><FormMessage tone="error">{errorMessage(scene.error)}</FormMessage></div>}
         {scene.data && (
           <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">{t('view3d.loading3d')}</p>}>
-            <SceneCanvas scene={scene.data} onCamera={onCamera} />
+            {parts && <SceneCanvas scene={scene.data} parts={parts} selected={selected} onSelect={setSelected} onCamera={onCamera} />}
           </Suspense>
+        )}
+        {notFound && (
+          <p role="status" className="absolute top-3 left-3 rounded-md border bg-card/95 px-3 py-2 text-sm">{t('view3d.notFound', { code: notFound })}</p>
+        )}
+        {scene.data && selected !== null && (
+          <BinPanel scene={scene.data} index={selected} warehouseId={id} canManage={can(me.data, 'warehouses:manage')}
+            onClose={() => setSelected(null)} />
         )}
         {scene.data && (
           <div className="absolute right-3 bottom-3 flex flex-col items-end gap-2">

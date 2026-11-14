@@ -260,8 +260,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Load 3D page code only on 3D routes (lazy import); scene + bin-status API (task 1)
 - [x] Draw floor, zones, racks and bins with instanced meshes; one draw call per shape (7 calls for 5,000 bins)
 - [x] Orbit, zoom, top view, reset camera; keyboard shortcuts (+ − T R Home, arrows, Shift = faster)
-- [ ] Click bin → side panel (code, capacity, contents placeholder until v0.4)
-- [ ] Search bin code → camera flies to it and it highlights
+- [x] Click bin → side panel (code, capacity, contents placeholder until v0.4)
+- [x] Search bin code → camera flies to it and it highlights (viewpoint in the aisle in front of the bin)
 - [ ] Colour modes: by zone, by status (empty / partly full / full / blocked)
 - [ ] Lite mode: 2D top-down map for weak PCs; auto-suggest when fps stays under 20
 - [ ] Live updates over WebSocket (STOMP) for bin status changes
