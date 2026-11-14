@@ -31,3 +31,15 @@ it('converts typed weights to grams', async () => {
   expect(parseWeight('heavy')).toBeNull()
   expect(formatKg(1_500_000)).toBe('1,500 kg')
 })
+
+it('reads volumes in litres or as a box in cm, and money in cents', async () => {
+  const { parseVolume, parseMoney } = await import('./units')
+  expect(parseVolume('1.1')).toBe(1100)
+  expect(parseVolume('2 L')).toBe(2000)
+  expect(parseVolume('30x20x15')).toBe(9000)
+  expect(parseVolume('30 × 20 × 15 cm')).toBe(9000)
+  expect(parseVolume('big')).toBeNull()
+  expect(parseMoney('1,250.50')).toBe(125050)
+  expect(parseMoney('450')).toBe(45000)
+  expect(parseMoney('4.555')).toBeNull()
+})

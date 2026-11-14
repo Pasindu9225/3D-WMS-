@@ -52,3 +52,22 @@ export function parseWeight(text: string): number | null {
 export function formatKg(g: number): string {
   return `${(Math.round(g / 10) / 100).toLocaleString('en')} kg`
 }
+
+/**
+ * Volume in cm³ from what people know: litres ("1.5") or a box in cm ("30x20x15", also "30 × 20 × 15").
+ * Null when it is neither.
+ */
+export function parseVolume(text: string): number | null {
+  const t = text.trim().toLowerCase()
+  const box = /^(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(cm)?$/.exec(t)
+  if (box) return Math.round(Number(box[1]) * Number(box[2]) * Number(box[3]))
+  const litres = /^(\d+(?:\.\d+)?|\.\d+)\s*(l|litres?|liters?)?$/.exec(t)
+  return litres ? Math.round(Number(litres[1]) * 1000) : null
+}
+
+/** Money in cents from "450", "450.50" or "1,250.00"; null when it is not an amount. */
+export function parseMoney(text: string): number | null {
+  const t = text.trim().replace(/,/g, '')
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null
+  return Math.round(Number(t) * 100)
+}
