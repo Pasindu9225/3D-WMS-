@@ -16,6 +16,11 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, lazy: () => import('./AppHome').then((m) => ({ Component: m.AppHome })) },
+          { path: 'warehouses', lazy: () => import('@/features/warehouses/WarehousesPage').then((m) => ({ Component: m.WarehousesPage })) },
+          {
+            path: 'warehouses/:id/layout',
+            lazy: () => import('@/features/layout/LayoutEditorPage').then((m) => ({ Component: m.LayoutEditorPage })),
+          },
           { path: 'users', lazy: () => import('@/features/users/UsersPage').then((m) => ({ Component: m.UsersPage })) },
           { path: 'roles', lazy: () => import('@/features/roles/RolesPage').then((m) => ({ Component: m.RolesPage })) },
           { path: 'audit', lazy: () => import('@/features/audit/AuditPage').then((m) => ({ Component: m.AuditPage })) },

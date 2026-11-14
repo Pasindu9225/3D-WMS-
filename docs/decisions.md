@@ -63,3 +63,5 @@
 | 2026-11-13 | Measured: 100 racks / 5,000 bins first publish 3.9 s, republish 0.2 s, draft check 0.1 s (local MySQL) | IDENTITY keys mean one insert per new bin; fine at this size |
 | 2026-11-13 | Labels: A4 3x8 (70x37 mm) sheets and 100x50 mm singles; QR (ZXing 3.5.4, ECC M) holds exactly the printed bin code; vector QR via OpenPDF 2.0.5 | Typed fallback matches the scan; crisp print, small files (5,000 labels < 3 MB) |
 | 2026-11-14 | OpenPDF 2.0.5 (not 3.x / 2.1+); build fails if any runtime library targets newer than Java 17 (enforcer: enforceBytecodeVersion) | OpenPDF 2.1+ is compiled for Java 21; it compiled on a JDK 25 dev PC but broke CI on JDK 17 and would have broken the server |
+| 2026-11-14 | react-konva 19.0.10 + Konva 10.7; editor state in a Zustand store; Konva only in the editor chunk (~100 KB gzip, lazy) | 19.2+ needs React 19.2/19.3; initial bundle unchanged (158 KB) |
+| 2026-11-14 | Editor: corners snap to 0.1 m; doors/docks always snap onto the outer wall; labels upright and nudged inward | Server rules (on-wall, whole mm) hold by construction; readable on every wall |

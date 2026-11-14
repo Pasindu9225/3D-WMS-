@@ -15,20 +15,31 @@ export interface FieldError {
   message: string
 }
 
+/** A problem the server found in a whole document (e.g. a layout); ref names the zone or rack. */
+export interface Issue {
+  severity: 'ERROR' | 'WARNING'
+  code: string
+  message: string
+  ref: string
+}
+
 /** A ProblemDetail from the backend, or a network failure (status 0, code NETWORK). */
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
   readonly correlationId?: string
   readonly errors: FieldError[]
+  readonly issues: Issue[]
 
-  constructor(status: number, code: string, message: string, correlationId?: string, errors: FieldError[] = []) {
+  constructor(status: number, code: string, message: string, correlationId?: string, errors: FieldError[] = [],
+    issues: Issue[] = []) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.correlationId = correlationId
     this.errors = errors
+    this.issues = issues
   }
 }
 
@@ -121,8 +132,15 @@ async function primeCsrf(force: boolean): Promise<void> {
 
 async function toApiError(res: Response): Promise<ApiError> {
   try {
-    const p = (await res.json()) as { code?: string; detail?: string; correlationId?: string; errors?: FieldError[] }
-    return new ApiError(res.status, p.code ?? 'ERROR', p.detail ?? res.statusText, p.correlationId, p.errors ?? [])
+    const p = (await res.json()) as {
+      code?: string
+      detail?: string
+      correlationId?: string
+      errors?: FieldError[]
+      issues?: Issue[]
+    }
+    return new ApiError(res.status, p.code ?? 'ERROR', p.detail ?? res.statusText, p.correlationId, p.errors ?? [],
+      p.issues ?? [])
   } catch {
     return new ApiError(res.status, 'ERROR', res.statusText)
   }
