@@ -136,6 +136,18 @@ class LiveUpdatesTest extends ApiTest {
         assertThat(errors.poll(5, TimeUnit.SECONDS)).isNotNull(); // closed; the browser must sign in again
     }
 
+    @Test
+    void oneSignInGetsAtMostFiveSockets() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            connect(admin, "http://localhost:" + port);
+        }
+        Thread.sleep(300);
+        assertThat(live.openSockets()).isEqualTo(5);
+        assertThatThrownBy(() -> connect(admin, "http://localhost:" + port)) // the sixth is closed at once
+                .hasMessageContaining("Connection closed");
+        assertThat(live.openSockets()).isEqualTo(5);
+    }
+
     private StompSession connect(Cookie cookie, String origin) throws Exception {
         WebSocketHttpHeaders headers = new WebSocketHttpHeaders();
         headers.setOrigin(origin);

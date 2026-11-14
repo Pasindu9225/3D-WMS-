@@ -21,6 +21,7 @@ export const router = createBrowserRouter([
             path: 'warehouses/:id/layout',
             lazy: () => import('@/features/layout/LayoutEditorPage').then((m) => ({ Component: m.LayoutEditorPage })),
           },
+          { path: '3d-perf', lazy: () => import('@/features/view3d/PerfPage').then((m) => ({ Component: m.PerfPage })) },
           { path: '3d', lazy: () => import('@/features/view3d/View3DPage').then((m) => ({ Component: m.View3DIndexPage })) },
           { path: 'warehouses/:id/3d', lazy: () => import('@/features/view3d/View3DPage').then((m) => ({ Component: m.View3DPage })) },
           { path: 'rack-types', lazy: () => import('@/features/rack-types/RackTypesPage').then((m) => ({ Component: m.RackTypesPage })) },

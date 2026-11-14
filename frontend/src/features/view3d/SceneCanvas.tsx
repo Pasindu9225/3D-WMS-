@@ -70,7 +70,7 @@ function Boxes({ specs, color, colors, onPick }: {
  * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
  * draw call each, whatever the number of racks.
  */
-export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow }: {
+export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow, onFrame }: {
   scene: Scene
   /** Boxes from buildInstances(scene), worked out by the page so search and fly-to use the same positions. */
   parts: ReturnType<typeof buildInstances>
@@ -82,6 +82,8 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
   onCamera?: (api: CameraApi) => void
   /** Called once if moving the camera stays under 20 fps (the page then offers Lite mode). */
   onSlow?: () => void
+  /** Performance page only: keep the camera turning and report every frame time (seconds). */
+  onFrame?: (delta: number) => void
 }) {
   const floor = useMemo(() => new THREE.ShapeGeometry(shapeOf(scene.floor)), [scene.floor])
   const zones = useMemo(() => scene.zones.map((z) => ({ ...z, geometry: new THREE.ShapeGeometry(shapeOf(z.polygon)) })),
@@ -132,6 +134,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       <Boxes specs={doors} color="#facc15" />
       <Rig box={box} onCamera={onCamera} />
       {onSlow && <FpsWatch onSlow={onSlow} />}
+      {onFrame && <Spin onFrame={onFrame} />}
     </Canvas>
   )
 }
@@ -216,6 +219,18 @@ function FpsWatch({ onSlow }: { onSlow: () => void }) {
       done.current = true
       onSlow()
     }
+  })
+  return null
+}
+
+/** Turns the camera slowly on every frame (continuous rendering) and reports frame times: a stress test. */
+function Spin({ onFrame }: { onFrame: (delta: number) => void }) {
+  const controls = useThree((state) => state.controls) as unknown as CameraControls | null
+  const invalidate = useThree((state) => state.invalidate)
+  useFrame((_, delta) => {
+    onFrame(delta)
+    void controls?.rotate(delta * 0.4, 0, false)
+    invalidate() // render on demand: ask for the next frame straight away
   })
   return null
 }

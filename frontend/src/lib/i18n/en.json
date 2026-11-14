@@ -389,5 +389,10 @@
   "view3d.slowKeep": "Keep 3D",
   "view3d.live.live": "live",
   "view3d.live.connecting": "connecting…",
-  "view3d.live.offline": "offline, retrying"
+  "view3d.live.offline": "offline, retrying",
+  "view3d.perf.title": "3D performance test (fake data)",
+  "view3d.perf.bins": "{n} bins",
+  "view3d.perf.start": "Run 10 s test",
+  "view3d.perf.running": "Running…",
+  "view3d.perf.result": "Median {median} fps · slowest 10% {p10} fps"
 }

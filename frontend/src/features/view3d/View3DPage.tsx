@@ -206,25 +206,39 @@ export function View3DPage() {
             {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} />}
           </Suspense>
         )}
+        {/* Bottom bar: legend left and camera right; stacked on phones (camera above) so nothing overlaps. */}
         {scene.data && (
-          <div className="absolute bottom-3 left-3 max-w-[60%] space-y-2 rounded-lg border bg-card/90 p-2 text-xs shadow-sm">
-            <div role="radiogroup" aria-label={t('view3d.colorBy')} className="flex gap-1">
-              {(['zone', 'status'] as ColorMode[]).map((m) => (
-                <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
-                  className={`rounded px-2 py-1 font-medium ${mode === m ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
-                  {t(`view3d.colorBy.${m}` as MessageKey)}
-                </button>
-              ))}
+          <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="pointer-events-auto space-y-2 rounded-lg border bg-card/90 p-2 text-xs shadow-sm sm:max-w-[60%]">
+              <div role="radiogroup" aria-label={t('view3d.colorBy')} className="flex gap-1">
+                {(['zone', 'status'] as ColorMode[]).map((m) => (
+                  <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
+                    className={`rounded px-2 py-1 font-medium ${mode === m ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
+                    {t(`view3d.colorBy.${m}` as MessageKey)}
+                  </button>
+                ))}
+              </div>
+              <ul className="flex flex-wrap gap-x-3 gap-y-1">
+                {legend(scene.data, mode).map((l) => (
+                  <li key={l.key} className="flex items-center gap-1.5">
+                    <span className="size-3 rounded-sm" style={{ background: l.color }} />
+                    {mode === 'zone' ? t(`layout.zoneType.${l.key}` as MessageKey) : t(`view3d.status.${l.key}` as MessageKey)}
+                  </li>
+                ))}
+              </ul>
+              {mode === 'status' && <p className="text-muted-foreground">{t('view3d.status.note')}</p>}
             </div>
-            <ul className="flex flex-wrap gap-x-3 gap-y-1">
-              {legend(scene.data, mode).map((l) => (
-                <li key={l.key} className="flex items-center gap-1.5">
-                  <span className="size-3 rounded-sm" style={{ background: l.color }} />
-                  {mode === 'zone' ? t(`layout.zoneType.${l.key}` as MessageKey) : t(`view3d.status.${l.key}` as MessageKey)}
-                </li>
-              ))}
-            </ul>
-            {mode === 'status' && <p className="text-muted-foreground">{t('view3d.status.note')}</p>}
+            {view === '3d' && (
+              <div className="pointer-events-auto flex flex-col items-end gap-2 self-end">
+                <div className="flex gap-1 rounded-lg border bg-card/90 p-1 shadow-sm">
+                  <Button variant="ghost" size="icon" aria-label={t('view3d.zoomIn')} title={t('view3d.zoomIn')} onClick={() => camera.current?.zoom(1)}><ZoomIn /></Button>
+                  <Button variant="ghost" size="icon" aria-label={t('view3d.zoomOut')} title={t('view3d.zoomOut')} onClick={() => camera.current?.zoom(-1)}><ZoomOut /></Button>
+                  <Button variant="ghost" size="icon" aria-label={t('view3d.top')} title={t('view3d.top')} onClick={() => camera.current?.top()}><Scan /></Button>
+                  <Button variant="ghost" size="icon" aria-label={t('view3d.reset')} title={t('view3d.reset')} onClick={() => camera.current?.reset()}><RotateCcw /></Button>
+                </div>
+                <p className="hidden rounded bg-card/80 px-2 py-1 text-xs text-muted-foreground sm:block">{t('view3d.keys')}</p>
+              </div>
+            )}
           </div>
         )}
         {notFound && (
@@ -233,17 +247,6 @@ export function View3DPage() {
         {scene.data && selected !== null && (
           <BinPanel scene={scene.data} index={selected} warehouseId={id} canManage={can(me.data, 'warehouses:manage')}
             onClose={() => setSelected(null)} />
-        )}
-        {scene.data && view === '3d' && (
-          <div className="absolute right-3 bottom-3 flex flex-col items-end gap-2">
-            <div className="flex gap-1 rounded-lg border bg-card/90 p-1 shadow-sm">
-              <Button variant="ghost" size="icon" aria-label={t('view3d.zoomIn')} title={t('view3d.zoomIn')} onClick={() => camera.current?.zoom(1)}><ZoomIn /></Button>
-              <Button variant="ghost" size="icon" aria-label={t('view3d.zoomOut')} title={t('view3d.zoomOut')} onClick={() => camera.current?.zoom(-1)}><ZoomOut /></Button>
-              <Button variant="ghost" size="icon" aria-label={t('view3d.top')} title={t('view3d.top')} onClick={() => camera.current?.top()}><Scan /></Button>
-              <Button variant="ghost" size="icon" aria-label={t('view3d.reset')} title={t('view3d.reset')} onClick={() => camera.current?.reset()}><RotateCcw /></Button>
-            </div>
-            <p className="hidden rounded bg-card/80 px-2 py-1 text-xs text-muted-foreground sm:block">{t('view3d.keys')}</p>
-          </div>
         )}
       </div>
     </div>

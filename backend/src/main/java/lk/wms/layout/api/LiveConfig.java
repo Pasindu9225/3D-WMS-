@@ -41,6 +41,7 @@ import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
  * Live bin status for the 3D viewer: STOMP over WebSocket at /ws (v0.3 task 7).
  *
  * <ul>
+ *   <li>At most 5 sockets per sign-in.</li>
  *   <li>The handshake goes through the normal security chain, so it needs a valid session cookie.</li>
  *   <li>Only our own origin (and the CORS allow-list) may connect: browsers send cookies with WebSocket
  *       handshakes, so another site could otherwise open a socket as the user (cross-site WebSocket hijacking).</li>
@@ -56,6 +57,8 @@ public class LiveConfig implements WebSocketMessageBrokerConfigurer {
 
     static final Pattern BIN_TOPIC = Pattern.compile("^/topic/wh/([0-9A-HJKMNP-TV-Z]{26})/bins$");
     static final Duration MAX_SOCKET_AGE = Duration.ofMinutes(15);
+    /** A few tabs per sign-in is plenty; more would let one account use up server memory. */
+    static final int MAX_SOCKETS_PER_SESSION = 5;
     private static final Logger log = LoggerFactory.getLogger(LiveConfig.class);
 
     private final WarehouseService warehouses;
@@ -140,6 +143,12 @@ public class LiveConfig implements WebSocketMessageBrokerConfigurer {
         return new WebSocketHandlerDecorator(handler) {
             @Override
             public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+                String sid = sessionIdOf(session);
+                long mine = open.values().stream().filter(t -> sid != null && sid.equals(sessionIdOf(t.session()))).count();
+                if (mine >= MAX_SOCKETS_PER_SESSION) {
+                    session.close(CloseStatus.POLICY_VIOLATION.withReason("too many connections"));
+                    return;
+                }
                 open.put(session.getId(), new Tracked(session, Instant.now()));
                 super.afterConnectionEstablished(session);
             }
@@ -150,6 +159,11 @@ public class LiveConfig implements WebSocketMessageBrokerConfigurer {
                 super.afterConnectionClosed(session, status);
             }
         };
+    }
+
+    private static String sessionIdOf(WebSocketSession session) {
+        return session.getPrincipal() instanceof Authentication a && a.getPrincipal() instanceof CurrentUser u
+                ? u.sessionId() : null;
     }
 
     /** Every minute: close sockets whose session was revoked or that outlived the access token. */
