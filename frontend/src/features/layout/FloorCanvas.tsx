@@ -44,6 +44,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
   const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select, addDrawPoint, finishDrawing,
     moveZonePoint, setCursor, moveZone } = useEditor.getState()
   const rackNodes = useRef(new Map<number, Konva.Group>())
+  const zoneDrag = useRef<{ start: { x: number; y: number }; applied: { x: number; y: number } } | null>(null)
   const transformer = useRef<Konva.Transformer>(null)
   const [live, setLive] = useState<{ x: number; y: number; text: string } | null>(null)
 
@@ -145,16 +146,24 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
             const selected = selection?.kind === 'zone' && selection.index === i
             return (
               <Group key={i} draggable={editable} onMouseDown={() => editable && select({ kind: 'zone', index: i })}
-                onDragMove={(e) => {
-                  // Move in whole 0.1 m steps; the group itself stays put and the store moves the zone and its racks.
-                  const dx = Math.round(e.target.x() / 100) * 100
-                  const dy = Math.round(e.target.y() / 100) * 100
-                  if (dx !== 0 || dy !== 0) {
-                    moveZone(i, dx, dy)
-                    e.target.position({ x: e.target.x() - dx, y: e.target.y() - dy })
-                  }
+                onDragStart={(e) => {
+                  zoneDrag.current = { start: e.target.absolutePosition(), applied: { x: 0, y: 0 } }
                 }}
-                onDragEnd={(e) => e.target.position({ x: 0, y: 0 })}>
+                dragBoundFunc={(pos) => {
+                  // Konva reports the total drag since it started. Apply only the part not applied yet, in whole
+                  // 0.1 m steps; the group stays where it is and the store moves the zone and its racks.
+                  const d = zoneDrag.current
+                  if (!d) return pos
+                  const total = { x: Math.round((pos.x - d.start.x) / view.scale / 100) * 100, y: Math.round((pos.y - d.start.y) / view.scale / 100) * 100 }
+                  if (total.x !== d.applied.x || total.y !== d.applied.y) {
+                    moveZone(i, total.x - d.applied.x, total.y - d.applied.y)
+                    d.applied = total
+                  }
+                  return d.start
+                }}
+                onDragEnd={() => {
+                  zoneDrag.current = null
+                }}>
                 <Line points={z.polygon.flatMap((p) => [p.x, p.y])} closed fill={ZONE_FILL[z.type]}
                   stroke={selected ? '#2563eb' : '#64748b'} strokeWidth={selected ? 2 : 1} dash={selected ? undefined : [6, 4]}
                   strokeScaleEnabled={false} />

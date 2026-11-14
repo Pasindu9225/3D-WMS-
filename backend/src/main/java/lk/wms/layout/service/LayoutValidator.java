@@ -96,7 +96,7 @@ public final class LayoutValidator {
             }
             Footprint fp = templates.get(r.templateId());
             if (fp == null) {
-                issues.add(error("RACK_UNKNOWN_TEMPLATE", "Rack " + r.code() + " uses a rack type that does not exist",
+                issues.add(error("RACK_UNKNOWN_TEMPLATE", "Rack " + r.code() + " uses a rack type that is archived or does not exist; choose another type for it",
                         r.code()));
                 continue;
             }

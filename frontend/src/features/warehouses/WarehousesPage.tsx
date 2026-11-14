@@ -63,12 +63,14 @@ export function WarehousesPage() {
               <td>
                 <Badge tone={w.layoutStatus === 'PUBLISHED' ? 'good' : 'warn'}>{t(`warehouses.layout.${w.layoutStatus}`)}</Badge>
               </td>
-              <td className="whitespace-nowrap text-right">
+              <td className="text-right">
+                {/* Wraps on phones so every action stays visible instead of scrolling off the table. */}
+                <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button asChild variant="outline" size="sm">
                   <Link to={`/app/warehouses/${w.id}/layout`}><Map /> {manage ? t('warehouses.edit') : t('warehouses.view')}</Link>
                 </Button>
                 {w.layoutStatus === 'PUBLISHED' && (
-                  <Button asChild variant="outline" size="sm" className="ml-2">
+                  <Button asChild variant="outline" size="sm">
                     <Link to={`/app/warehouses/${w.id}/bins`}><Boxes /> {t('warehouses.bins')}</Link>
                   </Button>
                 )}
@@ -76,6 +78,7 @@ export function WarehousesPage() {
                   <Button variant="ghost" size="icon" aria-label={t('warehouses.archive', { code: w.code })}
                     onClick={() => setArchiving(w)}><Archive /></Button>
                 )}
+                </div>
               </td>
             </Tr>
           ))}

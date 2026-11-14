@@ -58,6 +58,7 @@ export function UsersPage() {
         <FormMessage tone="error">{errorMessage(reinvite.error ?? setEnabled.error ?? unlock.error)}</FormMessage>
       )}
 
+      {!users.isError && (
       <Table>
         <thead>
           <tr>
@@ -131,6 +132,7 @@ export function UsersPage() {
           )}
         </tbody>
       </Table>
+      )}
 
       {data && data.total > PAGE_SIZE && (
         <Pager page={data.page} size={data.size} total={data.total} onPage={setPage}
