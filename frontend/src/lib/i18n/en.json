@@ -377,5 +377,14 @@
   "view3d.status.FULL": "Full",
   "view3d.status.BLOCKED": "Blocked",
   "view3d.status.PICK_FACE": "Pick face (empty)",
-  "view3d.status.note": "Fill levels appear once stock is recorded (next version)."
+  "view3d.status.note": "Fill levels appear once stock is recorded (next version).",
+  "view3d.viewMode": "View",
+  "view3d.view.3d": "3D",
+  "view3d.view.lite": "Lite map",
+  "view3d.lite.map": "Warehouse plan",
+  "view3d.lite.rack": "Rack {code}",
+  "view3d.lite.level": "L{n}",
+  "view3d.slow": "3D looks slow on this computer.",
+  "view3d.slowSwitch": "Use the Lite map",
+  "view3d.slowKeep": "Keep 3D"
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft, Map, RotateCcw, Scan, Search, ZoomIn, ZoomOut } from 'lucide-react'
+import { ArrowLeft, Cuboid, Map, RotateCcw, Scan, Search, Square, ZoomIn, ZoomOut } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import { useScene } from './api'
 import { shortcut, viewpoint, type CameraApi } from './camera'
 import { BinPanel } from './BinPanel'
 import { binColors, legend, type ColorMode } from './colors'
+import { LiteMap, RackBins } from './LiteMap'
 import { buildInstances, floorBox } from './sceneLayout'
 import { findBin, suggestions } from './search'
 
@@ -19,6 +20,16 @@ import { findBin, suggestions } from './search'
 const SceneCanvas = lazy(() => import('./SceneCanvas').then((m) => ({ default: m.SceneCanvas })))
 
 const MODE_KEY = 'wms.3d.colorMode'
+const VIEW_KEY = 'wms.3d.view'
+type ViewMode = '3d' | 'lite'
+/** 3D or Lite map, per browser: a weak PC that chose Lite should not download three.js again. */
+function savedView(): ViewMode {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'lite' ? 'lite' : '3d'
+  } catch {
+    return '3d'
+  }
+}
 /** Colour mode is a per-browser preference; storage may be unavailable (private window). */
 function savedMode(): ColorMode {
   try {
@@ -77,12 +88,26 @@ export function View3DPage() {
     }
   }
   const colors = useMemo(() => (scene.data ? binColors(scene.data, mode, scene.data.flags) : []), [scene.data, mode])
+  const [view, setViewState] = useState<ViewMode>(savedView)
+  const [slow, setSlow] = useState(false)
+  const [rack, setRack] = useState<number | null>(null)
+  const setView = (v: ViewMode) => {
+    setViewState(v)
+    setSlow(false)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {
+      // private window: the choice lasts until reload
+    }
+  }
+  const onSlow = useCallback(() => setSlow(true), [])
 
   const find = (text: string) => {
     const i = findBin(codes, text)
     setNotFound(i === null ? text.trim().toUpperCase() : null)
     if (i === null || !parts) return
     setSelected(i)
+    setRack(scene.data!.bins.rack[i]!)
     const b = parts.bins[i]!
     camera.current?.flyTo(b, viewpoint(b))
   }
@@ -94,6 +119,7 @@ export function View3DPage() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSelected(null)
+        setRack(null)
         return
       }
       if (e.key === '/' && !(e.target instanceof HTMLInputElement)) {
@@ -140,6 +166,16 @@ export function View3DPage() {
             <datalist id="bin-codes">{hints.map((c) => <option key={c} value={c} />)}</datalist>
           </form>
         )}
+        {scene.data && (
+          <div role="radiogroup" aria-label={t('view3d.viewMode')} className="flex rounded-md border p-0.5">
+            {(['3d', 'lite'] as ViewMode[]).map((v) => (
+              <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)}
+                className={`flex items-center gap-1 rounded px-2 py-1 text-sm font-medium ${view === v ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
+                {v === '3d' ? <Cuboid className="size-4" /> : <Square className="size-4" />} {t(`view3d.view.${v}` as MessageKey)}
+              </button>
+            ))}
+          </div>
+        )}
         {can(me.data, 'warehouses:manage') && (
           <Button asChild variant="outline" size="sm"><Link to={`/app/warehouses/${id}/layout`}><Map /> {t('view3d.editLayout')}</Link></Button>
         )}
@@ -147,9 +183,23 @@ export function View3DPage() {
       <div className="relative min-h-0 flex-1">
         {notPublished && <p className="p-6 text-muted-foreground">{t('view3d.notPublished')}</p>}
         {scene.isError && !notPublished && <div className="p-6"><FormMessage tone="error">{errorMessage(scene.error)}</FormMessage></div>}
-        {scene.data && (
+        {scene.data && view === 'lite' && (
+          <LiteMap scene={scene.data} colors={colors} selectedBin={selected} selectedRack={rack} onRack={setRack} />
+        )}
+        {scene.data && view === 'lite' && rack !== null && (
+          <RackBins scene={scene.data} rack={rack} colors={colors} selectedBin={selected} onBin={setSelected}
+            onClose={() => setRack(null)} />
+        )}
+        {slow && view === '3d' && (
+          <div role="alert" className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-lg border bg-card px-4 py-2 text-sm shadow-lg">
+            {t('view3d.slow')}
+            <Button size="sm" onClick={() => setView('lite')}>{t('view3d.slowSwitch')}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setSlow(false)}>{t('view3d.slowKeep')}</Button>
+          </div>
+        )}
+        {scene.data && view === '3d' && (
           <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">{t('view3d.loading3d')}</p>}>
-            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} />}
+            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} />}
           </Suspense>
         )}
         {scene.data && (
@@ -180,7 +230,7 @@ export function View3DPage() {
           <BinPanel scene={scene.data} index={selected} warehouseId={id} canManage={can(me.data, 'warehouses:manage')}
             onClose={() => setSelected(null)} />
         )}
-        {scene.data && (
+        {scene.data && view === '3d' && (
           <div className="absolute right-3 bottom-3 flex flex-col items-end gap-2">
             <div className="flex gap-1 rounded-lg border bg-card/90 p-1 shadow-sm">
               <Button variant="ghost" size="icon" aria-label={t('view3d.zoomIn')} title={t('view3d.zoomIn')} onClick={() => camera.current?.zoom(1)}><ZoomIn /></Button>

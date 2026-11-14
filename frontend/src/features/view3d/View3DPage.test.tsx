@@ -5,7 +5,8 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { View3DPage } from './View3DPage'
 
-vi.mock('./SceneCanvas', () => ({ SceneCanvas: () => <p>3D canvas</p> }))
+// The fake canvas reports "slow" when the page passes onSlow, so the Lite suggestion can be tested.
+vi.mock('./SceneCanvas', () => ({ SceneCanvas: ({ onSlow }: { onSlow?: () => void }) => <p>3D canvas<button type="button" onClick={onSlow}>simulate slow</button></p> }))
 
 let sceneReply: Response
 const SCENE = { publishedAt: 'x', floor: [0, 0, 10000, 0, 10000, 10000, 0, 10000], openings: [], zones: [],
@@ -36,14 +37,14 @@ it('explains when there is no published layout and does not load the 3D engine',
   sceneReply = Response.json({ code: 'NOT_PUBLISHED', title: 'Not found' }, { status: 404 })
   renderPage()
   expect(await screen.findByText(/no published layout yet/)).toBeInTheDocument()
-  expect(screen.queryByText('3D canvas')).not.toBeInTheDocument()
+  expect(screen.queryByText(/^3D canvas/)).not.toBeInTheDocument()
   expect(screen.queryByRole('link', { name: /Edit layout/ })).not.toBeInTheDocument() // read-only user
 })
 
 it('shows the scene with its rack and bin count', async () => {
   sceneReply = Response.json(SCENE)
   renderPage()
-  expect(await screen.findByText('3D canvas')).toBeInTheDocument()
+  expect(await screen.findByText(/^3D canvas/)).toBeInTheDocument()
   expect(screen.getByText('1 racks · 2 bins')).toBeInTheDocument()
 })
 
@@ -60,4 +61,28 @@ it('finds a bin by its code and shows its details', async () => {
   await userEvent.clear(box)
   await userEvent.type(box, 'Z9{Enter}')
   expect(await screen.findByText('No bin starts with Z9.')).toBeInTheDocument()
+})
+
+it('Lite map: never loads the 3D canvas; a rack click shows its bins, a bin click its details', async () => {
+  localStorage.setItem('wms.3d.view', 'lite')
+  sceneReply = Response.json(SCENE)
+  renderPage()
+  const map = await screen.findByRole('img', { name: 'Warehouse plan' })
+  expect(screen.queryByText(/^3D canvas/)).not.toBeInTheDocument()
+  await userEvent.click(map.querySelector('polygon[class*="cursor-pointer"]')!)
+  expect(screen.getByRole('region', { name: 'Rack R01' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'A-R01-01-02' }))
+  expect(await screen.findByRole('complementary', { name: 'Bin A-R01-01-02' })).toBeInTheDocument()
+  localStorage.removeItem('wms.3d.view')
+})
+
+it('offers the Lite map when 3D is slow, and switching remembers the choice', async () => {
+  sceneReply = Response.json(SCENE)
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'simulate slow' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('3D looks slow on this computer.')
+  await userEvent.click(screen.getByRole('button', { name: 'Use the Lite map' }))
+  expect(await screen.findByRole('img', { name: 'Warehouse plan' })).toBeInTheDocument()
+  expect(localStorage.getItem('wms.3d.view')).toBe('lite')
+  localStorage.removeItem('wms.3d.view')
 })

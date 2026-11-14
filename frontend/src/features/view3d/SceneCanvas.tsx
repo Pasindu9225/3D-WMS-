@@ -1,10 +1,11 @@
 import { CameraControls } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { nearestOnOutline } from '@/features/layout/geometry'
 import type { Scene } from './api'
 import type { CameraApi } from './camera'
+import { slowFromFrameTimes } from './perf'
 import { ZONE_COLOR } from './colors'
 import { buildInstances, floorBox, type BoxSpec } from './sceneLayout'
 
@@ -69,7 +70,7 @@ function Boxes({ specs, color, colors, onPick }: {
  * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
  * draw call each, whatever the number of racks.
  */
-export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera }: {
+export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow }: {
   scene: Scene
   /** Boxes from buildInstances(scene), worked out by the page so search and fly-to use the same positions. */
   parts: ReturnType<typeof buildInstances>
@@ -79,6 +80,8 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
   selected: number | null
   onSelect: (index: number | null) => void
   onCamera?: (api: CameraApi) => void
+  /** Called once if moving the camera stays under 20 fps (the page then offers Lite mode). */
+  onSlow?: () => void
 }) {
   const floor = useMemo(() => new THREE.ShapeGeometry(shapeOf(scene.floor)), [scene.floor])
   const zones = useMemo(() => scene.zones.map((z) => ({ ...z, geometry: new THREE.ShapeGeometry(shapeOf(z.polygon)) })),
@@ -128,6 +131,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       {selected !== null && parts.bins[selected] && <Highlight spec={parts.bins[selected]!} />}
       <Boxes specs={doors} color="#facc15" />
       <Rig box={box} onCamera={onCamera} />
+      {onSlow && <FpsWatch onSlow={onSlow} />}
     </Canvas>
   )
 }
@@ -183,4 +187,35 @@ function Highlight({ spec }: { spec: BoxSpec }) {
       </mesh>
     </group>
   )
+}
+
+/** Watches frame times while the camera moves (controls active), see slowFromFrameTimes. */
+function FpsWatch({ onSlow }: { onSlow: () => void }) {
+  const controls = useThree((state) => state.controls) as unknown as CameraControls | null
+  const deltas = useRef<number[]>([])
+  const moving = useRef(false)
+  const done = useRef(false)
+  useEffect(() => {
+    if (!controls) return
+    const start = () => { moving.current = true }
+    const stop = () => { moving.current = false }
+    controls.addEventListener('controlstart', start)
+    controls.addEventListener('transitionstart', start)
+    controls.addEventListener('sleep', stop)
+    return () => {
+      controls.removeEventListener('controlstart', start)
+      controls.removeEventListener('transitionstart', start)
+      controls.removeEventListener('sleep', stop)
+    }
+  }, [controls])
+  useFrame((_, delta) => {
+    if (done.current || !moving.current) return
+    deltas.current.push(Math.min(delta, 2))
+    if (deltas.current.length > 300) deltas.current.shift()
+    if (slowFromFrameTimes(deltas.current)) {
+      done.current = true
+      onSlow()
+    }
+  })
+  return null
 }
