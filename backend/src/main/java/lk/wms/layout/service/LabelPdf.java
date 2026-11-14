@@ -12,12 +12,12 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
-import org.openpdf.text.Document;
-import org.openpdf.text.PageSize;
-import org.openpdf.text.Rectangle;
-import org.openpdf.text.pdf.BaseFont;
-import org.openpdf.text.pdf.PdfContentByte;
-import org.openpdf.text.pdf.PdfWriter;
+import com.lowagie.text.Document;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Rectangle;
+import com.lowagie.text.pdf.BaseFont;
+import com.lowagie.text.pdf.PdfContentByte;
+import com.lowagie.text.pdf.PdfWriter;
 
 /**
  * Bin labels as PDF: a QR code holding exactly the printed bin code, plus the code in large type.

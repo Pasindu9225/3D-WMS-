@@ -12,8 +12,8 @@ import jakarta.servlet.http.Cookie;
 import lk.wms.ApiTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openpdf.text.pdf.PdfReader;
-import org.openpdf.text.pdf.parser.PdfTextExtractor;
+import com.lowagie.text.pdf.PdfReader;
+import com.lowagie.text.pdf.parser.PdfTextExtractor;
 
 /** v0.2 task 4: bin label PDFs through HTTP. One rack R01 in zone A: 4 levels x 3 bins = 12 labels. */
 class LabelApiTest extends ApiTest {

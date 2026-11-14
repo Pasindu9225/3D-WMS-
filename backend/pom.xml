@@ -19,7 +19,7 @@
 		<archunit.version>1.4.1</archunit.version>
 		<bouncycastle.version>1.86</bouncycastle.version>
 		<bucket4j.version>8.21.0</bucket4j.version>
-		<openpdf.version>3.0.5</openpdf.version>
+		<openpdf.version>2.0.5</openpdf.version>
 		<zxing.version>3.5.4</zxing.version>
 	</properties>
 
@@ -65,7 +65,7 @@
 			<version>${bucket4j.version}</version>
 		</dependency>
 		<dependency>
-			<!-- Bin label PDFs (OpenPDF) with QR codes (ZXing) -->
+			<!-- Bin label PDFs (OpenPDF) with QR codes (ZXing). OpenPDF 2.1+ needs Java 21: stay on 2.0.x while we run Java 17 -->
 			<groupId>com.github.librepdf</groupId>
 			<artifactId>openpdf</artifactId>
 			<version>${openpdf.version}</version>
@@ -131,6 +131,41 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<!-- Fails the build if any runtime library is compiled for newer than Java 17 (our runtime).
+				     A newer JDK on a dev PC would otherwise compile fine and only the server would break. -->
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<dependencies>
+					<dependency>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>extra-enforcer-rules</artifactId>
+						<version>1.12.0</version>
+					</dependency>
+				</dependencies>
+				<executions>
+					<execution>
+						<id>java-17-bytecode</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<enforceBytecodeVersion>
+									<maxJdkVersion>17</maxJdkVersion>
+									<ignoredScopes>
+										<ignoredScope>test</ignoredScope>
+									</ignoredScopes>
+									<!-- multi-release jars carry newer classes under META-INF/versions; Java 17 ignores them -->
+									<ignoreClasses>
+										<ignoreClass>module-info</ignoreClass>
+									</ignoreClasses>
+								</enforceBytecodeVersion>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

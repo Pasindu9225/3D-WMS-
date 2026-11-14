@@ -61,4 +61,5 @@
 | 2026-11-13 | Bin capacity from the rack type: level weight / bins per level; volume = bin width x depth x level height. A hand-edited bin keeps its values on later publishes | Sensible defaults with room for real-world exceptions |
 | 2026-11-13 | Publish parks changing bin codes on a temporary value first | Codes can move between bins without breaking the unique key mid-publish |
 | 2026-11-13 | Measured: 100 racks / 5,000 bins first publish 3.9 s, republish 0.2 s, draft check 0.1 s (local MySQL) | IDENTITY keys mean one insert per new bin; fine at this size |
-| 2026-11-13 | Labels: A4 3x8 (70x37 mm) sheets and 100x50 mm singles; QR (ZXing 3.5.4, ECC M) holds exactly the printed bin code; vector QR via OpenPDF 3.0.5 | Typed fallback matches the scan; crisp print, small files (5,000 labels < 3 MB) |
+| 2026-11-13 | Labels: A4 3x8 (70x37 mm) sheets and 100x50 mm singles; QR (ZXing 3.5.4, ECC M) holds exactly the printed bin code; vector QR via OpenPDF 2.0.5 | Typed fallback matches the scan; crisp print, small files (5,000 labels < 3 MB) |
+| 2026-11-14 | OpenPDF 2.0.5 (not 3.x / 2.1+); build fails if any runtime library targets newer than Java 17 (enforcer: enforceBytecodeVersion) | OpenPDF 2.1+ is compiled for Java 21; it compiled on a JDK 25 dev PC but broke CI on JDK 17 and would have broken the server |
