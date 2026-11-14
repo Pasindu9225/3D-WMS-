@@ -70,14 +70,14 @@ export function rackRect(rack: { x: number; y: number; rotation: number }, width
   return { x: rack.x - w / 2, y: rack.y - d / 2, width: w, height: d }
 }
 
-export type FloorShape = 'RECT' | 'L' | 'U' | 'T'
+export type FloorShape = 'RECT' | 'L' | 'U' | 'T' | 'TRIANGLE' | 'OVAL'
 
 /**
- * Common building outlines inside a width x length box (mm), snapped to 0.1 m. Real warehouses are
+ * Common outlines inside a width x length box, in whole mm. Real warehouses are
  * rarely rectangles: L (corner cut away), U (loading yard in the middle), T (wide front, deep back).
  */
 export function floorPreset(shape: FloorShape, w: number, l: number): Point[] {
-  const p = (x: number, y: number) => ({ x: snap(x), y: snap(y) })
+  const p = (x: number, y: number) => ({ x: Math.round(x), y: Math.round(y) }) // whole mm: typed sizes stay exact
   switch (shape) {
     case 'L':
       return [p(0, 0), p(w * 0.6, 0), p(w * 0.6, l * 0.5), p(w, l * 0.5), p(w, l), p(0, l)]
@@ -86,6 +86,16 @@ export function floorPreset(shape: FloorShape, w: number, l: number): Point[] {
     case 'T':
       return [p(0, 0), p(w, 0), p(w, l * 0.4), p(w * 0.65, l * 0.4), p(w * 0.65, l), p(w * 0.35, l), p(w * 0.35, l * 0.4),
         p(0, l * 0.4)]
+    case 'TRIANGLE':
+      return [p(w / 2, 0), p(w, l), p(0, l)]
+    case 'OVAL': {
+      // Stored as a 32-corner outline (layouts are polygons); whole mm so small ovals stay round.
+      const n = 32
+      return Array.from({ length: n }, (_, i) => {
+        const a = (2 * Math.PI * i) / n
+        return { x: Math.round(w / 2 + (w / 2) * Math.cos(a)), y: Math.round(l / 2 + (l / 2) * Math.sin(a)) }
+      })
+    }
     default:
       return [p(0, 0), p(w, 0), p(w, l), p(0, l)]
   }

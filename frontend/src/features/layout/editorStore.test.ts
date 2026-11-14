@@ -153,3 +153,26 @@ describe('zones and racks in the editor', () => {
     expect(useEditor.getState().doc!).toMatchObject({ zones: [], racks: [] })
   })
 })
+
+describe('measurements', () => {
+  beforeEach(() => useEditor.getState().load(view))
+
+  it('types exact wall lengths towards the pointer, in 15° steps', () => {
+    const s = useEditor.getState()
+    s.startDrawing('floor')
+    s.addDrawPoint({ x: 0, y: 0 })
+    useEditor.getState().setCursor({ x: 50_000, y: 900 }) // almost straight right
+    useEditor.getState().addDrawLength(121_920) // 400 ft
+    useEditor.getState().setCursor({ x: 121_920, y: 90_000 }) // straight down
+    useEditor.getState().addDrawLength(15_240) // 50 ft
+    expect(useEditor.getState().drawing).toEqual([{ x: 0, y: 0 }, { x: 121_920, y: 0 }, { x: 121_920, y: 15_240 }])
+  })
+
+  it('places a sized shape as an area centred on the floor, exact to the mm', () => {
+    useEditor.getState().placeShape('RECT', 15_240, 4_000, 'zone')
+    const zone = useEditor.getState().doc!.zones[0]!
+    expect(zone.polygon).toEqual([{ x: 2380, y: 3000 }, { x: 17_620, y: 3000 }, { x: 17_620, y: 7000 }, { x: 2380, y: 7000 }])
+    useEditor.getState().placeShape('OVAL', 10_000, 10_000, 'floor')
+    expect(useEditor.getState().doc!.floor).toHaveLength(32)
+  })
+})

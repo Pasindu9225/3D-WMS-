@@ -4,6 +4,18 @@ import {
   bounds, floorPreset, insertOnEdge, nearestOnOutline, nextCode, pointInPolygon, rackRect, selfIntersects, snap,
   type FloorShape,
 } from './geometry'
+import { UNITS, type Unit } from './units'
+
+const UNIT_KEY = 'wms.editor.unit'
+/** Remembered per browser (a display preference only, so localStorage is fine and may be unavailable). */
+function savedUnit(): Unit {
+  try {
+    const u = localStorage.getItem(UNIT_KEY)
+    return u && u in UNITS ? (u as Unit) : 'm'
+  } catch {
+    return 'm'
+  }
+}
 
 export type Selection =
   | { kind: 'opening'; index: number }
@@ -24,8 +36,18 @@ interface EditorState {
   /** What the outline being drawn becomes: the floor, or a new zone. */
   drawTarget: 'floor' | 'zone'
   drawError: 'CROSSING' | 'TOO_FEW' | 'OUTSIDE' | null
+  /** Where the pointer is while drawing (snapped); gives the direction for a typed length. */
+  cursor: Point | null
+  unit: Unit
+  setUnit: (unit: Unit) => void
+  setCursor: (p: Point | null) => void
+  /** Next corner at an exact distance from the last one, towards the pointer (direction snapped to 15°). */
+  addDrawLength: (mm: number) => void
+  /** Shape tool: a sized preset becomes the floor, or a new zone centred on the floor. */
+  placeShape: (shape: FloorShape, widthMm: number, lengthMm: number, target: 'floor' | 'zone') => void
   load: (view: LayoutView) => void
-  moveFloorPoint: (index: number, p: Point) => void
+  /** exact: typed position, kept to the mm instead of snapping to the 0.1 m grid. */
+  moveFloorPoint: (index: number, p: Point, exact?: boolean) => void
   insertFloorPoint: (p: Point) => void
   removeFloorPoint: (index: number) => void
   insertCornerAfter: (index: number) => void
@@ -85,10 +107,49 @@ export const useEditor = create<EditorState>((set, get) => {
     drawing: null,
     drawTarget: 'floor',
     drawError: null,
+    cursor: null,
+    unit: savedUnit(),
+    setUnit: (unit) => {
+      try {
+        localStorage.setItem(UNIT_KEY, unit)
+      } catch {
+        // private window: the choice lasts until reload
+      }
+      set({ unit })
+    },
+    setCursor: (cursor) => set({ cursor }),
+    addDrawLength: (mm) => {
+      const { drawing, cursor } = get()
+      const last = drawing?.[drawing.length - 1]
+      if (!drawing || !last || mm <= 0) return
+      const raw = cursor ? Math.atan2(cursor.y - last.y, cursor.x - last.x) : 0
+      const step = Math.PI / 12 // 15°: walls at 0/45/90° come out exact
+      const angle = Math.round(raw / step) * step
+      // Whole mm, not the 0.1 m grid: a typed 50 ft wall must be exactly 50 ft.
+      const point = {
+        x: Math.min(1_000_000, Math.max(0, Math.round(last.x + mm * Math.cos(angle)))),
+        y: Math.min(1_000_000, Math.max(0, Math.round(last.y + mm * Math.sin(angle)))),
+      }
+      set({ drawing: [...drawing, point], drawError: null })
+    },
+    placeShape: (shape, widthMm, lengthMm, target) => {
+      const doc = get().doc
+      if (!doc) return
+      const b = bounds(doc.floor)
+      const origin = target === 'floor'
+        ? { x: b.minX, y: b.minY }
+        : { x: Math.max(0, Math.round((b.minX + b.maxX - widthMm) / 2)), y: Math.max(0, Math.round((b.minY + b.maxY - lengthMm) / 2)) }
+      const polygon = floorPreset(shape, widthMm, lengthMm).map((p) => ({ x: p.x + origin.x, y: p.y + origin.y }))
+      if (target === 'floor') setFloor(polygon)
+      else addZone(polygon)
+    },
     load: (view) =>
       set({ doc: view.layout, baseRevision: view.revision, dirty: false, selection: null, drawing: null, drawError: null }),
-    moveFloorPoint: (index, p) =>
-      change((d) => ({ ...d, floor: d.floor.map((pt, i) => (i === index ? { x: snap(p.x), y: snap(p.y) } : pt)) })),
+    moveFloorPoint: (index, p, exact) =>
+      change((d) => ({
+        ...d,
+        floor: d.floor.map((pt, i) => (i !== index ? pt : exact ? { x: Math.round(p.x), y: Math.round(p.y) } : { x: snap(p.x), y: snap(p.y) })),
+      })),
     insertFloorPoint: (p) => change((d) => ({ ...d, floor: insertOnEdge(d.floor, p) })),
     removeFloorPoint: (index) =>
       change((d) => (d.floor.length <= 3 ? d : { ...d, floor: d.floor.filter((_, i) => i !== index) })),

@@ -4,6 +4,7 @@ import { Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva'
 import type { RackType, ZoneType } from '@/features/warehouses/api'
 import { useEditor } from './editorStore'
 import { bounds, nearestOnOutline, rackRect, type RackStatus } from './geometry'
+import { formatWith, UNITS, type Unit } from './units'
 
 /** Zone fills: soft, distinct, readable in light and dark mode (semi-transparent over the floor). */
 const ZONE_FILL: Record<ZoneType, string> = {
@@ -38,9 +39,10 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
   const doc = useEditor((s) => s.doc)
   const selection = useEditor((s) => s.selection)
   const drawing = useEditor((s) => s.drawing)
-  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
+  const cursor = useEditor((s) => s.cursor)
+  const unit = useEditor((s) => s.unit)
   const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select, addDrawPoint, finishDrawing,
-    moveZonePoint, moveRack } = useEditor.getState()
+    moveZonePoint, moveRack, setCursor } = useEditor.getState()
   const box = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
   const [view, setView] = useState<View>({ scale: 0.02, x: 40, y: 40 })
@@ -80,7 +82,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
   const floorFlat = doc.floor.flatMap((p) => [p.x, p.y])
 
   return (
-    <div ref={box} className="h-full w-full overflow-hidden bg-muted/40" data-testid="floor-canvas">
+    <div ref={box} className="relative h-full w-full overflow-hidden bg-muted/40" data-testid="floor-canvas">
       <Stage
         width={size.width}
         height={size.height}
@@ -119,6 +121,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
               const p = e.target.getStage()?.getRelativePointerPosition()
               if (p) insertFloorPoint(p)
             }} />
+          {edgeLabels(doc.floor, unit, px, '#334155')}
           {doc.zones.map((z, i) => {
             const selected = selection?.kind === 'zone' && selection.index === i
             return (
@@ -192,6 +195,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
                 removeFloorPoint(i)
               }} />
           ))}
+          {selection?.kind === 'zone' && doc.zones[selection.index] && edgeLabels(doc.zones[selection.index]!.polygon, unit, px, '#1d4ed8')}
           {editable && !drawing && selection?.kind === 'zone' && doc.zones[selection.index]?.polygon.map((p, j) => (
             <Rect key={'zp' + j} x={p.x} y={p.y} width={10 * px} height={10 * px} offsetX={5 * px} offsetY={5 * px}
               fill="#fff" stroke="#2563eb" strokeWidth={2} strokeScaleEnabled={false} draggable
@@ -203,6 +207,8 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
           <Layer listening={false}>
             <Line points={[...drawing.flatMap((p) => [p.x, p.y]), ...(cursor ? [cursor.x, cursor.y] : [])]}
               stroke="#2563eb" strokeWidth={2} dash={[8, 6]} strokeScaleEnabled={false} />
+            {drawing.length > 0 && cursor && edgeLabels([drawing[drawing.length - 1]!, cursor], unit, px, '#2563eb', false)}
+            {drawing.length > 1 && edgeLabels(drawing, unit, px, '#2563eb', false)}
             {drawing.map((p, i) => (
               <Circle key={i} x={p.x} y={p.y} radius={(i === 0 ? 8 : 5) * px} fill={i === 0 ? '#2563eb' : '#fff'}
                 stroke="#2563eb" strokeWidth={2} strokeScaleEnabled={false} />
@@ -210,6 +216,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
           </Layer>
         )}
       </Stage>
+      <ScaleBar scale={view.scale} unit={unit} />
     </div>
   )
 }
@@ -253,4 +260,41 @@ function gridLines(view: View, size: { width: number; height: number }) {
     lines.push({ key: `y${y}`, points: [x0, y, x1, y], major: y % 5000 === 0 })
   }
   return lines
+}
+
+/**
+ * Length of every edge, written along it in the chosen unit: the drawing shows real sizes, not just shapes.
+ * closed=false labels an open path (the outline being drawn).
+ */
+function edgeLabels(polygon: { x: number; y: number }[], unit: Unit, px: number, fill: string, closed = true) {
+  const n = closed ? polygon.length : polygon.length - 1
+  const labels = []
+  for (let i = 0; i < n; i++) {
+    const a = polygon[i]!
+    const b = polygon[(i + 1) % polygon.length]!
+    const len = Math.hypot(b.x - a.x, b.y - a.y)
+    if (len < 40 * px) continue // too short on screen to label
+    let angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI
+    if (angle > 90 || angle <= -90) angle += 180 // keep text upright
+    labels.push(
+      <Text key={'e' + i} x={(a.x + b.x) / 2} y={(a.y + b.y) / 2} rotation={angle} text={formatWith(len, unit)}
+        fontSize={11 * px} fill={fill} offsetY={14 * px} offsetX={formatWith(len, unit).length * 0.28 * 11 * px}
+        listening={false} />,
+    )
+  }
+  return labels
+}
+
+/** Bar of a round length (1, 2, 5 x 10^n in the chosen unit) about 120 px long. */
+function ScaleBar({ scale, unit }: { scale: number; unit: Unit }) {
+  const target = 120 / scale / UNITS[unit] // length in units that 120 px covers
+  const pow = 10 ** Math.floor(Math.log10(target))
+  const nice = [1, 2, 5, 10].map((f) => f * pow).filter((v) => v <= target).pop() ?? pow
+  const widthPx = nice * UNITS[unit] * scale
+  return (
+    <div className="pointer-events-none absolute bottom-3 left-3 rounded bg-background/80 px-2 py-1 text-xs tabular-nums">
+      <div className="h-1.5 border-x-2 border-b-2 border-foreground" style={{ width: widthPx }} />
+      {nice} {unit}
+    </div>
+  )
 }

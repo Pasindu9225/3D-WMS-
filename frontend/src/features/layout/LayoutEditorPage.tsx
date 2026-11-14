@@ -9,10 +9,12 @@ import { can, useMe } from '@/features/auth/session'
 import { useLayout, useRackTypes, useSaveLayout, useWarehouse } from '@/features/warehouses/api'
 import { ApiError, type Issue } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
-import { t, type MessageKey } from '@/lib/i18n'
+import { t } from '@/lib/i18n'
 import { useEditor } from './editorStore'
-import { CornerTable, DrawingPanel } from './FloorPanels'
-import { areaM2, rackStatuses, type FloorShape } from './geometry'
+import { CornerTable, DrawingPanel, ShapeDialog } from './FloorPanels'
+import { LengthInput } from './LengthInput'
+import { areaM2, rackStatuses } from './geometry'
+import { UNITS, type Unit } from './units'
 import { RackPanel, ZonePanel } from './ZoneRackPanels'
 
 // Konva only loads here, never in the main bundle.
@@ -31,9 +33,11 @@ export function LayoutEditorPage() {
   const selection = useEditor((s) => s.selection)
   const drawing = useEditor((s) => s.drawing)
   const drawTarget = useEditor((s) => s.drawTarget)
-  const { load, addOpening, updateOpening, removeOpening, applyShape, startDrawing, finishDrawing, cancelDrawing, addRack,
+  const { load, addOpening, updateOpening, removeOpening, setUnit, startDrawing, finishDrawing, cancelDrawing, addRack,
     rotateRack, removeSelected } = useEditor.getState()
   const [fitSignal, setFitSignal] = useState(0)
+  const [shaping, setShaping] = useState(false)
+  const unit = useEditor((s) => s.unit)
   const rackTypes = useRackTypes()
   // Types used by the layout (even archived ones) plus the whole library for placing new racks.
   const templates = useMemo(
@@ -80,7 +84,7 @@ export function LayoutEditorPage() {
   useEffect(() => {
     if (!drawing) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') finishDrawing()
+      if (e.key === 'Enter' && !(e.target instanceof HTMLInputElement)) finishDrawing() // Enter in the length box adds a wall
       if (e.key === 'Escape') cancelDrawing()
     }
     window.addEventListener('keydown', onKey)
@@ -112,16 +116,9 @@ export function LayoutEditorPage() {
         </div>
         {editable && (
           <>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={!doc || !!drawing}><Shapes /> {t('layout.shape')}</Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {(['RECT', 'L', 'U', 'T'] as FloorShape[]).map((shape) => (
-                  <DropdownMenuItem key={shape} onSelect={() => applyShape(shape)}>{t(`layout.shape.${shape}` as MessageKey)}</DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="outline" size="sm" disabled={!doc || !!drawing} onClick={() => setShaping(true)}>
+              <Shapes /> {t('layout.shape')}
+            </Button>
             <Button variant={drawing && drawTarget === 'floor' ? 'default' : 'outline'} size="sm"
               onClick={() => (drawing ? cancelDrawing() : startDrawing('floor'))}
               disabled={!doc || (!!drawing && drawTarget !== 'floor')} aria-pressed={!!drawing && drawTarget === 'floor'}>
@@ -151,6 +148,10 @@ export function LayoutEditorPage() {
           </>
         )}
         <Button variant="outline" size="sm" onClick={() => setFitSignal((n) => n + 1)}><Maximize /> {t('layout.fit')}</Button>
+        <select aria-label={t('layout.unit')} value={unit} onChange={(e) => setUnit(e.target.value as Unit)}
+          className="h-8 rounded-md border border-input bg-background px-2 text-sm">
+          {(Object.keys(UNITS) as Unit[]).map((u) => <option key={u} value={u}>{u}</option>)}
+        </select>
         {editable && (
           <Button size="sm" onClick={onSave} disabled={!dirty || save.isPending}>
             <Save /> {save.isPending ? t('common.saving') : t('layout.save')}
@@ -183,10 +184,10 @@ export function LayoutEditorPage() {
                 {(p) => <Input {...p} value={opening.label} maxLength={40}
                   onChange={(e) => updateOpening(selection.index, { label: e.target.value })} />}
               </Field>
-              <Field label={t('layout.widthM')}>
-                {(p) => <Input {...p} type="number" min={0.5} max={20} step={0.1} value={opening.widthMm / 1000}
-                  onChange={(e) => updateOpening(selection.index, { widthMm: Math.round(Number(e.target.value) * 1000) })} />}
-              </Field>
+              <label className="grid gap-1.5 text-sm font-medium">{t('layout.widthIn', { unit })}
+                <LengthInput label={t('layout.widthIn', { unit })} mm={opening.widthMm} min={500} className="h-10 w-full"
+                  onCommit={(mm) => updateOpening(selection.index, { widthMm: Math.min(20_000, mm) })} />
+              </label>
               <Button variant="outline" size="sm" className="text-destructive" onClick={() => removeOpening(selection.index)}>
                 <Trash2 /> {t('layout.remove')}
               </Button>
@@ -209,6 +210,7 @@ export function LayoutEditorPage() {
         </aside>
       </div>
 
+      {shaping && <ShapeDialog onClose={() => setShaping(false)} />}
       {blocker.state === 'blocked' && (
         <div role="alertdialog" aria-modal="true" className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
           <div className="max-w-sm space-y-4 rounded-lg border bg-card p-6">

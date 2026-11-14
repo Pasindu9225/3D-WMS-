@@ -1,0 +1,10 @@
+
+  VITE v7.3.8  ready in 481 ms
+
+  ➜  Local:   http://localhost:5180/
+  ➜  Network: use --host to expose
+8:20:29 AM [vite] (client) hmr update /src/index.css, /src/features/layout/LengthInput.tsx
+8:20:29 AM [vite] (client) hmr update /src/index.css, /src/features/layout/FloorPanels.tsx
+8:20:29 AM [vite] (client) page reload src/lib/i18n/en.json
+8:21:21 AM [vite] (client) hmr update /src/features/layout/LayoutEditorPage.tsx, /src/index.css
+8:21:21 AM [vite] (client) page reload src/lib/i18n/en.json

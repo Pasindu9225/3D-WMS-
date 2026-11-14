@@ -241,6 +241,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Draw zones with type (receiving, storage, picking, dispatch, quarantine, cold)
 - [ ] Rack templates: size, levels, bins per level, max weight per level
 - [x] Place racks: drag, snap, rotate 90°, duplicate row, aisle-width warning, overlap check
+- [ ] Measurements and shapes (task 7b): unit converter, typed lengths while drawing, triangle/oval tools, edge lengths + scale bar, move/resize/copy areas and racks, racks at any angle
 - [x] Auto-generate levels and bins with a naming pattern (`{zone}-{rack}-{level}-{bin}`)
 - [ ] Edit single bin: capacity, blocked, pick face
 - [x] Draft → publish layout; cannot delete racks or bins that hold stock (checked again in v0.4)
