@@ -1,5 +1,6 @@
 package lk.wms.layout.service;
 
+import java.util.List;
 import lk.wms.common.audit.AuditService;
 import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
@@ -51,6 +52,26 @@ public class BinService {
         bin.edit(maxWeightG, maxVolumeCm3, pickFace, blocked);
         audit.record(cu.tenantId(), cu.userId(), "BIN_UPDATED", "bin", bin.getPublicId(), before, view(bin));
         return view(bin);
+    }
+
+    public record LabelBatch(String warehouseCode, List<String> codes) {
+    }
+
+    static final int MAX_LABELS = 10_000;
+
+    /** Bin codes to print (whole warehouse, a zone or a rack by code prefix). */
+    @Transactional(readOnly = true)
+    public LabelBatch labels(CurrentUser cu, String warehouseId, String codePrefix) {
+        WarehouseService.WarehouseRef w = warehouses.requireAccess(cu, warehouseId);
+        List<String> codes = bins.findByWarehouseIdAndCodeStartingWithOrderByCode(w.id(),
+                codePrefix == null ? "" : codePrefix.trim()).stream().map(BinRepository.CodeOnly::getCode).toList();
+        if (codes.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NO_BINS", "No published bins match. Publish the layout first.");
+        }
+        if (codes.size() > MAX_LABELS) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "TOO_MANY_LABELS", "Print at most 10,000 labels at once");
+        }
+        return new LabelBatch(w.code(), codes);
     }
 
     private static BinView view(Bin b) {

@@ -23,6 +23,13 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
 
     long countByWarehouseId(long warehouseId);
 
+    interface CodeOnly {
+        String getCode();
+    }
+
+    /** Label printing: codes only, in order. Spring escapes % and _ in StartingWith. */
+    List<CodeOnly> findByWarehouseIdAndCodeStartingWithOrderByCode(long warehouseId, String codePrefix);
+
     @Modifying
     @Query("delete from Bin b where b.id in :ids")
     int deleteByIds(@Param("ids") Collection<Long> ids);

@@ -243,7 +243,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Auto-generate levels and bins with a naming pattern (`{zone}-{rack}-{level}-{bin}`)
 - [ ] Edit single bin: capacity, blocked, pick face
 - [x] Draft → publish layout; cannot delete racks or bins that hold stock (checked again in v0.4)
-- [ ] Bin label PDF (QR code + human-readable code), A4 sheets and single labels
+- [x] Bin label PDF (QR code + human-readable code), A4 sheets and single labels
 
 **Deliverables:** layout editor, rack template library, label printing, layout saved as data (no images).
 

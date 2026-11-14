@@ -19,6 +19,8 @@
 		<archunit.version>1.4.1</archunit.version>
 		<bouncycastle.version>1.86</bouncycastle.version>
 		<bucket4j.version>8.21.0</bucket4j.version>
+		<openpdf.version>3.0.5</openpdf.version>
+		<zxing.version>3.5.4</zxing.version>
 	</properties>
 
 	<dependencies>
@@ -61,6 +63,17 @@
 			<groupId>com.bucket4j</groupId>
 			<artifactId>bucket4j_jdk17-core</artifactId>
 			<version>${bucket4j.version}</version>
+		</dependency>
+		<dependency>
+			<!-- Bin label PDFs (OpenPDF) with QR codes (ZXing) -->
+			<groupId>com.github.librepdf</groupId>
+			<artifactId>openpdf</artifactId>
+			<version>${openpdf.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.zxing</groupId>
+			<artifactId>core</artifactId>
+			<version>${zxing.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
