@@ -6,6 +6,7 @@ import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
 import lk.wms.layout.domain.Bin;
 import lk.wms.layout.repo.BinRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -23,11 +24,14 @@ public class BinService {
     private final BinRepository bins;
     private final WarehouseService warehouses;
     private final AuditService audit;
+    private final ApplicationEventPublisher events;
 
-    public BinService(BinRepository bins, WarehouseService warehouses, AuditService audit) {
+    public BinService(BinRepository bins, WarehouseService warehouses, AuditService audit,
+            ApplicationEventPublisher events) {
         this.bins = bins;
         this.warehouses = warehouses;
         this.audit = audit;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -51,6 +55,8 @@ public class BinService {
         BinView before = view(bin);
         bin.edit(maxWeightG, maxVolumeCm3, pickFace, blocked);
         audit.record(cu.tenantId(), cu.userId(), "BIN_UPDATED", "bin", bin.getPublicId(), before, view(bin));
+        events.publishEvent(new LiveBins.BinChanged(warehouses.publicIdOf(bin.getWarehouseId()), bin.getPublicId(),
+                (bin.isBlocked() ? SceneService.BLOCKED : 0) + (bin.isPickFace() ? SceneService.PICK_FACE : 0)));
         return view(bin);
     }
 

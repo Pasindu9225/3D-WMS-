@@ -9,6 +9,7 @@ import { ApiError } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { t, type MessageKey } from '@/lib/i18n'
 import { useScene } from './api'
+import { useLiveBins } from './live'
 import { shortcut, viewpoint, type CameraApi } from './camera'
 import { BinPanel } from './BinPanel'
 import { binColors, legend, type ColorMode } from './colors'
@@ -67,6 +68,7 @@ export function View3DPage() {
   const me = useMe()
   const warehouse = useWarehouse(id)
   const scene = useScene(id)
+  const live = useLiveBins(id, !!scene.data)
   const notPublished = scene.error instanceof ApiError && scene.error.code === 'NOT_PUBLISHED'
   const camera = useRef<CameraApi | null>(null)
   const onCamera = useCallback((api: CameraApi) => { camera.current = api }, [])
@@ -146,8 +148,10 @@ export function View3DPage() {
         <div className="mr-auto min-w-0">
           <h1 className="truncate font-semibold">{warehouse.data ? `${warehouse.data.code} · ${warehouse.data.name}` : t('app.loading')}</h1>
           {scene.data && (
-            <p className="text-xs text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {t('view3d.summary', { racks: scene.data.racks.length, bins: scene.data.bins.ids.length })}
+              <span aria-hidden className={`size-2 rounded-full ${live === 'live' ? 'bg-emerald-500' : live === 'connecting' ? 'bg-amber-400' : 'bg-slate-400'}`} />
+              <span>{t(`view3d.live.${live}` as MessageKey)}</span>
             </p>
           )}
         </div>

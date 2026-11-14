@@ -35,4 +35,8 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Long> {
     /** Active (not archived) warehouses: what the plan limit counts. */
     @Query("select count(w) from Warehouse w")
     long countActive();
+
+    /** Public id for internal id (a query, so the tenant filter applies). */
+    @Query("select w.publicId from Warehouse w where w.id = :id")
+    Optional<String> publicIdOf(@Param("id") long id);
 }

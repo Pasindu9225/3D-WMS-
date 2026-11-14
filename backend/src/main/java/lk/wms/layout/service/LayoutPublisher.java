@@ -25,6 +25,7 @@ import lk.wms.layout.repo.WarehouseRepository;
 import lk.wms.layout.repo.ZoneRepository;
 import lk.wms.layout.service.LayoutValidator.Issue;
 import lk.wms.layout.service.LayoutValidator.Severity;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,10 +53,12 @@ public class LayoutPublisher {
     private final BinRepository bins;
     private final AuditService audit;
     private final JsonMapper json;
+    private final ApplicationEventPublisher events;
 
     public LayoutPublisher(WarehouseRepository warehouses, WarehouseService warehouseAccess,
             LayoutVersionRepository versions, RackTemplateService templates, ZoneRepository zones, RackRepository racks,
-            RackLevelRepository levels, BinRepository bins, AuditService audit, JsonMapper json) {
+            RackLevelRepository levels, BinRepository bins, AuditService audit, JsonMapper json,
+            ApplicationEventPublisher events) {
         this.warehouses = warehouses;
         this.warehouseAccess = warehouseAccess;
         this.versions = versions;
@@ -66,6 +69,7 @@ public class LayoutPublisher {
         this.bins = bins;
         this.audit = audit;
         this.json = json;
+        this.events = events;
     }
 
     // ponytail: one INSERT per new bin (IDENTITY keys cannot be batched): a 5,000-bin first publish takes
@@ -211,6 +215,7 @@ public class LayoutPublisher {
         PublishResult result = new PublishResult(doc.zones().size(), doc.racks().size(), levelCount, slots.size(), added,
                 deadBins.size(), renamed);
         audit.record(cu.tenantId(), cu.userId(), "LAYOUT_PUBLISHED", "warehouse", w.getPublicId(), null, result);
+        events.publishEvent(new LiveBins.LayoutPublished(w.getPublicId(), java.time.Instant.now()));
         return result;
     }
 

@@ -5,6 +5,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { View3DPage } from './View3DPage'
 
+vi.mock('./live', () => ({ useLiveBins: () => 'live' })) // no sockets in unit tests
 // The fake canvas reports "slow" when the page passes onSlow, so the Lite suggestion can be tested.
 vi.mock('./SceneCanvas', () => ({ SceneCanvas: ({ onSlow }: { onSlow?: () => void }) => <p>3D canvas<button type="button" onClick={onSlow}>simulate slow</button></p> }))
 

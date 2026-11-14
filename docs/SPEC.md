@@ -264,7 +264,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Search bin code → camera flies to it and it highlights (viewpoint in the aisle in front of the bin)
 - [x] Colour modes: by zone, by status (empty / partly full / full / blocked); fill levels light up with stock in v0.4
 - [x] Lite mode: 2D top-down map for weak PCs; auto-suggest when fps stays under 20 (SVG plan, no three.js download)
-- [ ] Live updates over WebSocket (STOMP) for bin status changes
+- [x] Live updates over WebSocket (STOMP) for bin status changes (/ws, topic /topic/wh/{warehouse}/bins)
 
 **Deliverables:** 3D viewer embedded in admin app; Lite mode; performance test page with 10,000 fake bins.
 
@@ -590,7 +590,7 @@ REST over JSON under `/api/v1`, cookie-authenticated, documented by springdoc in
 - Validation errors return 400 with a list of `{ field, message }`.
 - Write requests that change stock accept an `Idempotency-Key` header so a phone that retries on bad Wi-Fi does not double-count.
 - Every endpoint has a permission (e.g. `inventory:transfer`) checked with `@PreAuthorize` (SEC-09).
-- WebSocket (STOMP) at `/ws`; topics per tenant and warehouse: `/topic/t/{tenant}/wh/{wh}/bins`, `/user/queue/tasks`.
+- WebSocket (STOMP) at `/ws`; bin status topic per warehouse: `/topic/wh/{warehousePublicId}/bins` (subscribe checks tenant and warehouse access); `/user/queue/tasks` later.
 
 **Endpoint list by module**
 

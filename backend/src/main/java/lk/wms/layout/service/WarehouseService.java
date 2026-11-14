@@ -81,6 +81,11 @@ public class WarehouseService {
 
     /** Same check by internal ID, for records that point at a warehouse (bins, later stock). */
     @Transactional(readOnly = true)
+    /** Public id of a warehouse already checked with requireAccess. */
+    public String publicIdOf(long warehouseId) {
+        return warehouses.publicIdOf(warehouseId).orElseThrow();
+    }
+
     public void requireAccess(CurrentUser cu, long warehouseId) {
         boolean ok = warehouses.existsActive(warehouseId) // a query: the tenant filter applies
                 && (cu.isTenantAdmin() || warehouses.isAssigned(warehouseId, cu.userId()));

@@ -386,5 +386,8 @@
   "view3d.lite.level": "L{n}",
   "view3d.slow": "3D looks slow on this computer.",
   "view3d.slowSwitch": "Use the Lite map",
-  "view3d.slowKeep": "Keep 3D"
+  "view3d.slowKeep": "Keep 3D",
+  "view3d.live.live": "live",
+  "view3d.live.connecting": "connecting…",
+  "view3d.live.offline": "offline, retrying"
 }

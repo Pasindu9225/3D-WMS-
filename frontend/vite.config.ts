@@ -11,7 +11,10 @@ export default defineConfig({
   // Port 5180: 5173 is used by other projects on the dev PC.
   // changeOrigin: false keeps the browser's Host header, so Spring sees a same-origin request (as behind
   // Nginx with proxy_set_header Host $host). The string shorthand would rewrite Host and fail CORS.
-  server: { port: 5180, strictPort: true, proxy: { '/api': { target: 'http://localhost:8080', changeOrigin: false } } },
+  server: { port: 5180, strictPort: true, proxy: {
+    '/api': { target: 'http://localhost:8080', changeOrigin: false },
+    '/ws': { target: 'ws://localhost:8080', ws: true, changeOrigin: false }, // live bin status (STOMP)
+  } },
   preview: { port: 5180, strictPort: true },
   build: { target: 'es2022' },
   test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
