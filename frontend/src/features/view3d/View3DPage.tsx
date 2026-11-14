@@ -7,15 +7,26 @@ import { can, useMe } from '@/features/auth/session'
 import { useWarehouse, useWarehouses } from '@/features/warehouses/api'
 import { ApiError } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
-import { t } from '@/lib/i18n'
+import { t, type MessageKey } from '@/lib/i18n'
 import { useScene } from './api'
 import { shortcut, viewpoint, type CameraApi } from './camera'
 import { BinPanel } from './BinPanel'
+import { binColors, legend, type ColorMode } from './colors'
 import { buildInstances, floorBox } from './sceneLayout'
 import { findBin, suggestions } from './search'
 
 // three.js and React Three Fiber load only here, never in the main bundle (SPEC v0.3).
 const SceneCanvas = lazy(() => import('./SceneCanvas').then((m) => ({ default: m.SceneCanvas })))
+
+const MODE_KEY = 'wms.3d.colorMode'
+/** Colour mode is a per-browser preference; storage may be unavailable (private window). */
+function savedMode(): ColorMode {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'status' ? 'status' : 'zone'
+  } catch {
+    return 'zone'
+  }
+}
 
 /** /app/3d: open the only published warehouse straight away, otherwise let the user pick one. */
 export function View3DIndexPage() {
@@ -56,6 +67,16 @@ export function View3DPage() {
   const searchBox = useRef<HTMLInputElement>(null)
   const codes = useMemo(() => scene.data?.bins.codes ?? [], [scene.data])
   const hints = useMemo(() => suggestions(codes, query), [codes, query])
+  const [mode, setModeState] = useState<ColorMode>(savedMode)
+  const setMode = (m: ColorMode) => {
+    setModeState(m)
+    try {
+      localStorage.setItem(MODE_KEY, m)
+    } catch {
+      // private window: the choice lasts until reload
+    }
+  }
+  const colors = useMemo(() => (scene.data ? binColors(scene.data, mode, scene.data.flags) : []), [scene.data, mode])
 
   const find = (text: string) => {
     const i = findBin(codes, text)
@@ -128,8 +149,29 @@ export function View3DPage() {
         {scene.isError && !notPublished && <div className="p-6"><FormMessage tone="error">{errorMessage(scene.error)}</FormMessage></div>}
         {scene.data && (
           <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">{t('view3d.loading3d')}</p>}>
-            {parts && <SceneCanvas scene={scene.data} parts={parts} selected={selected} onSelect={setSelected} onCamera={onCamera} />}
+            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} />}
           </Suspense>
+        )}
+        {scene.data && (
+          <div className="absolute bottom-3 left-3 max-w-[60%] space-y-2 rounded-lg border bg-card/90 p-2 text-xs shadow-sm">
+            <div role="radiogroup" aria-label={t('view3d.colorBy')} className="flex gap-1">
+              {(['zone', 'status'] as ColorMode[]).map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
+                  className={`rounded px-2 py-1 font-medium ${mode === m ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
+                  {t(`view3d.colorBy.${m}` as MessageKey)}
+                </button>
+              ))}
+            </div>
+            <ul className="flex flex-wrap gap-x-3 gap-y-1">
+              {legend(scene.data, mode).map((l) => (
+                <li key={l.key} className="flex items-center gap-1.5">
+                  <span className="size-3 rounded-sm" style={{ background: l.color }} />
+                  {mode === 'zone' ? t(`layout.zoneType.${l.key}` as MessageKey) : t(`view3d.status.${l.key}` as MessageKey)}
+                </li>
+              ))}
+            </ul>
+            {mode === 'status' && <p className="text-muted-foreground">{t('view3d.status.note')}</p>}
+          </div>
         )}
         {notFound && (
           <p role="status" className="absolute top-3 left-3 rounded-md border bg-card/95 px-3 py-2 text-sm">{t('view3d.notFound', { code: notFound })}</p>

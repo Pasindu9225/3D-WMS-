@@ -368,5 +368,14 @@
   "view3d.bin.weight": "Max weight",
   "view3d.bin.volume": "Max volume",
   "view3d.bin.contentsSoon": "Contents (products and quantities) arrive with stock in the next version.",
-  "view3d.bin.edit": "Edit in bins page"
+  "view3d.bin.edit": "Edit in bins page",
+  "view3d.colorBy": "Colour bins by",
+  "view3d.colorBy.zone": "Zone",
+  "view3d.colorBy.status": "Status",
+  "view3d.status.EMPTY": "Empty",
+  "view3d.status.PARTLY": "Partly full",
+  "view3d.status.FULL": "Full",
+  "view3d.status.BLOCKED": "Blocked",
+  "view3d.status.PICK_FACE": "Pick face (empty)",
+  "view3d.status.note": "Fill levels appear once stock is recorded (next version)."
 }

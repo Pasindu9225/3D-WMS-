@@ -262,7 +262,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Orbit, zoom, top view, reset camera; keyboard shortcuts (+ − T R Home, arrows, Shift = faster)
 - [x] Click bin → side panel (code, capacity, contents placeholder until v0.4)
 - [x] Search bin code → camera flies to it and it highlights (viewpoint in the aisle in front of the bin)
-- [ ] Colour modes: by zone, by status (empty / partly full / full / blocked)
+- [x] Colour modes: by zone, by status (empty / partly full / full / blocked); fill levels light up with stock in v0.4
 - [ ] Lite mode: 2D top-down map for weak PCs; auto-suggest when fps stays under 20
 - [ ] Live updates over WebSocket (STOMP) for bin status changes
 

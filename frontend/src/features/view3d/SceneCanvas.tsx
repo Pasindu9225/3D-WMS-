@@ -2,22 +2,14 @@ import { CameraControls } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import type { ZoneType } from '@/features/warehouses/api'
 import { nearestOnOutline } from '@/features/layout/geometry'
 import type { Scene } from './api'
 import type { CameraApi } from './camera'
+import { ZONE_COLOR } from './colors'
 import { buildInstances, floorBox, type BoxSpec } from './sceneLayout'
 
 const M = 1 / 1000
 
-export const ZONE_COLOR: Record<ZoneType, string> = {
-  RECEIVING: '#3b82f6',
-  STORAGE: '#64748b',
-  PICKING: '#10b981',
-  DISPATCH: '#f59e0b',
-  QUARANTINE: '#ef4444',
-  COLD: '#0ea5e9',
-}
 
 /** Flat outline (x0, y0, x1, y1 …) as a three.js shape lying on the floor. */
 function shapeOf(flat: number[]): THREE.Shape {
@@ -77,10 +69,12 @@ function Boxes({ specs, color, colors, onPick }: {
  * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
  * draw call each, whatever the number of racks.
  */
-export function SceneCanvas({ scene, parts, selected, onSelect, onCamera }: {
+export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera }: {
   scene: Scene
   /** Boxes from buildInstances(scene), worked out by the page so search and fly-to use the same positions. */
   parts: ReturnType<typeof buildInstances>
+  /** One CSS colour per bin (colour mode worked out by the page). */
+  colors: string[]
   /** Index of the selected bin, or null. */
   selected: number | null
   onSelect: (index: number | null) => void
@@ -91,10 +85,13 @@ export function SceneCanvas({ scene, parts, selected, onSelect, onCamera }: {
     [scene.zones])
   const box = useMemo(() => floorBox(scene.floor), [scene.floor])
   const binColors = useMemo(() => {
-    const byZone = new Map(scene.zones.map((z) => [z.code, new THREE.Color(ZONE_COLOR[z.type])]))
-    const fallback = new THREE.Color('#94a3b8')
-    return scene.bins.rack.map((r) => byZone.get(scene.racks[r]!.zone) ?? fallback)
-  }, [scene])
+    const cache = new Map<string, THREE.Color>() // a few distinct colours, shared by thousands of bins
+    return colors.map((c) => {
+      let color = cache.get(c)
+      if (!color) cache.set(c, (color = new THREE.Color(c)))
+      return color
+    })
+  }, [colors])
   const doors = useMemo<BoxSpec[]>(() => {
     const outline: { x: number; y: number }[] = []
     for (let i = 0; i < scene.floor.length; i += 2) outline.push({ x: scene.floor[i]!, y: scene.floor[i + 1]! })
