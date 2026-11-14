@@ -28,3 +28,14 @@ the automated suites (143 backend, 76 frontend, green in CI) and the browser che
   map is the practical choice.
 - A weaker GPU than Intel UHD: the slow-PC banner covers it by offering the Lite map.
 - Server deployment (Nginx WebSocket upgrade, gzip): v1.0 deploy task; still waiting for SSH access.
+
+## Regression of v0.1 and v0.2 (same production build, fresh browser profile)
+
+| Area | Check | Result |
+| --- | --- | --- |
+| Sign-in | Signed-out page → login; wrong password → generic message; sign in → back to the page | Pass |
+| Users, roles, audit, account | Users list and invite dialog, roles page, audit log (25 rows), My account | Pass |
+| Warehouses | List with Edit layout, Bins and 3D buttons | Pass |
+| Layout editor | Real drag of rack R100 (28.65 → 37.4 m), save, publish keeps all 5,000 bins (0 new, 0 removed); an area dragged off the floor is refused on save ("Zone Z1 goes outside the floor") | Pass |
+| Rack types, bins, labels | Rack type list, bins list, single-label PDF (application/pdf) | Pass |
+| Sign out | Back to login; the API answers 401 afterwards | Pass |
