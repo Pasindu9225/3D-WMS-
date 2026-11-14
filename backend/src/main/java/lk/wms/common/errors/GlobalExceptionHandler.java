@@ -105,6 +105,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return createResponseEntity(body, headers, status, request);
     }
 
+    /** SEC-40: uploads over the multipart limit (5 MB images) get a clear code instead of a bare 413. */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            org.springframework.web.multipart.MaxUploadSizeExceededException ex, HttpHeaders headers, HttpStatusCode status,
+            WebRequest request) {
+        return problem(HttpStatus.CONTENT_TOO_LARGE, "FILE_TOO_LARGE", "Files can be at most 5 MB", request);
+    }
+
     /** Every ProblemDetail (ours and the built-in Spring ones) passes through here. */
     @Override
     protected ResponseEntity<Object> createResponseEntity(Object body, HttpHeaders headers,

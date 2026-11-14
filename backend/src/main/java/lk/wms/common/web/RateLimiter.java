@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class RateLimiter {
 
-    public enum Scope { GLOBAL, LOGIN, USER }
+    /** UPLOAD: SEC-45, file uploads per user. */
+    public enum Scope { GLOBAL, LOGIN, USER, UPLOAD }
 
     private final Map<Scope, Integer> perMinute = new EnumMap<>(Scope.class);
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
@@ -28,10 +29,12 @@ public class RateLimiter {
 
     public RateLimiter(@Value("${wms.rate-limit.global-per-minute}") int global,
             @Value("${wms.rate-limit.login-per-minute}") int login,
-            @Value("${wms.rate-limit.user-per-minute}") int user) {
+            @Value("${wms.rate-limit.user-per-minute}") int user,
+            @Value("${wms.rate-limit.upload-per-minute:20}") int upload) {
         perMinute.put(Scope.GLOBAL, global);
         perMinute.put(Scope.LOGIN, login);
         perMinute.put(Scope.USER, user);
+        perMinute.put(Scope.UPLOAD, upload);
     }
 
     /** @return 0 if allowed, otherwise the seconds to wait (for the Retry-After header). */

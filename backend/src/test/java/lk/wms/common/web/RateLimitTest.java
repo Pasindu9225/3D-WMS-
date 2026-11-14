@@ -16,7 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 /** SEC-60 with small limits: global 5/min, login 2/min, user 3/min. */
 class RateLimitTest {
 
-    private final RateLimiter limiter = new RateLimiter(5, 2, 3);
+    private final RateLimiter limiter = new RateLimiter(5, 2, 3, 20);
 
     @AfterEach
     void clear() {

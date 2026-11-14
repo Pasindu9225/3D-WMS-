@@ -5,19 +5,24 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import lk.wms.catalog.domain.FileObject;
 import lk.wms.catalog.domain.Product;
 import lk.wms.catalog.domain.Product.UnitSpec;
 import lk.wms.catalog.domain.ProductUom;
+import lk.wms.catalog.repo.FileObjectRepository;
 import lk.wms.catalog.repo.ProductRepository;
 import lk.wms.common.audit.AuditService;
 import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
+import lk.wms.common.web.RateLimiter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** The company's product master (v0.4 task 1). Products are shared by all its warehouses. */
 @Service
@@ -40,11 +45,22 @@ public class ProductService {
     public record ScanView(ProductView product, String uom, int factor) {
     }
 
+    /** The stored picture of a product, ready to send. */
+    public record Image(byte[] bytes, String contentType, String sku) {
+    }
+
     private final ProductRepository products;
+    private final FileObjectRepository files;
+    private final ImageStore images;
+    private final RateLimiter limiter;
     private final AuditService audit;
 
-    public ProductService(ProductRepository products, AuditService audit) {
+    public ProductService(ProductRepository products, FileObjectRepository files, ImageStore images, RateLimiter limiter,
+            AuditService audit) {
         this.products = products;
+        this.files = files;
+        this.images = images;
+        this.limiter = limiter;
         this.audit = audit;
     }
 
@@ -97,6 +113,67 @@ public class ProductService {
         Product p = find(publicId);
         p.archive();
         audit.record(cu.tenantId(), cu.userId(), "PRODUCT_ARCHIVED", "product", p.getPublicId(), view(p), null);
+    }
+
+    /**
+     * Sets the product picture (SEC-40..45). The upload is checked and re-encoded by ImageStore; the previous
+     * picture is removed from disk only after the change is committed.
+     * ponytail: a new file whose transaction then fails stays on disk; add a sweep of unreferenced files if it matters.
+     */
+    @Transactional
+    public ProductView setImage(CurrentUser cu, String publicId, String filename, String contentType, byte[] bytes) {
+        if (limiter.tryConsume(RateLimiter.Scope.UPLOAD, Long.toString(cu.userId())) > 0) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_UPLOADS", "Too many uploads; wait a minute");
+        }
+        Product p = find(publicId);
+        ImageStore.Stored stored = images.store(cu.tenantId(), filename, contentType, bytes);
+        FileObject file = files.save(new FileObject("image/jpeg", stored.sizeBytes(), stored.width(), stored.height(),
+                stored.path(), cu.userId()));
+        dropImage(p);
+        p.setImageFileId(file.getId());
+        audit.record(cu.tenantId(), cu.userId(), "PRODUCT_IMAGE_SET", "product", p.getPublicId(), null,
+                java.util.Map.of("bytes", stored.sizeBytes(), "width", stored.width(), "height", stored.height()));
+        products.flush(); // bump the version now, so the answer carries the version the next save must send
+        return view(p);
+    }
+
+    @Transactional
+    public ProductView removeImage(CurrentUser cu, String publicId) {
+        Product p = find(publicId);
+        if (p.getImageFileId() != null) {
+            dropImage(p);
+            p.setImageFileId(null);
+            audit.record(cu.tenantId(), cu.userId(), "PRODUCT_IMAGE_REMOVED", "product", p.getPublicId(), null, null);
+            products.flush();
+        }
+        return view(p);
+    }
+
+    /** The picture, only through its product, so the tenant filter decides who may see it (SEC-44). */
+    @Transactional(readOnly = true)
+    public Image image(String publicId) {
+        Product p = find(publicId);
+        FileObject file = p.getImageFileId() == null ? null : files.findLive(p.getImageFileId()).orElse(null);
+        if (file == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "IMAGE_NOT_FOUND", "This product has no picture");
+        }
+        return new Image(images.read(file.getPath()), file.getContentType(), p.getSku());
+    }
+
+    private void dropImage(Product p) {
+        if (p.getImageFileId() == null) {
+            return;
+        }
+        files.findLive(p.getImageFileId()).ifPresent(old -> {
+            old.delete();
+            String path = old.getPath();
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    images.delete(path);
+                }
+            });
+        });
     }
 
     /** Scanning: a product barcode counts 1 base unit, a case barcode counts its factor. */

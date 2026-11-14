@@ -32,6 +32,15 @@ public abstract class IntegrationTest {
                     "--collation-server=utf8mb4_0900_ai_ci");
 
     private static final Path KEYS = testKeys();
+    protected static final Path FILES = tempFiles();
+
+    private static Path tempFiles() {
+        try {
+            return java.nio.file.Files.createTempDirectory("wms-files-");
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
 
     static {
         MYSQL.start(); // stopped by Testcontainers' Ryuk when the JVM exits
@@ -39,6 +48,7 @@ public abstract class IntegrationTest {
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
+        registry.add("wms.files.dir", () -> FILES.toString()); // uploads go to a temp folder, never the repo
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
         registry.add("spring.datasource.password", () -> APP_PASSWORD);
         registry.add("spring.flyway.password", () -> FLYWAY_PASSWORD);

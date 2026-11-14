@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Archive, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Archive, ImageOff, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -13,7 +13,7 @@ import { formatKg, parseMoney, parseVolume, parseWeight } from '@/features/layou
 import { errorMessage, fieldErrors } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
-import { PRODUCT_PAGE_SIZE, useArchiveProduct, useProducts, useSaveProduct, type Product } from './api'
+import { imageUrl, PRODUCT_PAGE_SIZE, useArchiveProduct, useProductImage, useProducts, useSaveProduct, type Product } from './api'
 
 /** The company's products: SKU, barcode, units of measure, size and weight (v0.4 task 1). */
 export function ProductsPage() {
@@ -60,6 +60,7 @@ export function ProductsPage() {
             <Tr key={p.id}>
               <td className="font-mono font-medium">{p.sku}</td>
               <td>
+                {p.hasImage && <img src={imageUrl(p)} alt="" loading="lazy" className="mr-2 inline size-8 rounded object-cover align-middle" />}
                 {p.name}
                 {(p.trackBatch || p.trackExpiry) && (
                   <span className="ml-2 inline-flex gap-1">
@@ -136,6 +137,8 @@ type Values = z.input<typeof schema>
 
 function ProductDialog({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const save = useSaveProduct()
+  // Uploading a picture bumps the version; keep the latest so Save does not look like someone else's change.
+  const [current, setCurrent] = useState(product)
   const form = useForm<Values, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: product
@@ -155,7 +158,7 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
   const submit = form.handleSubmit((v) => save.mutate({
     id: product?.id,
     sku: product ? undefined : v.sku,
-    version: product?.version,
+    version: current?.version,
     name: v.name,
     barcode: v.barcode || null,
     baseUom: v.baseUom,
@@ -172,6 +175,7 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
       description={t('products.formHint')}>
       <form noValidate className="grid max-h-[70vh] gap-4 overflow-y-auto pr-1" onSubmit={submit}>
         {save.isError && Object.keys(server).length === 0 && <FormMessage tone="error">{errorMessage(save.error)}</FormMessage>}
+        {current && <ImageField product={current} onChange={setCurrent} />}
         <div className="grid grid-cols-[9rem_1fr] gap-3">
           <Field label={t('products.col.sku')} error={errors.sku?.message ?? server.sku}>
             {(p) => <Input {...p} className="font-mono uppercase" maxLength={40} disabled={!!product} {...form.register('sku', upper)} />}
@@ -233,5 +237,35 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
         </div>
       </form>
     </Dialog>
+  )
+}
+
+/** Picture of an existing product: uploads straight away (JPEG/PNG up to 5 MB, re-encoded by the server). */
+function ImageField({ product, onChange }: { product: Product; onChange: (p: Product) => void }) {
+  const image = useProductImage()
+  const pick = (file: File | null) => image.mutate({ id: product.id, file }, { onSuccess: onChange })
+  return (
+    <div className="flex items-center gap-3 rounded-md border p-2">
+      {product.hasImage
+        ? <img src={imageUrl(product)} alt={t('products.imageAlt', { sku: product.sku })} className="size-16 rounded object-cover" />
+        : <div className="grid size-16 place-items-center rounded bg-secondary text-muted-foreground"><ImageOff /></div>}
+      <div className="space-y-1 text-sm">
+        <div className="flex flex-wrap gap-2">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 font-medium hover:bg-secondary">
+            <Upload className="size-4" /> {product.hasImage ? t('products.imageReplace') : t('products.imageUpload')}
+            <input type="file" accept="image/jpeg,image/png" className="sr-only" disabled={image.isPending}
+              onChange={(e) => {
+                pick(e.target.files?.[0] ?? null)
+                e.target.value = ''
+              }} />
+          </label>
+          {product.hasImage && (
+            <Button type="button" variant="ghost" size="sm" disabled={image.isPending} onClick={() => pick(null)}>{t('products.imageRemove')}</Button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">{image.isPending ? t('products.imageUploading') : t('products.imageHint')}</p>
+        {image.isError && <p role="alert" className="text-xs text-destructive">{errorMessage(image.error)}</p>}
+      </div>
+    </div>
   )
 }

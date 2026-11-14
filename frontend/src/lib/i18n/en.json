@@ -452,5 +452,19 @@
   "error.TOO_MANY_LABELS": "Print at most 10,000 labels at once. Narrow the search first.",
   "error.UOM_REPEATED": "A unit is listed twice, or a larger unit has the same name as the base unit.",
   "error.USER_UNKNOWN": "One or more of those users do not exist.",
-  "error.VERSION_REQUIRED": "Reload and try again."
+  "error.VERSION_REQUIRED": "Reload and try again.",
+  "products.imageAlt": "Picture of {sku}",
+  "products.imageUpload": "Add picture",
+  "products.imageReplace": "Replace picture",
+  "products.imageRemove": "Remove",
+  "products.imageUploading": "Uploading…",
+  "products.imageHint": "JPEG or PNG, up to 5 MB. It is resized and cleaned (no location data) before saving.",
+  "error.FILE_EMPTY": "The file is empty.",
+  "error.FILE_TOO_LARGE": "Files can be at most 5 MB.",
+  "error.FILE_TYPE_NOT_ALLOWED": "Only JPEG and PNG pictures are allowed.",
+  "error.FILE_TYPE_MISMATCH": "The file name and its content do not match. Save it again as a normal JPEG or PNG.",
+  "error.IMAGE_TOO_LARGE": "Pictures can be at most 16,000 pixels on a side.",
+  "error.IMAGE_UNREADABLE": "This picture cannot be read. Try another file.",
+  "error.IMAGE_NOT_FOUND": "This product has no picture.",
+  "error.TOO_MANY_UPLOADS": "Too many uploads. Wait a minute and try again."
 }

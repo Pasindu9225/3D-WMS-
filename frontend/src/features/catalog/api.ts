@@ -56,3 +56,20 @@ export function useArchiveProduct() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
   })
 }
+
+/** Product picture: JPEG or PNG up to 5 MB; the server re-encodes it. */
+export function useProductImage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File | null }) => {
+      if (!file) return api<Product>(`/products/${id}/image`, { method: 'DELETE' })
+      const form = new FormData()
+      form.append('file', file)
+      return api<Product>(`/products/${id}/image`, { method: 'POST', body: form })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+}
+
+/** Image URL with a version so a replaced picture is not shown from the browser cache. */
+export const imageUrl = (p: Product) => `/api/v1/products/${p.id}/image?v=${p.version}`

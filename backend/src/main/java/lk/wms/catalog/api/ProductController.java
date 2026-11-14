@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import lk.wms.catalog.domain.Product.UnitSpec;
@@ -18,9 +20,14 @@ import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
 import lk.wms.common.web.PageResponse;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,6 +37,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** Product master (v0.4 task 1). Read: catalog:read; changes: catalog:manage. */
 @RestController
@@ -117,5 +125,31 @@ public class ProductController {
     public ResponseEntity<Void> archive(@PathVariable @Size(max = 26) String id) {
         products.archive(CurrentUser.require(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** SEC-40..45: JPEG or PNG up to 5 MB, re-encoded before it is stored. */
+    @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('catalog:manage')")
+    public ProductView setImage(@PathVariable @Size(max = 26) String id, @RequestParam("file") MultipartFile file)
+            throws IOException {
+        return products.setImage(CurrentUser.require(), id, file.getOriginalFilename(), file.getContentType(), file.getBytes());
+    }
+
+    @DeleteMapping("/{id}/image")
+    @PreAuthorize("hasAuthority('catalog:manage')")
+    public ProductView removeImage(@PathVariable @Size(max = 26) String id) {
+        return products.removeImage(CurrentUser.require(), id);
+    }
+
+    /** Served only through the product (tenant check), never as a static file (SEC-44); nosniff is global. */
+    @GetMapping("/{id}/image")
+    @PreAuthorize("hasAuthority('catalog:read')")
+    public ResponseEntity<byte[]> image(@PathVariable @Size(max = 26) String id) {
+        ProductService.Image img = products.image(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(img.contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(img.sku() + ".jpg").build().toString())
+                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(5)).cachePrivate())
+                .body(img.bytes());
     }
 }

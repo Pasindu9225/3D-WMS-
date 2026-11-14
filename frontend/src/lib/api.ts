@@ -83,7 +83,8 @@ async function send<T>(path: string, { method = 'GET', body }: RequestOptions, m
 
 async function rawFetch(path: string, method: Method, body: unknown): Promise<Response> {
   const headers: Record<string, string> = {}
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const form = body instanceof FormData // file uploads: the browser sets the multipart boundary itself
+  if (body !== undefined && !form) headers['Content-Type'] = 'application/json'
   if (method !== 'GET') {
     await primeCsrf(false)
     headers['X-XSRF-TOKEN'] = readCookie('XSRF-TOKEN') ?? ''
@@ -93,7 +94,7 @@ async function rawFetch(path: string, method: Method, body: unknown): Promise<Re
       method,
       headers,
       credentials: 'same-origin',
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
     })
   } catch {
     throw new ApiError(0, 'NETWORK', 'Network error')

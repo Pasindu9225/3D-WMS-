@@ -24,12 +24,12 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-27** (v0.1): Least-privilege DB users — task 1+3, DatabasePrivilegesTest
 - [x] **SEC-28** (v0.1): Audit log on all changes — task 6, UserManagementTest + ArchUnit
 - [x] **SEC-29** (v0.1): Passwords hashed with Argon2id (or BCrypt cost 12) — task 4, AuthFlowTest
-- [ ] **SEC-40** (v0.4): Allow-list file types and size per type
-- [ ] **SEC-41** (v0.4): Check magic bytes and match them with Content-Type and extension
-- [ ] **SEC-42** (v0.4): Block SVG and HTML
-- [ ] **SEC-43** (v0.4): Re-encode every image, never serve the original
-- [ ] **SEC-44** (v0.4): Random file names, stored outside the web root
-- [ ] **SEC-45** (v0.4): Upload rate limit per user
+- [x] **SEC-40** (v0.4): Allow-list file types and size per type — task 1b: JPEG/PNG, 5 MB, ProductImageTest
+- [x] **SEC-41** (v0.4): Check magic bytes and match them with Content-Type and extension — task 1b, ProductImageTest
+- [x] **SEC-42** (v0.4): Block SVG and HTML — task 1b, ProductImageTest
+- [x] **SEC-43** (v0.4): Re-encode every image, never serve the original — task 1b: new JPEG, EXIF/comments gone, ProductImageTest
+- [x] **SEC-44** (v0.4): Random file names, stored outside the web root — task 1b: {tenant}/{uuid}.jpg under wms.files.dir, served via product (tenant check)
+- [x] **SEC-45** (v0.4): Upload rate limit per user — task 1b: 20/min, ProductImageTest
 - [ ] **SEC-46** (v0.4): CSV import safety
 - [x] **SEC-60** (v0.1): Rate limits — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-61** (v0.1): Security headers — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit

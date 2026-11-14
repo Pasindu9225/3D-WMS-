@@ -277,7 +277,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 **Tasks**
 
 - [ ] Tables: `product`, `uom`, `product_uom`, `partner`, `purchase_order`, `po_line`, `receipt`, `receipt_line`, `stock`, `stock_movement`, `task`, `file_object`
-- [ ] Product master with barcode, units of measure, size/weight, optional image (SEC-40 to SEC-45) — products, units and barcodes done (1a); image next (1b)
+- [x] Product master with barcode, units of measure, size/weight, optional image (SEC-40 to SEC-45)
 - [ ] Suppliers (partners); CSV import for products and suppliers (SEC-46)
 - [ ] Purchase orders: create, approve, cancel
 - [ ] Receiving on phone: scan PO or product, enter quantity, note damage, create GRN
