@@ -30,7 +30,7 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-43** (v0.4): Re-encode every image, never serve the original — task 1b: new JPEG, EXIF/comments gone, ProductImageTest
 - [x] **SEC-44** (v0.4): Random file names, stored outside the web root — task 1b: {tenant}/{uuid}.jpg under wms.files.dir, served via product (tenant check)
 - [x] **SEC-45** (v0.4): Upload rate limit per user — task 1b: 20/min, ProductImageTest
-- [ ] **SEC-46** (v0.4): CSV import safety
+- [x] **SEC-46** (v0.4): CSV import safety — task 2: .csv UTF-8, 10 MB, 5,000 rows, all or nothing, formula-safe export (CsvTest, ImportApiTest)
 - [x] **SEC-60** (v0.1): Rate limits — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-61** (v0.1): Security headers — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-62** (v0.1): CORS allow-list, no wildcard — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit

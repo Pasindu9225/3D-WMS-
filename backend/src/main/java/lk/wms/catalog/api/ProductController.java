@@ -73,10 +73,90 @@ public class ProductController {
         }
     }
 
-    private final ProductService products;
+    /** One part of the units column: CASE=12 or CASE=12:14791234000018. */
+    private static final java.util.regex.Pattern UNIT =
+            java.util.regex.Pattern.compile("^\\s*([A-Za-z]+)\\s*=\\s*(\\d{1,7})\\s*(?::\\s*(\\S+))?\\s*$");
 
-    public ProductController(ProductService products) {
+    static final List<String> COLUMNS = List.of("sku", "name", "barcode", "base_uom", "weight_kg", "volume_l", "cost",
+            "track_batch", "track_expiry", "units");
+
+    private final ProductService products;
+    private final jakarta.validation.Validator validator;
+    private final lk.wms.common.web.RateLimiter limiter;
+
+    public ProductController(ProductService products, jakarta.validation.Validator validator,
+            lk.wms.common.web.RateLimiter limiter) {
         this.products = products;
+        this.validator = validator;
+        this.limiter = limiter;
+    }
+
+    /**
+     * SEC-46: .csv, UTF-8, at most 10 MB and 5,000 rows; every row checked with the same rules as the form;
+     * new SKUs created, existing ones updated, all or nothing. units: CASE=12:barcode;PAL=480
+     */
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('catalog:manage')")
+    public lk.wms.catalog.service.ImportResult importCsv(@RequestParam("file") MultipartFile file) throws IOException {
+        CurrentUser cu = CurrentUser.require();
+        CsvRows.uploadAllowed(limiter, cu);
+        CsvRows csv = new CsvRows(lk.wms.common.Csv.readUpload(file.getOriginalFilename(), file.getBytes()), COLUMNS,
+                List.of("sku", "name", "base_uom"));
+        List<ProductService.ImportRow> rows = new java.util.ArrayList<>();
+        Map<String, String> columnOf = Map.of("sku", "sku", "name", "name", "barcode", "barcode", "baseUom", "base_uom",
+                "weightG", "weight_kg", "volumeCm3", "volume_l", "costMinor", "cost", "units", "units");
+        for (int i = 0; i < csv.size(); i++) {
+            int errorsBefore = csv.errors.size();
+            Long weight = csv.scaled(i, "weight_kg", 1000);
+            Long volume = csv.scaled(i, "volume_l", 1000);
+            Long cost = csv.scaled(i, "cost", 100);
+            List<UnitRequest> units = units(csv, i);
+            ProductRequest r = new ProductRequest(csv.upper(i, "sku"), csv.text(i, "name"), csv.text(i, "barcode"),
+                    csv.upper(i, "base_uom"), toInt(weight), toInt(volume), csv.yesNo(i, "track_batch"),
+                    csv.yesNo(i, "track_expiry"), cost, units, null);
+            if (r.sku() == null) {
+                csv.error(i, "sku", "SKU is required");
+            } else if (csv.valid(validator, i, r, columnOf) && csv.errors.size() == errorsBefore) {
+                rows.add(new ProductService.ImportRow(CsvRows.rowNumber(i), r.sku(), r.spec()));
+            }
+        }
+        return products.importRows(cu, rows, csv.errors);
+    }
+
+    /** Example file to fill in; cells are written formula-safe (SEC-46). */
+    @GetMapping("/import-template.csv")
+    @PreAuthorize("hasAuthority('catalog:read')")
+    public ResponseEntity<byte[]> template() {
+        String csv = lk.wms.common.Csv.line(COLUMNS)
+                + lk.wms.common.Csv.line(List.of("OIL-1L", "Coconut oil 1L", "4791234000011", "EA", "0.95", "1.1", "450.00",
+                        "no", "yes", "CASE=12:14791234000018;PAL=480"))
+                + lk.wms.common.Csv.line(List.of("RICE-5KG", "Samba rice 5kg", "", "BAG", "5", "6.5", "1250", "yes", "no", ""));
+        return CsvRows.csvFile("products-template.csv", csv);
+    }
+
+    /** "CASE=12:barcode;PAL=480" into unit requests; a malformed part is a row error. */
+    private static List<UnitRequest> units(CsvRows csv, int i) {
+        String v = csv.text(i, "units");
+        List<UnitRequest> out = new java.util.ArrayList<>();
+        if (v == null) {
+            return out;
+        }
+        for (String part : v.split(";")) {
+            java.util.regex.Matcher m = UNIT.matcher(part);
+            if (part.isBlank()) {
+                continue;
+            }
+            if (!m.matches()) {
+                csv.error(i, "units", "Write units like CASE=12 or CASE=12:barcode, separated by ;");
+                return List.of();
+            }
+            out.add(new UnitRequest(m.group(1).toUpperCase(java.util.Locale.ROOT), Integer.parseInt(m.group(2)), m.group(3)));
+        }
+        return out;
+    }
+
+    private static Integer toInt(Long v) {
+        return v == null ? null : (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, v));
     }
 
     @GetMapping

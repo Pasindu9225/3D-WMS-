@@ -26,6 +26,17 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByBarcode(String barcode);
 
+    /** Products with their units in one query (imports update thousands; no per-product unit queries). */
+    @Query("select distinct p from Product p left join fetch p.units where p.sku in :skus")
+    java.util.List<Product> findBySkuInWithUnits(@Param("skus") java.util.Collection<String> skus);
+
+    /** Owners of these barcodes, as [barcode, sku] pairs: product barcodes, then unit barcodes. */
+    @Query("select p.barcode, p.sku from Product p where p.barcode in :codes")
+    java.util.List<Object[]> productBarcodeOwners(@Param("codes") java.util.Collection<String> codes);
+
+    @Query("select u.barcode, u.product.sku from ProductUom u where u.barcode in :codes")
+    java.util.List<Object[]> unitBarcodeOwners(@Param("codes") java.util.Collection<String> codes);
+
     @Query("select u from ProductUom u join fetch u.product where u.barcode = :barcode")
     Optional<ProductUom> findUnitByBarcode(@Param("barcode") String barcode);
 }

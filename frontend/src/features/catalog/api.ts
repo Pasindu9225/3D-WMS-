@@ -73,3 +73,66 @@ export function useProductImage() {
 
 /** Image URL with a version so a replaced picture is not shown from the browser cache. */
 export const imageUrl = (p: Product) => `/api/v1/products/${p.id}/image?v=${p.version}`
+
+export interface Supplier {
+  id: string
+  type: 'SUPPLIER'
+  code: string
+  name: string
+  contactName: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  version: number
+}
+
+export type SupplierInput = Pick<Supplier, 'name' | 'contactName' | 'phone' | 'email' | 'address'> & { code?: string; version?: number }
+
+export function useSuppliers(q: string, page: number) {
+  const params = new URLSearchParams({ page: String(page), size: String(PRODUCT_PAGE_SIZE) })
+  if (q) params.set('q', q)
+  return useQuery({
+    queryKey: ['suppliers', q, page],
+    queryFn: () => api<Page<Supplier>>(`/suppliers?${params}`),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useSaveSupplier() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: SupplierInput & { id?: string }) =>
+      id ? api<Supplier>(`/suppliers/${id}`, { method: 'PUT', body }) : api<Supplier>('/suppliers', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+  })
+}
+
+export function useArchiveSupplier() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/suppliers/${id}/archive`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+  })
+}
+
+/** CSV import result: all saved, or nothing saved and the rows to fix. */
+export interface ImportResult {
+  saved: boolean
+  created: number
+  updated: number
+  errors: { row: number; field: string; message: string }[]
+}
+
+export function useImport(what: 'products' | 'suppliers') {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return api<ImportResult>(`/${what}/import`, { method: 'POST', body: form })
+    },
+    onSuccess: (r) => {
+      if (r.saved) void qc.invalidateQueries({ queryKey: [what] })
+    },
+  })
+}

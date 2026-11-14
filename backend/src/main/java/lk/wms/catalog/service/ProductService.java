@@ -66,8 +66,92 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<ProductView> list(String query, Pageable pageable) {
-        String q = query == null ? "" : query.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_");
-        return products.search(q, pageable).map(ProductService::view);
+        return products.search(likeText(query), pageable).map(ProductService::view);
+    }
+
+    /** Search text for LIKE: trimmed, with ! % _ escaped (the queries use ESCAPE '!'), never a pattern. */
+    static String likeText(String query) {
+        return query == null ? "" : query.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    }
+
+    /** One CSV row, already validated field by field. */
+    public record ImportRow(int row, String sku, ProductSpec spec) {
+    }
+
+    /**
+     * CSV import (SEC-46): new SKUs are created, existing ones updated, all or nothing. Rows are already checked
+     * field by field; here: SKUs and barcodes repeated in the file, and barcodes owned by other products.
+     */
+    @Transactional
+    public ImportResult importRows(CurrentUser cu, List<ImportRow> rows, List<ImportResult.RowError> errors) {
+        java.util.Map<String, Integer> skuRow = new java.util.HashMap<>();
+        java.util.Map<String, Integer> barcodeRow = new java.util.HashMap<>();
+        java.util.Map<Integer, List<String>> rowCodes = new java.util.HashMap<>();
+        for (ImportRow r : rows) {
+            Integer seen = skuRow.putIfAbsent(r.sku(), r.row());
+            if (seen != null) {
+                errors.add(new ImportResult.RowError(r.row(), "sku", "SKU " + r.sku() + " is already on row " + seen));
+            }
+            List<String> codes = new ArrayList<>();
+            if (r.spec().barcode() != null) {
+                codes.add(r.spec().barcode());
+            }
+            r.spec().units().stream().map(UnitSpec::barcode).filter(Objects::nonNull).forEach(codes::add);
+            rowCodes.put(r.row(), codes);
+            for (String code : codes) {
+                Integer other = barcodeRow.putIfAbsent(code, r.row());
+                if (other != null && other != r.row()) {
+                    errors.add(new ImportResult.RowError(r.row(), "barcode", "Barcode " + code + " is already on row " + other));
+                }
+            }
+        }
+        java.util.Map<String, Product> existing = products.findBySkuInWithUnits(skuRow.keySet()).stream()
+                .collect(java.util.stream.Collectors.toMap(Product::getSku, java.util.function.Function.identity()));
+        // Who owns each barcode in the file today: two queries for the whole file, not four per row.
+        java.util.Map<String, String> owner = new java.util.HashMap<>();
+        products.productBarcodeOwners(barcodeRow.keySet()).forEach(o -> owner.put((String) o[0], (String) o[1]));
+        products.unitBarcodeOwners(barcodeRow.keySet()).forEach(o -> owner.put((String) o[0], (String) o[1]));
+        for (ImportRow r : rows) {
+            try {
+                checkUnits(r.spec());
+            } catch (ApiException e) {
+                errors.add(new ImportResult.RowError(r.row(), "units", e.getMessage()));
+            }
+            for (String code : rowCodes.getOrDefault(r.row(), List.of())) {
+                String sku = owner.get(code);
+                if (sku != null && !sku.equals(r.sku())) {
+                    errors.add(new ImportResult.RowError(r.row(), "barcode", "Barcode " + code + " belongs to " + sku));
+                }
+            }
+        }
+        int created = 0;
+        int updated = 0;
+        if (errors.isEmpty()) {
+            for (ImportRow r : rows) {
+                Product p = existing.get(r.sku());
+                if (p == null) {
+                    p = new Product(r.sku());
+                    created++;
+                } else {
+                    updated++;
+                }
+                apply(p, r.spec());
+                products.save(p);
+            }
+            try {
+                products.flush();
+            } catch (DataIntegrityViolationException e) {
+                errors.add(new ImportResult.RowError(1, "file", "A SKU or barcode clashes with an archived product"));
+            }
+        }
+        ImportResult result = ImportResult.of(created, updated, errors);
+        if (!result.saved()) {
+            org.springframework.transaction.interceptor.TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return result;
+        }
+        audit.record(cu.tenantId(), cu.userId(), "PRODUCTS_IMPORTED", "product", null, null,
+                java.util.Map.of("created", created, "updated", updated));
+        return result;
     }
 
     @Transactional(readOnly = true)
@@ -212,6 +296,11 @@ public class ProductService {
                 throw conflict();
             }
         }
+        checkUnits(s);
+    }
+
+    /** A larger unit appears once and never has the base unit's name. */
+    private static void checkUnits(ProductSpec s) {
         Set<String> uoms = new HashSet<>();
         for (UnitSpec u : s.units()) {
             if (u.uom().equals(s.baseUom()) || !uoms.add(u.uom())) {

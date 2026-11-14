@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Archive, ImageOff, Pencil, Plus, Trash2, Upload } from 'lucide-react'
+import { Archive, FileUp, ImageOff, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -13,6 +13,7 @@ import { formatKg, parseMoney, parseVolume, parseWeight } from '@/features/layou
 import { errorMessage, fieldErrors } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
+import { ImportDialog } from './ImportDialog'
 import { imageUrl, PRODUCT_PAGE_SIZE, useArchiveProduct, useProductImage, useProducts, useSaveProduct, type Product } from './api'
 
 /** The company's products: SKU, barcode, units of measure, size and weight (v0.4 task 1). */
@@ -26,6 +27,7 @@ export function ProductsPage() {
   const archive = useArchiveProduct()
   const [editing, setEditing] = useState<Product | 'new' | null>(null)
   const [archiving, setArchiving] = useState<Product | null>(null)
+  const [importing, setImporting] = useState(false)
   const data = list.data
 
   return (
@@ -35,7 +37,12 @@ export function ProductsPage() {
           <h1 className="text-2xl font-semibold">{t('products.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('products.hint')}</p>
         </div>
-        {manage && <Button onClick={() => setEditing('new')}><Plus /> {t('products.new')}</Button>}
+        {manage && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImporting(true)}><FileUp /> {t('import.button')}</Button>
+            <Button onClick={() => setEditing('new')}><Plus /> {t('products.new')}</Button>
+          </div>
+        )}
       </div>
       <Input aria-label={t('products.search')} placeholder={t('products.search')} value={search} maxLength={200} className="max-w-sm"
         onChange={(e) => {
@@ -97,6 +104,7 @@ export function ProductsPage() {
             range: t('common.pageOf', { from: data.page * data.size + 1, to: data.page * data.size + data.items.length, total: data.total }),
           }} />
       )}
+      {importing && <ImportDialog what="products" onClose={() => setImporting(false)} />}
       {editing && <ProductDialog product={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
       {archiving && (
         <Dialog open onOpenChange={(o) => !o && setArchiving(null)} title={t('products.archiveTitle')}
