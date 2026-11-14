@@ -65,4 +65,13 @@ public class Zone extends TenantScoped {
     public Type getType() {
         return type;
     }
+
+    public String getName() {
+        return name;
+    }
+
+    /** JSON array of {x, y} points in mm. */
+    public String getPolygon() {
+        return polygon;
+    }
 }

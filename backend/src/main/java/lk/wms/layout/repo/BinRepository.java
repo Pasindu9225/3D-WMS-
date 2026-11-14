@@ -23,6 +23,23 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
 
     long countByWarehouseId(long warehouseId);
 
+    /** 3D scene: just what the viewer needs per bin, in id order so status flags line up with it. */
+    interface SceneBin {
+        String getPublicId();
+
+        String getCode();
+
+        Long getLevelId();
+
+        Integer getPositionNo();
+
+        Boolean getPickFace();
+
+        Boolean getBlocked();
+    }
+
+    List<SceneBin> findByWarehouseIdOrderById(long warehouseId);
+
     interface CodeOnly {
         String getCode();
     }

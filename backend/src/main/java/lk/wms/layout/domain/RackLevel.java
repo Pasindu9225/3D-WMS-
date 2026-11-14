@@ -53,4 +53,8 @@ public class RackLevel extends TenantScoped {
     public int getLevelNo() {
         return levelNo;
     }
+
+    public int getHeightFromFloorMm() {
+        return heightFromFloorMm;
+    }
 }

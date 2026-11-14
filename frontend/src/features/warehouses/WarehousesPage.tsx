@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Archive, Boxes, Map, Plus } from 'lucide-react'
+import { Archive, Boxes, Cuboid, Map, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
@@ -72,6 +72,11 @@ export function WarehousesPage() {
                 {w.layoutStatus === 'PUBLISHED' && (
                   <Button asChild variant="outline" size="sm">
                     <Link to={`/app/warehouses/${w.id}/bins`}><Boxes /> {t('warehouses.bins')}</Link>
+                  </Button>
+                )}
+                {w.layoutStatus === 'PUBLISHED' && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link to={`/app/warehouses/${w.id}/3d`}><Cuboid /> {t('warehouses.view3d')}</Link>
                   </Button>
                 )}
                 {manage && (

@@ -104,4 +104,8 @@ public class LayoutVersion extends TenantScoped {
     public Instant getUpdatedAt() {
         return updatedAt;
     }
+
+    public Instant getPublishedAt() {
+        return publishedAt;
+    }
 }

@@ -257,7 +257,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Tasks**
 
-- [ ] Load 3D page code only on 3D routes (lazy import)
+- [x] Load 3D page code only on 3D routes (lazy import); scene + bin-status API (task 1)
 - [ ] Draw floor, zones, racks and bins with instanced meshes; one draw call per shape
 - [ ] Orbit, zoom, top view, reset camera; keyboard shortcuts
 - [ ] Click bin → side panel (code, capacity, contents placeholder until v0.4)

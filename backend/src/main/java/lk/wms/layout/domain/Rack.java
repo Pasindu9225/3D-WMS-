@@ -75,4 +75,32 @@ public class Rack extends TenantScoped {
     public String getCode() {
         return code;
     }
+
+    public Long getZoneId() {
+        return zoneId;
+    }
+
+    public int getPosXMm() {
+        return posXMm;
+    }
+
+    public int getPosYMm() {
+        return posYMm;
+    }
+
+    public int getRotationDeg() {
+        return rotationDeg;
+    }
+
+    public int getWidthMm() {
+        return widthMm;
+    }
+
+    public int getDepthMm() {
+        return depthMm;
+    }
+
+    public int getHeightMm() {
+        return heightMm;
+    }
 }

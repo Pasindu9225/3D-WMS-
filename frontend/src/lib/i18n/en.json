@@ -20,7 +20,7 @@
   "menu.signOut": "Sign out",
   "menu.signOutAll": "Sign out on all devices",
   "home.welcome": "Welcome, {name}",
-  "home.body": "Set up your warehouses and draw their floor plans under Warehouses. The 3D view and stock arrive in the next versions.",
+  "home.body": "Set up your warehouses and draw their floor plans under Warehouses, then see them under 3D view. Stock arrives in the next version.",
   "login.title": "Sign in",
   "login.subtitle": "Use the email and password from your invite.",
   "login.email": "Email",
@@ -341,5 +341,12 @@
   "action.RACK_TEMPLATE_ARCHIVED": "Rack type archived",
   "action.BIN_UPDATED": "Bin changed",
   "action.LAYOUT_DRAFT_SAVED": "Layout draft saved",
-  "action.LAYOUT_PUBLISHED": "Layout published"
+  "action.LAYOUT_PUBLISHED": "Layout published",
+  "view3d.title": "3D view",
+  "view3d.nonePublished": "No warehouse has a published layout yet. Publish one in its layout editor first.",
+  "view3d.summary": "{racks} racks · {bins} bins",
+  "view3d.editLayout": "Edit layout",
+  "view3d.notPublished": "This warehouse has no published layout yet. Publish it in the layout editor to see it in 3D.",
+  "view3d.loading3d": "Loading 3D…",
+  "warehouses.view3d": "3D"
 }
