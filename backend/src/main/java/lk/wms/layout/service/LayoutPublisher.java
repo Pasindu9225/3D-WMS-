@@ -85,7 +85,7 @@ public class LayoutPublisher {
                 doc.racks().stream().map(LayoutDocument.Rack::templateId).collect(Collectors.toSet()));
         // Checked again: a rack type may have been archived since the draft was saved.
         List<Issue> errors = LayoutValidator.validate(doc, types.values().stream().collect(Collectors.toMap(
-                RackTemplate::getPublicId, t -> new LayoutValidator.Footprint(t.getWidthMm(), t.getDepthMm()))))
+                RackTemplate::getPublicId, t -> new LayoutValidator.Footprint(t.getWidthMm(), t.getDepthMm(), t.getLevels() * t.getBinsPerLevel()))))
                 .stream().filter(i -> i.severity() == Severity.ERROR).toList();
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "LAYOUT_INVALID",

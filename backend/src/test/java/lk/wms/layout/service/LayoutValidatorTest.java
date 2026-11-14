@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 class LayoutValidatorTest {
 
     static final String T = "01TEMPLATE0000000000000000";
-    static final Map<String, Footprint> TEMPLATES = Map.of(T, new Footprint(2700, 1100));
+    static final Map<String, Footprint> TEMPLATES = Map.of(T, new Footprint(2700, 1100, 12));
     static final List<Point> FLOOR = rect(0, 0, 40_000, 20_000);
 
     @Test
@@ -64,6 +64,21 @@ class LayoutValidatorTest {
         // Turned so a corner sticks out past the zone edge at x = 0.
         assertThat(validate(List.of(new Rack("R4", T, "A", 1200, 5000, 30, null, null, null)))).extracting(Issue::code)
                 .containsExactly("RACK_OUTSIDE_ZONE");
+    }
+
+    @Test
+    void aLayoutCannotMakeMoreThan50000Bins() {
+        // 1,000 bins per rack (20 levels x 50): 50 racks is the limit, 51 is one rack too many.
+        Map<String, Footprint> big = Map.of(T, new Footprint(2700, 1100, 1000));
+        List<Rack> racks = new ArrayList<>();
+        for (int i = 0; i < 51; i++) {
+            racks.add(rack("R" + i, 2000 + (i % 10) * 3000, 2000 + (i / 10) * 3000));
+        }
+        List<Zone> zones = List.of(zone("A", FLOOR));
+        assertThat(LayoutValidator.validate(doc(FLOOR, zones, racks.subList(0, 50), List.of()), big))
+                .extracting(Issue::code).doesNotContain("TOO_MANY_BINS");
+        assertThat(LayoutValidator.validate(doc(FLOOR, zones, racks, List.of()), big))
+                .extracting(Issue::code).contains("TOO_MANY_BINS");
     }
 
     @Test

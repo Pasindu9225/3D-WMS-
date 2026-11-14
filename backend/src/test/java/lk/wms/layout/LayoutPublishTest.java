@@ -96,6 +96,29 @@ class LayoutPublishTest extends ApiTest {
     }
 
     @Test
+    void onlyManagersOfThisCompanyCanPublishOrChangeItsRackTypes() throws Exception {
+        save(0, rack("R01", "A", 5000, 5000));
+        Cookie viewer = login(newUser(tenant, "VIEWER"));
+        String viewerId = jdbc.queryForObject("SELECT public_id FROM app_user WHERE tenant_id = ? AND full_name = 'User VIEWER'",
+                String.class, tenant);
+        send(admin, put("/api/v1/warehouses/" + warehouse + "/users").content("{\"users\":[\"" + viewerId + "\"]}"))
+                .andExpect(status().isOk());
+        send(viewer, post("/api/v1/warehouses/" + warehouse + "/layout/publish").content("{\"baseRevision\":1}"))
+                .andExpect(status().isForbidden());
+
+        Cookie otherAdmin = login(newUser(newTenant(2), "TENANT_ADMIN"));
+        send(otherAdmin, get("/api/v1/warehouses/" + warehouse + "/layout")).andExpect(status().isNotFound());
+        send(otherAdmin, put("/api/v1/warehouses/" + warehouse + "/layout").content("{\"baseRevision\":1,\"layout\":" + layout() + "}"))
+                .andExpect(status().isNotFound());
+        send(otherAdmin, post("/api/v1/warehouses/" + warehouse + "/layout/publish").content("{\"baseRevision\":1}"))
+                .andExpect(status().isNotFound());
+        send(otherAdmin, put("/api/v1/rack-templates/" + type).content(typeJson(null, 2))).andExpect(status().isNotFound());
+        send(otherAdmin, post("/api/v1/rack-templates/" + type + "/archive")).andExpect(status().isNotFound());
+        send(otherAdmin, get("/api/v1/warehouses/" + warehouse + "/labels.pdf")).andExpect(status().isNotFound());
+        assertThat(count("bin WHERE warehouse_id = " + warehouseId())).isZero(); // nothing was published
+    }
+
+    @Test
     void aResizedAngledRackKeepsItsOwnSizeAndBinVolume() throws Exception {
         save(0, "{\"code\":\"R01\",\"templateId\":\"" + type + "\",\"zone\":\"A\",\"x\":8000,\"y\":8000,\"rotation\":30,"
                 + "\"widthMm\":3600,\"depthMm\":1200,\"heightMm\":4000}");

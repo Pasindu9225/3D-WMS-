@@ -1,7 +1,7 @@
 import type Konva from 'konva'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Circle, Group, Label, Layer, Line, Rect, Stage, Tag, Text, Transformer } from 'react-konva'
-import type { RackType, ZoneType } from '@/features/warehouses/api'
+import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { Circle, Group, Label, Layer, Line, Rect, Shape, Stage, Tag, Text, Transformer } from 'react-konva'
+import type { Rack, RackType, ZoneType } from '@/features/warehouses/api'
 import { useEditor } from './editorStore'
 import { bounds, nearestOnOutline, rackSize, type RackStatus } from './geometry'
 import { formatWith, UNITS, type Unit } from './units'
@@ -42,7 +42,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
   const cursor = useEditor((s) => s.cursor)
   const unit = useEditor((s) => s.unit)
   const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select, addDrawPoint, finishDrawing,
-    moveZonePoint, moveRack, setCursor, moveZone, updateRack } = useEditor.getState()
+    moveZonePoint, setCursor, moveZone } = useEditor.getState()
   const rackNodes = useRef(new Map<number, Konva.Group>())
   const transformer = useRef<Konva.Transformer>(null)
   const [live, setLive] = useState<{ x: number; y: number; text: string } | null>(null)
@@ -116,10 +116,20 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
         }}
       >
         <Layer listening={false}>
-          {grid.map((g) => (
-            <Line key={g.key} points={g.points} stroke={g.major ? '#94a3b8' : '#cbd5e1'} strokeWidth={g.major ? 1 : 0.5}
-              opacity={g.major ? 0.7 : 0.45} strokeScaleEnabled={false} />
-          ))}
+          {/* One shape for the whole grid: hundreds of Line nodes made every zoom step slow on weak laptops. */}
+          <Shape perfectDrawEnabled={false} sceneFunc={(ctx) => {
+            for (const major of [false, true]) {
+              ctx.beginPath()
+              for (const g of grid) {
+                if (g.major !== major) continue
+                ctx.moveTo(g.points[0]!, g.points[1]!)
+                ctx.lineTo(g.points[2]!, g.points[3]!)
+              }
+              ctx.setAttr('strokeStyle', major ? 'rgba(148,163,184,0.7)' : 'rgba(203,213,225,0.45)')
+              ctx.setAttr('lineWidth', (major ? 1 : 0.5) / view.scale)
+              ctx.stroke()
+            }
+          }} />
         </Layer>
         {/* While drawing, clicks must reach the stage, not select doors or add corners to the old outline. */}
         <Layer listening={!drawing}>
@@ -156,49 +166,11 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
           {doc.racks.map((r, i) => {
             const t = templates[r.templateId]
             if (!t) return null
-            const { widthMm: w, depthMm: d } = rackSize(r, t)
-            const selected = selection?.kind === 'rack' && selection.index === i
+            const { widthMm, depthMm } = rackSize(r, t)
             return (
-              <Group key={i} x={r.x} y={r.y} rotation={r.rotation} draggable={editable}
-                ref={(node) => {
-                  if (node) rackNodes.current.set(i, node)
-                  else rackNodes.current.delete(i)
-                }}
-                onMouseDown={(e) => {
-                  e.cancelBubble = true // select the rack, not the zone underneath
-                  select({ kind: 'rack', index: i })
-                }}
-                onDragMove={(e) => moveRack(i, { x: e.target.x(), y: e.target.y() })}
-                onDragEnd={(e) => {
-                  const placed = useEditor.getState().doc?.racks[i]
-                  if (placed) e.target.position({ x: placed.x, y: placed.y })
-                }}
-                onTransform={(e) => {
-                  // Live size and angle while dragging the handles: the length is worked out as you drag.
-                  const n = e.target
-                  const deg = ((Math.round(n.rotation()) % 360) + 360) % 360
-                  setLive({ x: n.x(), y: n.y(), text: `${formatWith(w * n.scaleX(), unit)} × ${formatWith(d * n.scaleY(), unit)} · ${deg}°` })
-                }}
-                onTransformEnd={(e) => {
-                  const n = e.target
-                  const widthMm = Math.min(30_000, Math.max(300, Math.round(w * n.scaleX())))
-                  const depthMm = Math.min(5_000, Math.max(300, Math.round(d * n.scaleY())))
-                  const rotation = ((Math.round(n.rotation()) % 360) + 360) % 360
-                  n.scale({ x: 1, y: 1 })
-                  setLive(null)
-                  updateRack(i, {
-                    rotation,
-                    widthMm: widthMm === t.widthMm ? null : widthMm,
-                    depthMm: depthMm === t.depthMm ? null : depthMm,
-                  })
-                  moveRack(i, { x: n.x(), y: n.y() })
-                }}>
-                <Rect x={-w / 2} y={-d / 2} width={w} height={d}
-                  fill={RACK_FILL[statuses[i] ?? 'ok']} stroke={selected ? '#2563eb' : '#475569'}
-                  strokeWidth={selected ? 3 : 1} strokeScaleEnabled={false} />
-                <Text x={-w / 2} y={-5 * px} width={w} align="center" text={r.code}
-                  fontSize={10 * px} fill="#1e293b" listening={false} />
-              </Group>
+              <RackNode key={i} index={i} rack={r} w={widthMm} d={depthMm} fill={RACK_FILL[statuses[i] ?? 'ok']}
+                selected={selection?.kind === 'rack' && selection.index === i} editable={editable}
+                typeW={t.widthMm} typeD={t.depthMm} nodes={rackNodes} onLive={setLive} unit={unit} />
             )
           })}
           {editable && !drawing && (
@@ -353,3 +325,62 @@ function ScaleBar({ scale, unit }: { scale: number; unit: Unit }) {
     </div>
   )
 }
+
+/**
+ * One rack. Memoized, and its label is sized in floor units (it scales with the drawing like a plan), so
+ * zooming and panning redraw it without re-rendering 100s of React components.
+ */
+const RackNode = memo(function RackNode({ index: i, rack: r, w, d, fill, selected, editable, typeW, typeD, nodes, onLive, unit }: {
+  index: number
+  rack: Rack
+  w: number
+  d: number
+  fill: string
+  selected: boolean
+  editable: boolean
+  typeW: number
+  typeD: number
+  nodes: RefObject<Map<number, Konva.Group>>
+  onLive: (live: { x: number; y: number; text: string } | null) => void
+  unit: Unit
+}) {
+  const { select, moveRack, updateRack } = useEditor.getState()
+  const fontSize = Math.min(d * 0.6, w / (r.code.length * 0.62))
+  return (
+    <Group x={r.x} y={r.y} rotation={r.rotation} draggable={editable}
+      ref={(node) => {
+        if (node) nodes.current.set(i, node)
+        else nodes.current.delete(i)
+      }}
+      onMouseDown={(e) => {
+        e.cancelBubble = true // select the rack, not the zone underneath
+        select({ kind: 'rack', index: i })
+      }}
+      onDragMove={(e) => moveRack(i, { x: e.target.x(), y: e.target.y() })}
+      onDragEnd={(e) => {
+        const placed = useEditor.getState().doc?.racks[i]
+        if (placed) e.target.position({ x: placed.x, y: placed.y })
+      }}
+      onTransform={(e) => {
+        // Live size and angle while dragging the handles: the length is worked out as you drag.
+        const n = e.target
+        const deg = ((Math.round(n.rotation()) % 360) + 360) % 360
+        onLive({ x: n.x(), y: n.y(), text: `${formatWith(w * n.scaleX(), unit)} × ${formatWith(d * n.scaleY(), unit)} · ${deg}°` })
+      }}
+      onTransformEnd={(e) => {
+        const n = e.target
+        const widthMm = Math.min(30_000, Math.max(300, Math.round(w * n.scaleX())))
+        const depthMm = Math.min(5_000, Math.max(300, Math.round(d * n.scaleY())))
+        const rotation = ((Math.round(n.rotation()) % 360) + 360) % 360
+        n.scale({ x: 1, y: 1 })
+        onLive(null)
+        updateRack(i, { rotation, widthMm: widthMm === typeW ? null : widthMm, depthMm: depthMm === typeD ? null : depthMm })
+        moveRack(i, { x: n.x(), y: n.y() })
+      }}>
+      <Rect x={-w / 2} y={-d / 2} width={w} height={d} fill={fill} stroke={selected ? '#2563eb' : '#475569'}
+        strokeWidth={selected ? 3 : 1} strokeScaleEnabled={false} perfectDrawEnabled={false} />
+      <Text x={-w / 2} y={-fontSize / 2} width={w} align="center" text={r.code} fontSize={fontSize} fill="#1e293b"
+        listening={false} perfectDrawEnabled={false} />
+    </Group>
+  )
+})

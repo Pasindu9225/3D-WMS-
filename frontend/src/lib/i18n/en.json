@@ -239,8 +239,8 @@
   "layout.rack": "Rack",
   "layout.inZone": "zone {zone}",
   "layout.rackType": "Rack type",
-  "layout.repeat": "Copies in a row",
-  "layout.repeatGo": "Add row",
+  "layout.repeat": "More along",
+  "layout.repeatGo": "Build block",
   "layout.live.bad": "{n} racks overlap or are outside their zone.",
   "layout.live.narrow": "{n} racks face an aisle narrower than the minimum.",
   "layout.corners.size": "Overall {w} × {l}",
@@ -326,5 +326,11 @@
   "bins.editTitle": "Capacity of {code}",
   "bins.editHint": "Overrides what the rack type gives this bin. Kept when the layout is published again.",
   "bins.weightField": "Max weight (kg, or 2t / 500lb)",
-  "bins.volumeField": "Max volume (m³)"
+  "bins.volumeField": "Max volume (m³)",
+  "layout.centreX": "Centre X ({unit})",
+  "layout.centreY": "Centre Y ({unit})",
+  "layout.block": "Build a block from this rack",
+  "layout.rows": "Rows",
+  "layout.aisle": "Aisle ({unit})",
+  "layout.blockResult": "{n} racks in the block, including this one."
 }

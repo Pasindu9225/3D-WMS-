@@ -234,7 +234,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Tasks**
 
-- [ ] Tables: `warehouse`, `zone`, `rack_template`, `rack`, `rack_level`, `bin`, `layout_version`
+- [x] Tables: `warehouse`, `zone`, `rack_template`, `rack`, `rack_level`, `bin`, `layout_version` (V4–V6)
 - [x] Warehouse CRUD with plan limit check (per-warehouse pricing)
 - [x] 2D editor (react-konva): draw floor polygon on a metre grid, doors and docks
 - [x] Non-rectangular floors: L / U / T presets, click-to-draw outline, exact corner table (metres)

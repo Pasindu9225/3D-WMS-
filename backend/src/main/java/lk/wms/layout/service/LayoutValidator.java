@@ -28,9 +28,15 @@ public final class LayoutValidator {
     public record Issue(Severity severity, String code, String message, String ref) {
     }
 
-    /** Size of a rack template, as far as the floor plan is concerned. */
-    public record Footprint(int widthMm, int depthMm) {
+    /** Size of a rack template, as far as the floor plan is concerned, and how many bins one rack makes. */
+    public record Footprint(int widthMm, int depthMm, int binsPerRack) {
     }
+
+    /**
+     * Most bins one layout may publish. 10x the v0.2 target (5,000) and still a few seconds to publish on the
+     * 4 GB server; without it 2,000 racks x 20 levels x 50 bins = 2 M bins would tie up the shared server.
+     */
+    static final int MAX_BINS = 50_000;
 
     static final int MAX_WARNINGS = 50;
     private static final double WALL_TOLERANCE_MM = 100;
@@ -108,6 +114,11 @@ public final class LayoutValidator {
             placed.add(rect);
             placedCodes.add(r.code());
             placedStraight.add(straight(r));
+        }
+        long bins = doc.racks().stream().map(r -> templates.get(r.templateId())).filter(java.util.Objects::nonNull)
+                .mapToLong(Footprint::binsPerRack).sum();
+        if (bins > MAX_BINS) {
+            issues.add(error("TOO_MANY_BINS", "This layout would make " + bins + " bins; the limit is " + MAX_BINS, "racks"));
         }
         checkRackPairs(placed, placedStraight, placedCodes, doc.settings().minAisleMm(), issues);
         return issues;

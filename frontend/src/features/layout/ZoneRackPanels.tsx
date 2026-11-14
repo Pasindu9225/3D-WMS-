@@ -68,8 +68,11 @@ export function ZonePanel({ index }: { index: number }) {
 export function RackPanel({ index, types }: { index: number; types: Record<string, RackType> }) {
   const rack = useEditor((s) => s.doc?.racks[index])
   const unit = useEditor((s) => s.unit)
-  const { updateRack, rotateRack, repeatRack, removeRack, duplicateRack } = useEditor.getState()
-  const [count, setCount] = useState(5)
+  const minAisle = useEditor((s) => s.doc?.settings.minAisleMm ?? 1200)
+  const { updateRack, rotateRack, repeatRack, removeRack, duplicateRack, moveRack } = useEditor.getState()
+  const [count, setCount] = useState(9)
+  const [rows, setRows] = useState(1)
+  const [aisle, setAisle] = useState<number | null>(null)
   if (!rack) return null
   const type = types[rack.templateId]
   const resized = rack.widthMm != null || rack.depthMm != null || rack.heightMm != null
@@ -111,6 +114,14 @@ export function RackPanel({ index, types }: { index: number; types: Record<strin
           </p>
         </>
       )}
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <label className="grid gap-1">{t('layout.centreX', { unit })}
+          <LengthInput label={t('layout.centreX', { unit })} mm={rack.x} className="w-full" onCommit={(mm) => moveRack(index, { x: mm, y: rack.y }, true)} />
+        </label>
+        <label className="grid gap-1">{t('layout.centreY', { unit })}
+          <LengthInput label={t('layout.centreY', { unit })} mm={rack.y} className="w-full" onCommit={(mm) => moveRack(index, { x: rack.x, y: mm }, true)} />
+        </label>
+      </div>
       <div className="flex flex-wrap items-end gap-2">
         <label className="grid gap-1 text-sm">{t('layout.angle')}
           <input aria-label={t('layout.angle')} type="number" min={0} max={359} value={rack.rotation}
@@ -127,13 +138,27 @@ export function RackPanel({ index, types }: { index: number; types: Record<strin
         <Button variant="outline" size="sm" className="text-destructive" onClick={() => removeRack(index)}><Trash2 /> {t('layout.remove')}</Button>
       </div>
       {type && (
-        <div className="flex items-end gap-2">
-          <Field label={t('layout.repeat')}>
-            {(p) => <Input {...p} type="number" min={1} max={50} value={count} className="w-20"
-              onChange={(e) => setCount(Math.max(1, Math.min(50, Math.round(Number(e.target.value)) || 1)))} />}
-          </Field>
-          <Button variant="outline" size="sm" className="mb-1" onClick={() => repeatRack(index, count, type)}><Copy /> {t('layout.repeatGo')}</Button>
-        </div>
+        <fieldset className="space-y-2 rounded-md border p-2">
+          <legend className="px-1 text-sm font-medium">{t('layout.block')}</legend>
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <label className="grid gap-1">{t('layout.repeat')}
+              <input type="number" min={0} max={99} value={count} aria-label={t('layout.repeat')}
+                onChange={(e) => setCount(Math.max(0, Math.min(99, Math.round(Number(e.target.value)) || 0)))}
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" />
+            </label>
+            <label className="grid gap-1">{t('layout.rows')}
+              <input type="number" min={1} max={50} value={rows} aria-label={t('layout.rows')}
+                onChange={(e) => setRows(Math.max(1, Math.min(50, Math.round(Number(e.target.value)) || 1)))}
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" />
+            </label>
+            <label className="grid gap-1">{t('layout.aisle', { unit })}
+              <LengthInput label={t('layout.aisle', { unit })} mm={aisle ?? Math.max(minAisle, 3000)} live onCommit={setAisle} className="w-full" />
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">{t('layout.blockResult', { n: (count + 1) * rows })}</p>
+          <Button variant="outline" size="sm" disabled={count === 0 && rows === 1}
+            onClick={() => repeatRack(index, count, type, rows, aisle ?? Math.max(minAisle, 3000))}><Copy /> {t('layout.repeatGo')}</Button>
+        </fieldset>
       )}
       <p className="text-xs text-muted-foreground">{t('layout.rack.hint')}</p>
     </section>

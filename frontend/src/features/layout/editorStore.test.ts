@@ -239,3 +239,20 @@ describe('angled and resized racks in the editor', () => {
     expect(useEditor.getState().doc!.racks[1]).toMatchObject({ x: 11_500, y: 7598, rotation: 60, widthMm: 3000 })
   })
 })
+
+describe('building a whole block of racks', () => {
+  const type = { id: '01ARZ3NDEKTSV4RRFFQ69G5FAV', code: 'P1', name: 'Pallet', widthMm: 2700, depthMm: 1100,
+    heightMm: 6000, levels: 5, binsPerLevel: 10, maxWeightPerLevelG: 1_000_000 }
+
+  it('makes 100 racks (5,000 bins) in one action: 10 along x 10 rows with a 3 m aisle', () => {
+    useEditor.getState().load({ ...view, layout: { ...view.layout, floor: [{ x: 0, y: 0 }, { x: 60_000, y: 0 }, { x: 60_000, y: 50_000 }, { x: 0, y: 50_000 }] } })
+    useEditor.getState().placeShape('RECT', 56_000, 46_000, 'zone')
+    useEditor.getState().addRack(type)
+    useEditor.getState().moveRack(0, { x: 5350, y: 4550 }, true)
+    useEditor.getState().repeatRack(0, 9, type, 10, 3000)
+    const racks = useEditor.getState().doc!.racks
+    expect(racks).toHaveLength(100)
+    expect(racks[99]).toMatchObject({ code: 'R100', x: 5350 + 9 * 2700, y: 4550 + 9 * 4100 })
+    expect(new Set(racks.map((r) => r.code)).size).toBe(100)
+  })
+})

@@ -76,10 +76,15 @@ interface EditorState {
   copySelection: () => void
   paste: () => void
   addRack: (type: RackType) => void
-  moveRack: (index: number, p: Point) => void
+  /** exact: a typed centre, kept to the mm instead of the 0.1 m grid. */
+  moveRack: (index: number, p: Point, exact?: boolean) => void
   /** Turns clockwise by step degrees (default 90). */
   rotateRack: (index: number, step?: number) => void
-  repeatRack: (index: number, count: number, fp: Footprint) => void
+  /**
+   * Builds a block from one rack: count more copies along its length (no gap), and rows-1 more rows
+   * beside it, each its depth plus aisleMm further on. Works at any angle.
+   */
+  repeatRack: (index: number, count: number, fp: Footprint, rows?: number, aisleMm?: number) => void
   /** Code, type, exact angle or this rack's own size (null size = back to the type size). */
   updateRack: (index: number, patch: Partial<Pick<Rack, 'code' | 'templateId' | 'rotation' | 'widthMm' | 'depthMm' | 'heightMm'>>) => void
   removeRack: (index: number) => void
@@ -353,9 +358,11 @@ export const useEditor = create<EditorState>((set, get) => {
         set({ selection: { kind: 'rack', index: d.racks.length } })
         return { ...d, racks: [...d.racks, rack] }
       }),
-    moveRack: (index, p) =>
+    moveRack: (index, p, exact) =>
       change((d) => {
-        const at = { x: snap(p.x), y: snap(p.y) }
+        const at = exact
+          ? { x: Math.min(1_000_000, Math.max(0, Math.round(p.x))), y: Math.min(1_000_000, Math.max(0, Math.round(p.y))) }
+          : { x: snap(p.x), y: snap(p.y) }
         return {
           ...d,
           racks: d.racks.map((r, i) => (i === index ? { ...r, ...at, zone: zoneAt(d, at, r.zone) } : r)),
@@ -366,24 +373,29 @@ export const useEditor = create<EditorState>((set, get) => {
         ...d,
         racks: d.racks.map((r, i) => (i === index ? { ...r, rotation: (((r.rotation + step) % 360) + 360) % 360 } : r)),
       })),
-    repeatRack: (index, count, fp) =>
+    repeatRack: (index, count, fp, rows = 1, aisleMm = 0) =>
       change((d) => {
-        // Copies side by side along the rack's length (no gap): one action builds a whole row.
         const base = d.racks[index]!
-        // Along its length at its own angle, so angled rows work too; whole mm keeps rows exact.
+        // Along its length and across it, at its own angle; whole mm keeps straight rows exact.
         const length = base.widthMm ?? fp.widthMm
+        const across = (base.depthMm ?? fp.depthMm) + aisleMm
         const a = (base.rotation * Math.PI) / 180
-        const step = base.rotation % 90 === 0
-          ? { x: Math.round(Math.cos(a)) * length, y: Math.round(Math.sin(a)) * length }
-          : { x: Math.cos(a) * length, y: Math.sin(a) * length }
+        const cos = base.rotation % 90 === 0 ? Math.round(Math.cos(a)) : Math.cos(a)
+        const sin = base.rotation % 90 === 0 ? Math.round(Math.sin(a)) : Math.sin(a)
         const used = d.racks.map((r) => r.code)
         const copies: Rack[] = []
-        for (let n = 1; n <= count; n++) {
-          const code = nextCode('R', used, 2)
-          used.push(code)
-          const at = { x: Math.round(base.x + n * step.x), y: Math.round(base.y + n * step.y) }
-          if (at.x < 0 || at.y < 0 || at.x > 1_000_000 || at.y > 1_000_000) break
-          copies.push({ ...base, ...at, code, zone: zoneAt(d, at, base.zone) })
+        for (let row = 0; row < rows; row++) {
+          for (let n = 0; n <= count; n++) {
+            if (row === 0 && n === 0) continue // the rack itself
+            const at = {
+              x: Math.round(base.x + n * length * cos - row * across * sin),
+              y: Math.round(base.y + n * length * sin + row * across * cos),
+            }
+            if (at.x < 0 || at.y < 0 || at.x > 1_000_000 || at.y > 1_000_000) continue
+            const code = nextCode('R', used, 2)
+            used.push(code)
+            copies.push({ ...base, ...at, code, zone: zoneAt(d, at, base.zone) })
+          }
         }
         return { ...d, racks: [...d.racks, ...copies] }
       }),
