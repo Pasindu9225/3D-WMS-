@@ -63,6 +63,18 @@ interface EditorState {
   updateZone: (index: number, patch: Partial<Pick<Zone, 'code' | 'name' | 'type'>>) => void
   moveZonePoint: (zone: number, point: number, p: Point) => void
   removeZone: (index: number) => void
+  /** Moves the zone and the racks standing in it. */
+  moveZone: (index: number, dx: number, dy: number) => void
+  /** Stretches the zone to a new overall width x length, keeping its top-left corner. */
+  resizeZone: (index: number, widthMm: number, lengthMm: number) => void
+  /** Copy of the zone (and its racks) right next to it, with new codes. */
+  duplicateZone: (index: number) => void
+  duplicateRack: (index: number, fp: Footprint) => void
+  /** Ctrl+C / Ctrl+V: copy the selected zone (with racks) or rack; each paste lands 1 m further on. */
+  clipboard: { zone: Zone; racks: Rack[] } | { rack: Rack } | null
+  pasteCount: number
+  copySelection: () => void
+  paste: () => void
   addRack: (type: RackType) => void
   moveRack: (index: number, p: Point) => void
   rotateRack: (index: number) => void
@@ -94,6 +106,24 @@ export const useEditor = create<EditorState>((set, get) => {
       const code = nextCode('Z', d.zones.map((z) => z.code))
       set({ selection: { kind: 'zone', index: d.zones.length } })
       return { ...d, zones: [...d.zones, { code, type: 'STORAGE', name: `Zone ${code.slice(1)}`, polygon }] }
+    })
+  /** Adds a copy of a zone and its racks, shifted by off, with fresh zone and rack codes. */
+  const pasteZone = (zone: Zone, racks: Rack[], off: Point) =>
+    change((d) => {
+      const code = nextCode('Z', d.zones.map((z) => z.code))
+      const clamp = (v: number) => Math.min(1_000_000, Math.max(0, v))
+      const used = d.racks.map((r) => r.code)
+      const copies = racks.map((r) => {
+        const rc = nextCode('R', used, 2)
+        used.push(rc)
+        return { ...r, code: rc, zone: code, x: clamp(r.x + off.x), y: clamp(r.y + off.y) }
+      })
+      set({ selection: { kind: 'zone', index: d.zones.length } })
+      return {
+        ...d,
+        zones: [...d.zones, { ...zone, code, name: (zone.name + ' copy').slice(0, 60), polygon: zone.polygon.map((p) => ({ x: clamp(p.x + off.x), y: clamp(p.y + off.y) })) }],
+        racks: [...d.racks, ...copies],
+      }
     })
   /** The zone a rack centre falls in; racks keep their zone when dropped outside every zone (flagged red). */
   const zoneAt = (d: LayoutDocument, p: Point, fallback: string) =>
@@ -236,6 +266,66 @@ export const useEditor = create<EditorState>((set, get) => {
           polygon: z.polygon.map((pt, j) => (j === point ? { x: snap(p.x), y: snap(p.y) } : pt)),
         })),
       })),
+    moveZone: (index, dx, dy) =>
+      change((d) => {
+        const z = d.zones[index]!
+        const b = bounds(z.polygon)
+        // Keep everything on the plan (coordinates are 0..1,000 m).
+        const mx = Math.max(-b.minX, Math.min(dx, 1_000_000 - b.maxX))
+        const my = Math.max(-b.minY, Math.min(dy, 1_000_000 - b.maxY))
+        return {
+          ...d,
+          zones: d.zones.map((zz, i) => (i !== index ? zz : { ...zz, polygon: zz.polygon.map((p) => ({ x: p.x + mx, y: p.y + my })) })),
+          racks: d.racks.map((r) => (r.zone === z.code ? { ...r, x: r.x + mx, y: r.y + my } : r)),
+        }
+      }),
+    resizeZone: (index, widthMm, lengthMm) =>
+      change((d) => {
+        const z = d.zones[index]!
+        const b = bounds(z.polygon)
+        const sx = widthMm / (b.maxX - b.minX || 1)
+        const sy = lengthMm / (b.maxY - b.minY || 1)
+        const polygon = z.polygon.map((p) => ({
+          x: Math.min(1_000_000, Math.round(b.minX + (p.x - b.minX) * sx)),
+          y: Math.min(1_000_000, Math.round(b.minY + (p.y - b.minY) * sy)),
+        }))
+        return { ...d, zones: d.zones.map((zz, i) => (i === index ? { ...zz, polygon } : zz)) }
+      }),
+    duplicateZone: (index) => {
+      const d = get().doc
+      if (!d) return
+      const z = d.zones[index]!
+      const b = bounds(z.polygon)
+      const floor = bounds(d.floor)
+      // Beside it if that still fits on the floor, otherwise below it.
+      const off = b.maxX + (b.maxX - b.minX) <= floor.maxX ? { x: b.maxX - b.minX, y: 0 } : { x: 0, y: b.maxY - b.minY }
+      pasteZone(z, d.racks.filter((r) => r.zone === z.code), off)
+    },
+    duplicateRack: (index, fp) => get().repeatRack(index, 1, fp),
+    clipboard: null,
+    pasteCount: 0,
+    copySelection: () => {
+      const { doc: d, selection: sel } = get()
+      if (!d || !sel) return
+      if (sel.kind === 'zone') {
+        const zone = d.zones[sel.index]!
+        set({ clipboard: { zone, racks: d.racks.filter((r) => r.zone === zone.code) }, pasteCount: 0 })
+      }
+      if (sel.kind === 'rack') set({ clipboard: { rack: d.racks[sel.index]! }, pasteCount: 0 })
+    },
+    paste: () => {
+      const { clipboard: c, pasteCount } = get()
+      if (!c) return
+      const step = (pasteCount + 1) * 1000
+      set({ pasteCount: pasteCount + 1 })
+      if ('zone' in c) return pasteZone(c.zone, c.racks, { x: step, y: step })
+      change((d) => {
+        const at = { x: Math.min(1_000_000, c.rack.x + step), y: Math.min(1_000_000, c.rack.y + step) }
+        const rack = { ...c.rack, ...at, code: nextCode('R', d.racks.map((r) => r.code), 2), zone: zoneAt(d, at, c.rack.zone) }
+        set({ selection: { kind: 'rack', index: d.racks.length } })
+        return { ...d, racks: [...d.racks, rack] }
+      })
+    },
     removeZone: (index) => {
       // Racks cannot exist outside a zone, so they go with it (the panel says how many first).
       change((d) => {

@@ -176,7 +176,7 @@
   "layout.status.DRAFT": "Draft",
   "layout.status.PUBLISHED": "Published",
   "layout.revision": "version {n}",
-  "layout.area": "{m2} m² floor",
+  "layout.area": "{area} sq {unit} floor",
   "layout.unsaved": "unsaved changes",
   "layout.addDoor": "Door",
   "layout.addDock": "Dock",
@@ -234,7 +234,7 @@
   "layout.zoneType.DISPATCH": "Dispatch",
   "layout.zoneType.QUARANTINE": "Quarantine",
   "layout.zoneType.COLD": "Cold store",
-  "layout.zone.hint": "Drag the square handles to reshape the zone. The code starts every bin code in it, e.g. {code}-R01-01-01.",
+  "layout.zone.hint": "Drag the area to move it (its racks move too), drag the square handles to reshape it, or type exact numbers above. Ctrl+C / Ctrl+V copies it. The code starts every bin code in it, e.g. {code}-R01-01-01.",
   "layout.zone.removeWithRacks": "Remove zone and its {n} racks",
   "layout.rack": "Rack",
   "layout.inZone": "zone {zone}",
@@ -259,5 +259,11 @@
   "layout.shapeTool.floor": "Floor outline",
   "layout.shapeTool.place": "Place shape",
   "layout.unit": "Units",
-  "layout.widthIn": "Width ({unit})"
+  "layout.widthIn": "Width ({unit})",
+  "layout.posX": "Left X ({unit})",
+  "layout.posY": "Top Y ({unit})",
+  "layout.sizeW": "Width ({unit})",
+  "layout.sizeL": "Length ({unit})",
+  "layout.zone.area": "Area {area} sq {unit}",
+  "layout.duplicate": "Duplicate"
 }

@@ -176,3 +176,44 @@ describe('measurements', () => {
     expect(useEditor.getState().doc!.floor).toHaveLength(32)
   })
 })
+
+describe('moving, resizing and copying areas', () => {
+  const type = { id: '01ARZ3NDEKTSV4RRFFQ69G5FAV', code: 'P1', name: 'Pallet', widthMm: 2000, depthMm: 1000,
+    heightMm: 4000, levels: 4, binsPerLevel: 3, maxWeightPerLevelG: 1_000_000 }
+  beforeEach(() => {
+    useEditor.getState().load(view) // floor 20 m x 10 m
+    useEditor.getState().placeShape('RECT', 6000, 4000, 'zone') // x 7..13 m, y 3..7 m
+    useEditor.getState().addRack(type) // centre 10 m, 5 m
+  })
+
+  it('moves an area with its racks and keeps it on the plan', () => {
+    useEditor.getState().moveZone(0, -2000, 1000)
+    const d = useEditor.getState().doc!
+    expect(d.zones[0]!.polygon[0]).toEqual({ x: 5000, y: 4000 })
+    expect(d.racks[0]).toMatchObject({ x: 8000, y: 6000 })
+    useEditor.getState().moveZone(0, -50_000, 0) // past the left edge: stops at 0
+    expect(useEditor.getState().doc!.zones[0]!.polygon[0]!.x).toBe(0)
+  })
+
+  it('resizes an area to a typed width and length from its top-left corner', () => {
+    useEditor.getState().resizeZone(0, 15_240, 2000)
+    expect(useEditor.getState().doc!.zones[0]!.polygon).toEqual([
+      { x: 7000, y: 3000 }, { x: 22_240, y: 3000 }, { x: 22_240, y: 5000 }, { x: 7000, y: 5000 },
+    ])
+  })
+
+  it('duplicates an area with its racks under new codes, and pastes copies 1 m apart', () => {
+    useEditor.getState().duplicateZone(0)
+    let d = useEditor.getState().doc!
+    expect(d.zones[1]).toMatchObject({ code: 'Z2', name: 'Zone 1 copy' })
+    expect(d.zones[1]!.polygon[0]).toEqual({ x: 13_000, y: 3000 }) // right beside it
+    expect(d.racks[1]).toMatchObject({ code: 'R02', zone: 'Z2', x: 16_000 })
+
+    useEditor.getState().select({ kind: 'rack', index: 0 })
+    useEditor.getState().copySelection()
+    useEditor.getState().paste()
+    useEditor.getState().paste()
+    d = useEditor.getState().doc!
+    expect(d.racks.slice(2).map((r) => [r.code, r.x, r.y])).toEqual([['R03', 11_000, 6000], ['R04', 12_000, 7000]])
+  })
+})

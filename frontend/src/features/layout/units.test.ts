@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { format, formatWith, parse } from './units'
+import { format, formatArea, formatWith, parse } from './units'
 
 it('converts typed lengths in any unit to millimetres', () => {
   expect(parse('400', 'ft')).toBe(121_920)
@@ -16,4 +16,9 @@ it('shows lengths in the chosen unit', () => {
   expect(format(121_920, 'ft')).toBe('400')
   expect(formatWith(12_500, 'm')).toBe('12.5 m')
   expect(format(15_240, 'ft')).toBe('50')
+})
+
+it('shows areas in square units', () => {
+  expect(formatArea(15_000 * 9_000, 'ft')).toBe('1453.13')
+  expect(formatArea(15_000 * 9_000, 'm')).toBe('135')
 })

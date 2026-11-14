@@ -5,6 +5,9 @@ import { Field, Input } from '@/components/ui/input'
 import type { RackType, ZoneType } from '@/features/warehouses/api'
 import { t, type MessageKey } from '@/lib/i18n'
 import { useEditor } from './editorStore'
+import { areaM2, bounds } from './geometry'
+import { LengthInput } from './LengthInput'
+import { formatArea } from './units'
 
 const ZONE_TYPES: ZoneType[] = ['RECEIVING', 'STORAGE', 'PICKING', 'DISPATCH', 'QUARANTINE', 'COLD']
 const SELECT = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm'
@@ -14,8 +17,10 @@ const code = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 1
 export function ZonePanel({ index }: { index: number }) {
   const zone = useEditor((s) => s.doc?.zones[index])
   const racks = useEditor((s) => s.doc?.racks.filter((r) => r.zone === zone?.code).length ?? 0)
-  const { updateZone, removeZone } = useEditor.getState()
+  const unit = useEditor((s) => s.unit)
+  const { updateZone, removeZone, moveZone, resizeZone, duplicateZone } = useEditor.getState()
   if (!zone) return null
+  const b = bounds(zone.polygon)
   return (
     <section className="space-y-3 rounded-lg border p-3">
       <h2 className="text-sm font-semibold">{t('layout.zone')}</h2>
@@ -32,10 +37,30 @@ export function ZonePanel({ index }: { index: number }) {
           </select>
         )}
       </Field>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <label className="grid gap-1">{t('layout.posX', { unit })}
+          <LengthInput label={t('layout.posX', { unit })} mm={b.minX} className="w-full" onCommit={(mm) => moveZone(index, mm - b.minX, 0)} />
+        </label>
+        <label className="grid gap-1">{t('layout.posY', { unit })}
+          <LengthInput label={t('layout.posY', { unit })} mm={b.minY} className="w-full" onCommit={(mm) => moveZone(index, 0, mm - b.minY)} />
+        </label>
+        <label className="grid gap-1">{t('layout.sizeW', { unit })}
+          <LengthInput label={t('layout.sizeW', { unit })} mm={b.maxX - b.minX} min={100} className="w-full"
+            onCommit={(mm) => resizeZone(index, mm, b.maxY - b.minY)} />
+        </label>
+        <label className="grid gap-1">{t('layout.sizeL', { unit })}
+          <LengthInput label={t('layout.sizeL', { unit })} mm={b.maxY - b.minY} min={100} className="w-full"
+            onCommit={(mm) => resizeZone(index, b.maxX - b.minX, mm)} />
+        </label>
+      </div>
+      <p className="text-xs tabular-nums text-muted-foreground">{t('layout.zone.area', { area: formatArea(areaM2(zone.polygon) * 1_000_000, unit), unit })}</p>
       <p className="text-xs text-muted-foreground">{t('layout.zone.hint', { code: zone.code })}</p>
-      <Button variant="outline" size="sm" className="text-destructive" onClick={() => removeZone(index)}>
-        <Trash2 /> {racks > 0 ? t('layout.zone.removeWithRacks', { n: racks }) : t('layout.remove')}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => duplicateZone(index)}><Copy /> {t('layout.duplicate')}</Button>
+        <Button variant="outline" size="sm" className="text-destructive" onClick={() => removeZone(index)}>
+          <Trash2 /> {racks > 0 ? t('layout.zone.removeWithRacks', { n: racks }) : t('layout.remove')}
+        </Button>
+      </div>
     </section>
   )
 }

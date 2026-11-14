@@ -14,7 +14,7 @@ import { useEditor } from './editorStore'
 import { CornerTable, DrawingPanel, ShapeDialog } from './FloorPanels'
 import { LengthInput } from './LengthInput'
 import { areaM2, rackStatuses } from './geometry'
-import { UNITS, type Unit } from './units'
+import { formatArea, UNITS, type Unit } from './units'
 import { RackPanel, ZonePanel } from './ZoneRackPanels'
 
 // Konva only loads here, never in the main bundle.
@@ -48,14 +48,17 @@ export function LayoutEditorPage() {
   const badRacks = statuses.filter((s) => s === 'bad').length
   const narrowRacks = statuses.filter((s) => s === 'warn').length
 
-  // Editing shortcuts (not while typing in a field): Delete removes the selected rack or door, R turns a rack.
+  // Editing shortcuts (not while typing in a field): Delete removes the selected rack or door, R turns a rack,
+  // Ctrl+C / Ctrl+V copy and paste the selected area (with its racks) or rack.
   useEffect(() => {
     if (!editable) return
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || useEditor.getState().drawing) return
       const sel = useEditor.getState().selection
       if (e.key === 'Delete' || e.key === 'Backspace') removeSelected()
-      if ((e.key === 'r' || e.key === 'R') && sel?.kind === 'rack') rotateRack(sel.index)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') useEditor.getState().copySelection()
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') useEditor.getState().paste()
+      else if ((e.key === 'r' || e.key === 'R') && sel?.kind === 'rack') rotateRack(sel.index)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -110,7 +113,7 @@ export function LayoutEditorPage() {
           <p className="text-xs text-muted-foreground">
             {layout.data && t(`layout.status.${layout.data.status}`)}
             {baseRevision > 0 && ` · ${t('layout.revision', { n: baseRevision })}`}
-            {doc && ` · ${t('layout.area', { m2: Math.round(areaM2(doc.floor)) })}`}
+            {doc && ` · ${t('layout.area', { area: formatArea(Math.round(areaM2(doc.floor) * 1_000_000), unit), unit })}`}
             {dirty && <span className="text-accent-foreground dark:text-accent"> · {t('layout.unsaved')}</span>}
           </p>
         </div>

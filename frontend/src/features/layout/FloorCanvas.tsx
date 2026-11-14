@@ -42,7 +42,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
   const cursor = useEditor((s) => s.cursor)
   const unit = useEditor((s) => s.unit)
   const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select, addDrawPoint, finishDrawing,
-    moveZonePoint, moveRack, setCursor } = useEditor.getState()
+    moveZonePoint, moveRack, setCursor, moveZone } = useEditor.getState()
   const box = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
   const [view, setView] = useState<View>({ scale: 0.02, x: 40, y: 40 })
@@ -125,7 +125,17 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
           {doc.zones.map((z, i) => {
             const selected = selection?.kind === 'zone' && selection.index === i
             return (
-              <Group key={i} onMouseDown={() => editable && select({ kind: 'zone', index: i })}>
+              <Group key={i} draggable={editable} onMouseDown={() => editable && select({ kind: 'zone', index: i })}
+                onDragMove={(e) => {
+                  // Move in whole 0.1 m steps; the group itself stays put and the store moves the zone and its racks.
+                  const dx = Math.round(e.target.x() / 100) * 100
+                  const dy = Math.round(e.target.y() / 100) * 100
+                  if (dx !== 0 || dy !== 0) {
+                    moveZone(i, dx, dy)
+                    e.target.position({ x: e.target.x() - dx, y: e.target.y() - dy })
+                  }
+                }}
+                onDragEnd={(e) => e.target.position({ x: 0, y: 0 })}>
                 <Line points={z.polygon.flatMap((p) => [p.x, p.y])} closed fill={ZONE_FILL[z.type]}
                   stroke={selected ? '#2563eb' : '#64748b'} strokeWidth={selected ? 2 : 1} dash={selected ? undefined : [6, 4]}
                   strokeScaleEnabled={false} />

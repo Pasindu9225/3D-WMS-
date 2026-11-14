@@ -28,3 +28,8 @@ export function parse(text: string, unit: Unit): number | null {
   if (!u) return null
   return Math.round(Number(m[1]) * UNITS[u])
 }
+
+/** Area for display in square units ("1453.24" for sq ft); input in mm². */
+export function formatArea(mm2: number, unit: Unit): string {
+  return String(Math.round((mm2 / UNITS[unit] / UNITS[unit]) * 100) / 100)
+}
