@@ -30,6 +30,8 @@ export const router = createBrowserRouter([
             path: 'purchase-orders/:id',
             lazy: () => import('@/features/inbound/PurchaseOrderPage').then((m) => ({ Component: m.PurchaseOrderPage })),
           },
+          { path: 'receive', lazy: () => import('@/features/inbound/ReceivePage').then((m) => ({ Component: m.ReceivePage })) },
+          { path: 'receive/:id', lazy: () => import('@/features/inbound/ReceivePage').then((m) => ({ Component: m.ReceiptPage })) },
           { path: 'products', lazy: () => import('@/features/catalog/ProductsPage').then((m) => ({ Component: m.ProductsPage })) },
           { path: 'rack-types', lazy: () => import('@/features/rack-types/RackTypesPage').then((m) => ({ Component: m.RackTypesPage })) },
           { path: 'warehouses/:id/bins', lazy: () => import('@/features/bins/BinsPage').then((m) => ({ Component: m.BinsPage })) },

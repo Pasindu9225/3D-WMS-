@@ -26,6 +26,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByBarcode(String barcode);
 
+    Optional<Product> findBySku(String sku);
+
     /** Products with their units in one query (imports update thousands; no per-product unit queries). */
     @Query("select distinct p from Product p left join fetch p.units where p.sku in :skus")
     java.util.List<Product> findBySkuInWithUnits(@Param("skus") java.util.Collection<String> skus);

@@ -83,10 +83,14 @@ public class PurchaseOrderController {
     @GetMapping
     @PreAuthorize("hasAuthority('inbound:read')")
     public PageResponse<Summary> list(@RequestParam(required = false) PurchaseOrder.Status status,
+            @RequestParam(required = false) Boolean receivable, // approved or partly received: what can be received now
             @RequestParam(required = false) @Size(max = 200) String q,
             @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
             @RequestParam(required = false) @Size(max = 40) String sort) {
-        return PageResponse.of(orders.list(CurrentUser.require(), status, q, PageResponse.request(page, size, sort,
+        List<PurchaseOrder.Status> statuses = status != null ? List.of(status)
+                : Boolean.TRUE.equals(receivable) ? List.of(PurchaseOrder.Status.APPROVED, PurchaseOrder.Status.PARTLY_RECEIVED)
+                : List.of(PurchaseOrder.Status.values());
+        return PageResponse.of(orders.list(CurrentUser.require(), statuses, q, PageResponse.request(page, size, sort,
                 Map.of("number", "number", "expectedDate", "expectedDate", "total", "totalMinor"),
                 Sort.by(Sort.Direction.DESC, "id"))), s -> s);
     }

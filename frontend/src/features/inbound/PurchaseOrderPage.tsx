@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Check, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, PackageCheck, Plus, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { useFieldArray, useForm, useWatch, type Control, type UseFormRegisterReturn } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -18,7 +18,7 @@ import { api } from '@/lib/api'
 import { errorMessage, fieldErrors } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
-import { usePoAction, usePurchaseOrder, type PurchaseOrder } from './api'
+import { usePoAction, usePurchaseOrder, useReceiptAction, type PurchaseOrder } from './api'
 import { PoStatusBadge } from './PurchaseOrdersPage'
 
 const SELECT = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm'
@@ -45,11 +45,27 @@ export function PurchaseOrderPage() {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">{order ? order.number : t('po.new')}</h1>
         {order && <PoStatusBadge status={order.status} />}
+        {order && can(me.data, 'inbound:receive') && (order.status === 'APPROVED' || order.status === 'PARTLY_RECEIVED')
+          && <ReceiveButton poId={order.id} />}
         {order && manage && <Actions po={order} />}
       </div>
       {order?.status === 'CANCELLED' && <FormMessage tone="error">{t('po.cancelledBecause', { reason: order.cancelReason ?? '' })}</FormMessage>}
       {editable ? <PoForm key={order?.version ?? 'new'} po={order} /> : order && <PoView po={order} />}
     </div>
+  )
+}
+
+function ReceiveButton({ poId }: { poId: string }) {
+  const navigate = useNavigate()
+  const open = useReceiptAction()
+  return (
+    <>
+      <Button variant="outline" disabled={open.isPending}
+        onClick={() => open.mutate({ kind: 'open', poId }, { onSuccess: (r) => void navigate(`/app/receive/${r.id}`) })}>
+        <PackageCheck /> {t('po.receive')}
+      </Button>
+      {open.isError && <p role="alert" className="w-full text-sm text-destructive">{errorMessage(open.error)}</p>}
+    </>
   )
 }
 
@@ -105,6 +121,7 @@ function PoView({ po }: { po: PurchaseOrder }) {
         <thead>
           <tr>
             <Th>{t('po.line.product')}</Th><Th>{t('po.line.unit')}</Th><Th className="text-right">{t('po.line.qty')}</Th>
+            <Th className="text-right">{t('po.line.received')}</Th>
             <Th className="text-right">{t('po.line.cost')}</Th><Th className="text-right">{t('po.line.total')}</Th>
           </tr>
         </thead>
@@ -114,6 +131,7 @@ function PoView({ po }: { po: PurchaseOrder }) {
               <td className="px-3 py-2"><span className="font-mono text-xs">{l.sku}</span> {l.productName}</td>
               <td className="px-3 py-2 font-mono text-xs">{l.uom}{l.factor > 1 && ` × ${l.factor}`}</td>
               <td className="px-3 py-2 text-right tabular-nums">{l.qty}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{Number((l.qtyReceived / l.factor).toFixed(3))}</td>
               <td className="px-3 py-2 text-right tabular-nums">{formatMoney(l.unitCostMinor)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{formatMoney(l.totalMinor)}</td>
             </tr>

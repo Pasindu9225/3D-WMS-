@@ -280,7 +280,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Product master with barcode, units of measure, size/weight, optional image (SEC-40 to SEC-45)
 - [x] Suppliers (partners); CSV import for products and suppliers (SEC-46)
 - [x] Purchase orders: create, approve, cancel
-- [ ] Receiving on phone: scan PO or product, enter quantity, note damage, create GRN
+- [x] Receiving on phone: scan PO or product, enter quantity, note damage, create GRN
 - [ ] Putaway: system suggests bin (same product first, then closest empty bin in a storage zone, respecting capacity); worker scans bin to confirm
 - [ ] `StockMovementService` is the ONLY code that changes stock; row locks and transactions (SEC-26)
 - [ ] Bin-to-bin transfer; stock adjustment with reason and manager approval above a value

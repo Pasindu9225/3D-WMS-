@@ -279,6 +279,21 @@ public class ProductService {
         });
     }
 
+    /**
+     * What a worker typed or scanned: a barcode (product or unit) first, else a SKU (base unit). For receiving,
+     * where a label may be missing and the SKU is typed instead.
+     */
+    @Transactional(readOnly = true)
+    public ScanView lookup(String code) {
+        try {
+            return byBarcode(code);
+        } catch (ApiException e) {
+            Product p = products.findBySku(code.toUpperCase(java.util.Locale.ROOT))
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "CODE_NOT_FOUND", "No product has this barcode or SKU"));
+            return new ScanView(view(p), p.getBaseUom(), 1);
+        }
+    }
+
     /** Scanning: a product barcode counts 1 base unit, a case barcode counts its factor. */
     @Transactional(readOnly = true)
     public ScanView byBarcode(String barcode) {

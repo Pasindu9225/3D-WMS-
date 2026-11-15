@@ -101,3 +101,92 @@ export function usePoAction() {
     },
   })
 }
+
+/** Orders that can be received now (approved or partly received), for the Receive screen. */
+export function useReceivableOrders(q: string) {
+  const params = new URLSearchParams({ receivable: 'true', size: String(PO_PAGE_SIZE) })
+  if (q) params.set('q', q)
+  return useQuery({
+    queryKey: ['purchase-orders', 'receivable', q],
+    queryFn: () => api<Page<PoSummary>>(`/purchase-orders?${params}`),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** One order line with what is still expected; all quantities in the product's base unit. */
+export interface LineProgress {
+  lineNo: number
+  sku: string
+  productName: string
+  baseUom: string
+  ordered: number
+  receivedBefore: number
+  thisReceipt: number
+  damagedThisReceipt: number
+}
+
+export interface Scan {
+  id: string
+  sku: string
+  uom: string
+  factor: number
+  qty: number
+  qtyBase: number
+  damagedBase: number
+  damageNote: string | null
+  createdAt: string
+}
+
+export interface Receipt {
+  id: string
+  number: string
+  status: 'OPEN' | 'CLOSED'
+  poId: string
+  poNumber: string
+  supplierName: string
+  warehouseCode: string
+  note: string | null
+  createdAt: string
+  closedAt: string | null
+  lines: LineProgress[]
+  scans: Scan[]
+  version: number
+}
+
+export interface ScanInput {
+  code: string
+  qty: number
+  uom?: string
+  damagedQty?: number
+  damageNote?: string
+  /** Same key when the same scan is sent again after a network error. */
+  key: string
+}
+
+export function useReceipt(id: string | undefined) {
+  return useQuery({ queryKey: ['receipt', id], queryFn: () => api<Receipt>(`/receipts/${id}`), enabled: !!id })
+}
+
+/** Open (or reuse) a receipt, scan, take back a scan, close. Each answer is the whole receipt. */
+export function useReceiptAction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (a: { kind: 'open'; poId: string } | { kind: 'scan'; id: string; scan: ScanInput }
+      | { kind: 'remove'; id: string; lineId: string } | { kind: 'close'; id: string; version: number; note?: string }) => {
+      switch (a.kind) {
+        case 'open': return api<Receipt>('/receipts', { method: 'POST', body: { poId: a.poId } })
+        case 'scan': {
+          const { key, ...body } = a.scan
+          return api<Receipt>(`/receipts/${a.id}/lines`, { method: 'POST', body, headers: { 'Idempotency-Key': key } })
+        }
+        case 'remove': return api<Receipt>(`/receipts/${a.id}/lines/${a.lineId}`, { method: 'DELETE' })
+        case 'close': return api<Receipt>(`/receipts/${a.id}/close`, { method: 'POST', body: { version: a.version, note: a.note } })
+      }
+    },
+    onSuccess: (r) => {
+      qc.setQueryData(['receipt', r.id], r)
+      void qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+      void qc.invalidateQueries({ queryKey: ['purchase-order', r.poId] })
+    },
+  })
+}

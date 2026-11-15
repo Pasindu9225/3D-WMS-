@@ -48,6 +48,8 @@ type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 interface RequestOptions {
   method?: Method
   body?: unknown
+  /** Extra headers, e.g. Idempotency-Key on scans so a retry on bad Wi-Fi is not counted twice. */
+  headers?: Record<string, string>
 }
 
 let refreshing: Promise<boolean> | null = null
@@ -62,27 +64,27 @@ export function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   return send<T>(path, options, true)
 }
 
-async function send<T>(path: string, { method = 'GET', body }: RequestOptions, mayRetry: boolean): Promise<T> {
-  const res = await rawFetch(path, method, body)
+async function send<T>(path: string, { method = 'GET', body, headers }: RequestOptions, mayRetry: boolean): Promise<T> {
+  const res = await rawFetch(path, method, body, headers)
   if (res.ok) {
     return (res.status === 204 ? undefined : await res.json()) as T
   }
   const problem = await toApiError(res)
   if (mayRetry && problem.code === 'CSRF_INVALID') {
     await primeCsrf(true)
-    return send<T>(path, { method, body }, false)
+    return send<T>(path, { method, body, headers }, false)
   }
   if (mayRetry && res.status === 401 && !NO_REFRESH.includes(path)) {
     if (await refreshOnce()) {
-      return send<T>(path, { method, body }, false)
+      return send<T>(path, { method, body, headers }, false)
     }
     onSessionExpired()
   }
   throw problem
 }
 
-async function rawFetch(path: string, method: Method, body: unknown): Promise<Response> {
-  const headers: Record<string, string> = {}
+async function rawFetch(path: string, method: Method, body: unknown, extra: Record<string, string> = {}): Promise<Response> {
+  const headers: Record<string, string> = { ...extra }
   const form = body instanceof FormData // file uploads: the browser sets the multipart boundary itself
   if (body !== undefined && !form) headers['Content-Type'] = 'application/json'
   if (method !== 'GET') {

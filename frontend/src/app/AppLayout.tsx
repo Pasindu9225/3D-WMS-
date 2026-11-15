@@ -1,4 +1,4 @@
-import { Barcode, Boxes, FileText, Truck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
+import { Barcode, Boxes, FileText, PackageCheck, Truck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
 import { useState, type ComponentType } from 'react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -30,6 +30,7 @@ const NAV: NavItem[] = [
   { to: '/app/products', label: 'nav.products', icon: Barcode, permission: 'catalog:read' },
   { to: '/app/suppliers', label: 'nav.suppliers', icon: Truck, permission: 'catalog:read' },
   { to: '/app/purchase-orders', label: 'nav.purchaseOrders', icon: FileText, permission: 'inbound:read' },
+  { to: '/app/receive', label: 'nav.receive', icon: PackageCheck, permission: 'inbound:receive' },
   { to: '/app/stock', label: 'nav.stock', icon: Package, soon: true },
   { to: '/app/users', label: 'nav.users', icon: Users, permission: 'users:read' },
   { to: '/app/roles', label: 'nav.roles', icon: ShieldCheck, permission: 'roles:read' },

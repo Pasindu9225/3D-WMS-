@@ -158,6 +158,13 @@ public class PurchaseOrder extends TenantScoped {
         this.cancelReason = reason;
     }
 
+    /** After a receipt closes: RECEIVED when every line has its ordered quantity, else PARTLY_RECEIVED. */
+    public void updateReceivedStatus() {
+        boolean all = lines.stream().allMatch(l -> l.getQtyReceived().compareTo(l.orderedBase()) >= 0);
+        this.status = all ? Status.RECEIVED : Status.PARTLY_RECEIVED;
+        this.updatedAt = Instant.now();
+    }
+
     public Long getId() {
         return id;
     }

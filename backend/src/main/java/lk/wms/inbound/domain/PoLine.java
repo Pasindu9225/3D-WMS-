@@ -82,6 +82,24 @@ public class PoLine extends TenantScoped {
         return qty.multiply(BigDecimal.valueOf(unitCostMinor)).setScale(0, RoundingMode.HALF_UP).longValueExact();
     }
 
+    /** What was ordered, in base units (qty x factor). */
+    public BigDecimal orderedBase() {
+        return qty.multiply(BigDecimal.valueOf(factor));
+    }
+
+    /** Adds a closed receipt's quantity (base units). */
+    public void addReceived(BigDecimal base) {
+        qtyReceived = qtyReceived.add(base);
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public PurchaseOrder getOrder() {
+        return order;
+    }
+
     public int getLineNo() {
         return lineNo;
     }

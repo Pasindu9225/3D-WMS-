@@ -18,8 +18,9 @@ import lk.wms.inbound.domain.PoLine;
 import lk.wms.inbound.domain.PurchaseOrder;
 import lk.wms.inbound.domain.PurchaseOrder.Party;
 import lk.wms.inbound.domain.PurchaseOrder.Status;
-import lk.wms.inbound.repo.DocCounterRepository;
+import lk.wms.inbound.domain.Receipt;
 import lk.wms.inbound.repo.PurchaseOrderRepository;
+import lk.wms.inbound.repo.ReceiptRepository;
 import lk.wms.layout.service.WarehouseService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -58,16 +59,18 @@ public class PurchaseOrderService {
     static final String KIND = "PO";
 
     private final PurchaseOrderRepository orders;
-    private final DocCounterRepository counters;
+    private final DocNumbers numbers;
+    private final ReceiptRepository receipts;
     private final PartnerService partners;
     private final ProductService products;
     private final WarehouseService warehouses;
     private final AuditService audit;
 
-    public PurchaseOrderService(PurchaseOrderRepository orders, DocCounterRepository counters, PartnerService partners,
+    public PurchaseOrderService(PurchaseOrderRepository orders, DocNumbers numbers, ReceiptRepository receipts, PartnerService partners,
             ProductService products, WarehouseService warehouses, AuditService audit) {
         this.orders = orders;
-        this.counters = counters;
+        this.numbers = numbers;
+        this.receipts = receipts;
         this.partners = partners;
         this.products = products;
         this.warehouses = warehouses;
@@ -75,9 +78,9 @@ public class PurchaseOrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Summary> list(CurrentUser cu, Status status, String query, Pageable pageable) {
+    public Page<Summary> list(CurrentUser cu, java.util.Collection<Status> statuses, String query, Pageable pageable) {
         List<Long> ids = warehouses.assignedIds(cu);
-        return orders.search(ids == null, ids == null || ids.isEmpty() ? List.of(-1L) : ids, status,
+        return orders.search(ids == null, ids == null || ids.isEmpty() ? List.of(-1L) : ids, statuses,
                 ProductService.likeText(query), pageable).map(PurchaseOrderService::summary);
     }
 
@@ -88,7 +91,7 @@ public class PurchaseOrderService {
 
     @Transactional
     public Detail create(CurrentUser cu, OrderSpec s) {
-        PurchaseOrder o = new PurchaseOrder(nextNumber(cu), cu.userId());
+        PurchaseOrder o = new PurchaseOrder(numbers.next(cu, KIND), cu.userId());
         apply(cu, o, s);
         o = orders.saveAndFlush(o);
         audit.record(cu.tenantId(), cu.userId(), "PO_CREATED", "purchase_order", o.getPublicId(), null, summary(o));
@@ -123,10 +126,11 @@ public class PurchaseOrderService {
     @Transactional
     public Detail cancel(CurrentUser cu, String publicId, int version, String reason) {
         PurchaseOrder o = current(cu, publicId, version);
-        boolean received = o.getLines().stream().anyMatch(l -> l.getQtyReceived().signum() > 0);
+        boolean received = o.getLines().stream().anyMatch(l -> l.getQtyReceived().signum() > 0)
+                || receipts.existsByOrderAndStatus(o, Receipt.Status.OPEN);
         if ((o.getStatus() != Status.DRAFT && o.getStatus() != Status.APPROVED) || received) {
             throw new ApiException(HttpStatus.CONFLICT, "PO_CANNOT_CANCEL",
-                    "Only a draft or approved order with nothing received can be cancelled");
+                    "Only a draft or approved order with nothing received (and no receipt open) can be cancelled");
         }
         o.cancel(cu.userId(), reason.trim());
         orders.flush();
@@ -166,12 +170,6 @@ public class PurchaseOrderService {
         } catch (ArithmeticException e) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PO_TOO_LARGE", "The order total is too large");
         }
-    }
-
-    /** PO-000001, PO-000002 ... per company, never repeated: the counter row stays locked until commit. */
-    private String nextNumber(CurrentUser cu) {
-        counters.bump(cu.tenantId(), KIND);
-        return String.format("%s-%06d", KIND, counters.taken(KIND));
     }
 
     /** The order if this user may see its warehouse; otherwise it does not exist for them. */
