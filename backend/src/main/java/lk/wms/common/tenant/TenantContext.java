@@ -31,6 +31,15 @@ public final class TenantContext {
         return run(SYSTEM, work);
     }
 
+    /** The current company, for the rare native query that must set tenant_id itself; fails outside one. */
+    public static long require() {
+        Long id = CURRENT.get();
+        if (id == null || id <= 0) {
+            throw new IllegalStateException("no tenant in context");
+        }
+        return id;
+    }
+
     static Long current() {
         Long id = CURRENT.get();
         return id != null ? id : NONE;

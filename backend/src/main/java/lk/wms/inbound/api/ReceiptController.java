@@ -40,7 +40,9 @@ public class ReceiptController {
             @Pattern(regexp = "[A-Z][A-Z0-9]{0,9}") String uom, // optional: the unit counted; default = the scanned one
             @NotNull @DecimalMin("0.001") @DecimalMax("1000000") @Digits(integer = 7, fraction = 3) BigDecimal qty,
             @DecimalMin("0") @DecimalMax("1000000") @Digits(integer = 7, fraction = 3) BigDecimal damagedQty,
-            @Size(max = 200) String damageNote) {
+            @Size(max = 200) String damageNote,
+            @Pattern(regexp = "[0-9A-Za-z._/-]{1,40}") String batchNo, // required for products that track batches
+            java.time.LocalDate expiryDate) { // required for products that track expiry
     }
 
     public record CloseRequest(@NotNull @Min(0) Integer version, @Size(max = 500) String note) {
@@ -79,7 +81,8 @@ public class ReceiptController {
             @RequestHeader("Idempotency-Key") @Pattern(regexp = "[0-9A-Za-z-]{8,64}") String key,
             @Valid @RequestBody ScanRequest body) {
         return receipts.scan(CurrentUser.require(), id,
-                new ScanSpec(body.code(), body.uom(), body.qty(), body.damagedQty(), body.damageNote(), key));
+                new ScanSpec(body.code(), body.uom(), body.qty(), body.damagedQty(), body.damageNote(), body.batchNo(),
+                        body.expiryDate(), key));
     }
 
     @DeleteMapping("/{id}/lines/{lineId}")

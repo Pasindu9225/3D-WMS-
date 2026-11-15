@@ -18,6 +18,13 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
 
     Optional<Bin> findByPublicId(String publicId);
 
+    Optional<Bin> findByWarehouseIdAndCode(long warehouseId, String code);
+
+    /** Stock moving into a bin locks it first, so two workers cannot both fill its last space. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select b from Bin b where b.id = :id")
+    Optional<Bin> lockForStock(@Param("id") long id);
+
     /** Bin list: optional code prefix (e.g. "A-03" for one rack). Spring escapes % and _ in StartingWith. */
     Page<Bin> findByWarehouseIdAndCodeStartingWith(long warehouseId, String codePrefix, Pageable pageable);
 

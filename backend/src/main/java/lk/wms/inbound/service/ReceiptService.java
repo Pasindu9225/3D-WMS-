@@ -18,6 +18,7 @@ import lk.wms.inbound.domain.Receipt;
 import lk.wms.inbound.domain.ReceiptLine;
 import lk.wms.inbound.repo.PurchaseOrderRepository;
 import lk.wms.inbound.repo.ReceiptRepository;
+import lk.wms.inventory.service.StockMovementService;
 import lk.wms.layout.service.WarehouseService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReceiptService {
 
     public record ScanSpec(String code, String uom, BigDecimal qty, BigDecimal damagedQty, String damageNote,
-            String clientRef) {
+            String batchNo, java.time.LocalDate expiryDate, String clientRef) {
     }
 
     public record ReceiptSummary(String id, String number, String status, Instant createdAt, Instant closedAt) {
@@ -46,7 +47,7 @@ public class ReceiptService {
     }
 
     public record Scan(String id, String sku, String uom, int factor, BigDecimal qty, BigDecimal qtyBase,
-            BigDecimal damagedBase, String damageNote, Instant createdAt) {
+            BigDecimal damagedBase, String damageNote, String batchNo, java.time.LocalDate expiryDate, Instant createdAt) {
     }
 
     public record ReceiptDetail(String id, String number, String status, String poId, String poNumber,
@@ -62,9 +63,11 @@ public class ReceiptService {
     private final ProductService products;
     private final WarehouseService warehouses;
     private final AuditService audit;
+    private final StockMovementService stock;
 
     public ReceiptService(ReceiptRepository receipts, PurchaseOrderRepository orders, DocNumbers numbers,
-            ProductService products, WarehouseService warehouses, AuditService audit) {
+            ProductService products, WarehouseService warehouses, AuditService audit, StockMovementService stock) {
+        this.stock = stock;
         this.receipts = receipts;
         this.orders = orders;
         this.numbers = numbers;
@@ -135,9 +138,16 @@ public class ReceiptService {
             throw new ApiException(HttpStatus.CONFLICT, "OVER_RECEIPT", "Only " + left.stripTrailingZeros().toPlainString()
                     + " " + baseUomOf(found) + " of " + found.product().sku() + " are still expected on this order");
         }
+        String batch = s.batchNo() == null || s.batchNo().isBlank() ? null : s.batchNo().trim().toUpperCase(java.util.Locale.ROOT);
+        if (found.product().trackBatch() && batch == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BATCH_REQUIRED", found.product().sku() + " needs a batch number");
+        }
+        if (found.product().trackExpiry() && s.expiryDate() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "EXPIRY_REQUIRED", found.product().sku() + " needs an expiry date");
+        }
         String note = s.damageNote() == null || s.damageNote().isBlank() ? null : s.damageNote().trim();
         ReceiptLine added = r.add(new ReceiptLine.Spec(line, uom, factor, s.qty().setScale(3, RoundingMode.UNNECESSARY),
-                qtyBase, damaged, damaged.signum() > 0 ? note : null, s.clientRef()), cu.userId());
+                qtyBase, damaged, damaged.signum() > 0 ? note : null, batch, s.expiryDate(), s.clientRef()), cu.userId());
         receipts.flush();
         audit.record(cu.tenantId(), cu.userId(), "RECEIPT_SCANNED", "receipt", r.getPublicId(), null,
                 Map.of("line", added.getPublicId(), "sku", line.getSku(), "qtyBase", qtyBase, "damagedBase", damaged));
@@ -169,6 +179,12 @@ public class ReceiptService {
         }
         PurchaseOrder o = r.getOrder();
         r.getLines().forEach(l -> l.getPoLine().addReceived(l.getQtyBase()));
+        // Into the warehouse's receiving area; putaway moves it to bins (task 5).
+        for (ReceiptLine l : r.getLines()) {
+            stock.move(new StockMovementService.Move(StockMovementService.Kind.RECEIVE, r.getWarehouseId(), l.getProductId(),
+                    l.getBatchNo(), l.getExpiryDate(), null, StockMovementService.Place.RECEIVING, l.getQtyBase(), null,
+                    "receipt", r.getId(), cu.userId()));
+        }
         o.updateReceivedStatus();
         r.close(cu.userId(), note == null || note.isBlank() ? null : note.trim());
         receipts.flush();
@@ -247,7 +263,8 @@ public class ReceiptService {
                     l.orderedBase(), before, here, damaged);
         }).toList();
         List<Scan> scans = r.getLines().stream().map(l -> new Scan(l.getPublicId(), l.getPoLine().getSku(), l.getUom(),
-                l.getFactor(), l.getQty(), l.getQtyBase(), l.getDamagedBase(), l.getDamageNote(), l.getCreatedAt())).toList();
+                l.getFactor(), l.getQty(), l.getQtyBase(), l.getDamagedBase(), l.getDamageNote(), l.getBatchNo(), l.getExpiryDate(),
+                l.getCreatedAt())).toList();
         return new ReceiptDetail(r.getPublicId(), r.getNumber(), r.getStatus().name(), o.getPublicId(), o.getNumber(),
                 o.getSupplierName(), o.getWarehouseCode(), r.getNote(), r.getCreatedAt(), r.getClosedAt(), lines, scans,
                 r.getVersion());

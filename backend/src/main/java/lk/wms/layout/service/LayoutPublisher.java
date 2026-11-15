@@ -54,11 +54,13 @@ public class LayoutPublisher {
     private final AuditService audit;
     private final JsonMapper json;
     private final ApplicationEventPublisher events;
+    private final lk.wms.inventory.service.StockService stock;
 
     public LayoutPublisher(WarehouseRepository warehouses, WarehouseService warehouseAccess,
             LayoutVersionRepository versions, RackTemplateService templates, ZoneRepository zones, RackRepository racks,
             RackLevelRepository levels, BinRepository bins, AuditService audit, JsonMapper json,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events, lk.wms.inventory.service.StockService stock) {
+        this.stock = stock;
         this.warehouses = warehouses;
         this.warehouseAccess = warehouseAccess;
         this.versions = versions;
@@ -172,6 +174,15 @@ public class LayoutPublisher {
             }
         }
         if (!deadBins.isEmpty()) {
+            List<Long> holding = stock.binsHoldingStock(deadBins);
+            if (!holding.isEmpty()) {
+                Map<Long, String> codeOf = binsByLevel.values().stream().flatMap(List::stream)
+                        .collect(Collectors.toMap(Bin::getId, Bin::getCode));
+                List<String> codes = holding.stream().map(codeOf::get).sorted().limit(20).toList();
+                throw new ApiException(HttpStatus.CONFLICT, "BINS_HOLD_STOCK", holding.size()
+                        + " bin(s) this publish would remove still hold stock: " + String.join(", ", codes)
+                        + ". Move the stock out first.");
+            }
             bins.deleteByIds(deadBins);
         }
         if (!deadLevels.isEmpty()) {

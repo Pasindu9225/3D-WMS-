@@ -105,6 +105,9 @@ function ScanForm({ receipt }: { receipt: Receipt }) {
   const [damaged, setDamaged] = useState(false)
   const [damagedQty, setDamagedQty] = useState('')
   const [note, setNote] = useState('')
+  const [lot, setLot] = useState(false)
+  const [batch, setBatch] = useState('')
+  const [expiry, setExpiry] = useState('')
   const [done, setDone] = useState('')
   const codeRef = useRef<HTMLInputElement>(null)
   // One key per scan: kept when the network fails so the retry is counted once, renewed once the scan lands.
@@ -129,6 +132,8 @@ function ScanForm({ receipt }: { receipt: Receipt }) {
       kind: 'scan', id: receipt.id, scan: {
         code: scanned, qty: Number(qty), key: key.current,
         ...(damaged ? { damagedQty: Number(damagedQty), damageNote: note.trim() || undefined } : {}),
+        ...(lot && batch.trim() ? { batchNo: batch.trim() } : {}),
+        ...(lot && expiry ? { expiryDate: expiry } : {}),
       },
     }, {
       onSuccess: () => {
@@ -138,11 +143,14 @@ function ScanForm({ receipt }: { receipt: Receipt }) {
         setDamaged(false)
         setDamagedQty('')
         setNote('')
+        setBatch('')
+        setExpiry('')
         key.current = crypto.randomUUID()
         codeRef.current?.focus()
       },
       onError: (e) => {
-        if (!(e instanceof ApiError && e.code === 'NETWORK')) renew() // a refused scan is a new scan next time
+        if (e instanceof ApiError && (e.code === 'BATCH_REQUIRED' || e.code === 'EXPIRY_REQUIRED')) setLot(true)
+        if (!(e instanceof ApiError && e.code === 'NETWORK')) key.current = crypto.randomUUID() // a refused scan is a new scan next time
       },
     })
   }
@@ -188,6 +196,28 @@ function ScanForm({ receipt }: { receipt: Receipt }) {
             {(p) => <Input {...p} className="h-12" maxLength={200} value={note} onChange={(e) => {
               renew()
               setNote(e.target.value)
+            }} />}
+          </Field>
+        </div>
+      )}
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" className="size-5" checked={lot} onChange={(e) => {
+          renew()
+          setLot(e.target.checked)
+        }} /> {t('receive.lot')}
+      </label>
+      {lot && (
+        <div className="grid grid-cols-2 gap-2">
+          <Field label={t('receive.batch')}>
+            {(p) => <Input {...p} className="h-12 font-mono uppercase" maxLength={40} value={batch} onChange={(e) => {
+              renew()
+              setBatch(e.target.value)
+            }} />}
+          </Field>
+          <Field label={t('receive.expiry')}>
+            {(p) => <Input {...p} type="date" className="h-12" value={expiry} onChange={(e) => {
+              renew()
+              setExpiry(e.target.value)
             }} />}
           </Field>
         </div>
@@ -240,6 +270,9 @@ function Scans({ receipt, editable }: { receipt: Receipt; editable: boolean }) {
             <span className="min-w-0 flex-1">
               <span className="font-mono text-xs">{s.sku}</span> {num(s.qty)} {s.uom}
               {s.factor > 1 && <span className="text-muted-foreground"> = {num(s.qtyBase)}</span>}
+              {(s.batchNo || s.expiryDate) && (
+                <span className="text-muted-foreground"> · {[s.batchNo, s.expiryDate].filter(Boolean).join(' · ')}</span>
+              )}
               {s.damagedBase > 0 && (
                 <span className="text-destructive"> · {t('receive.damagedCount', { n: num(s.damagedBase) })}{s.damageNote ? `: ${s.damageNote}` : ''}</span>
               )}

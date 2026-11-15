@@ -23,7 +23,7 @@ public class ReceiptLine extends TenantScoped {
 
     /** A scan the service has checked: order line found, unit factor fixed, base quantities worked out. */
     public record Spec(PoLine poLine, String uom, int factor, BigDecimal qty, BigDecimal qtyBase, BigDecimal damagedBase,
-            String damageNote, String clientRef) {
+            String damageNote, String batchNo, java.time.LocalDate expiryDate, String clientRef) {
     }
 
     @Id
@@ -63,6 +63,12 @@ public class ReceiptLine extends TenantScoped {
     @Column(name = "damage_note", length = 200, updatable = false)
     private String damageNote;
 
+    @Column(name = "batch_no", length = 40, updatable = false)
+    private String batchNo;
+
+    @Column(name = "expiry_date", updatable = false)
+    private java.time.LocalDate expiryDate;
+
     @Column(name = "client_ref", nullable = false, length = 64, updatable = false)
     private String clientRef;
 
@@ -86,6 +92,8 @@ public class ReceiptLine extends TenantScoped {
         this.qtyBase = s.qtyBase();
         this.damagedBase = s.damagedBase();
         this.damageNote = s.damageNote();
+        this.batchNo = s.batchNo();
+        this.expiryDate = s.expiryDate();
         this.clientRef = s.clientRef();
         this.createdBy = userId;
         this.createdAt = Instant.now();
@@ -121,6 +129,18 @@ public class ReceiptLine extends TenantScoped {
 
     public String getDamageNote() {
         return damageNote;
+    }
+
+    public String getBatchNo() {
+        return batchNo;
+    }
+
+    public java.time.LocalDate getExpiryDate() {
+        return expiryDate;
+    }
+
+    public Long getProductId() {
+        return productId;
     }
 
     public String getClientRef() {

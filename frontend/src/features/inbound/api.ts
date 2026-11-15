@@ -134,6 +134,8 @@ export interface Scan {
   qtyBase: number
   damagedBase: number
   damageNote: string | null
+  batchNo: string | null
+  expiryDate: string | null
   createdAt: string
 }
 
@@ -159,6 +161,8 @@ export interface ScanInput {
   uom?: string
   damagedQty?: number
   damageNote?: string
+  batchNo?: string
+  expiryDate?: string
   /** Same key when the same scan is sent again after a network error. */
   key: string
 }

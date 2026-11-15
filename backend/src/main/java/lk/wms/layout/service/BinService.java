@@ -41,6 +41,45 @@ public class BinService {
                 .map(BinService::view);
     }
 
+    /** What stock moves need to know about a bin. Ids are internal: only for other modules' services. */
+    public record BinRef(long id, String publicId, long warehouseId, String code, long maxWeightG, long maxVolumeCm3,
+            boolean blocked) {
+    }
+
+    /**
+     * For StockMovementService: the bin, write-locked until the caller's transaction ends, so two moves into it
+     * are checked against its capacity one after the other. Must run inside that transaction.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public BinRef lockForStock(long binId) {
+        Bin b = bins.lockForStock(binId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BIN_NOT_FOUND", "Bin not found"));
+        return ref(b);
+    }
+
+    /** A bin by its public id (scanned label or picked in the UI), if this user may work in its warehouse. */
+    @Transactional(readOnly = true)
+    public BinRef byPublicId(CurrentUser cu, String publicId) {
+        Bin b = bins.findByPublicId(publicId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BIN_NOT_FOUND", "Bin not found"));
+        warehouses.requireAccess(cu, b.getWarehouseId());
+        return ref(b);
+    }
+
+    /** A bin by its printed code in one warehouse (what a worker scans from the label). */
+    @Transactional(readOnly = true)
+    public BinRef byCode(CurrentUser cu, long warehouseId, String code) {
+        warehouses.requireAccess(cu, warehouseId);
+        Bin b = bins.findByWarehouseIdAndCode(warehouseId, code)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BIN_NOT_FOUND", "No bin " + code + " in this warehouse"));
+        return ref(b);
+    }
+
+    private static BinRef ref(Bin b) {
+        return new BinRef(b.getId(), b.getPublicId(), b.getWarehouseId(), b.getCode(), b.getMaxWeightG(),
+                b.getMaxVolumeCm3(), b.isBlocked());
+    }
+
     /** Capacity set here is kept by later publishes; blocked bins get no putaway (v0.4). */
     @Transactional
     public BinView edit(CurrentUser cu, String binId, Long maxWeightG, Long maxVolumeCm3, Boolean pickFace,

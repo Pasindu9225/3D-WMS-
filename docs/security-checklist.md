@@ -20,7 +20,7 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-23** (v0.1): Parameterised queries only — task 3, ArchUnit NO_STRING_BUILT_SQL + self-test
 - [x] **SEC-24** (v0.1): Tenant isolation (replaces PostgreSQL RLS, which MySQL lacks) — task 3, TenantIsolationTest (JWT wiring in task 4)
 - [x] **SEC-25** (v0.1): Password and token hashes never leave the auth module — task 4, AuthFlowTest
-- [ ] **SEC-26** (v0.4): Transactions for multi-step stock changes
+- [x] **SEC-26** (v0.4): Transactions for multi-step stock changes — task 6: StockMovementService, one transaction per move, bin then stock-row locks in a fixed order, append-only ledger (triggers), StockMovementTest
 - [x] **SEC-27** (v0.1): Least-privilege DB users — task 1+3, DatabasePrivilegesTest
 - [x] **SEC-28** (v0.1): Audit log on all changes — task 6, UserManagementTest + ArchUnit
 - [x] **SEC-29** (v0.1): Passwords hashed with Argon2id (or BCrypt cost 12) — task 4, AuthFlowTest

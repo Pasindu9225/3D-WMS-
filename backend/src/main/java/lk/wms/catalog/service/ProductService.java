@@ -155,6 +155,21 @@ public class ProductService {
     }
 
     /** What an order line needs from a product: ids, names, cost and the units it can be ordered in. */
+    /** Size of one base unit, for bin capacity checks (null = not entered, not checked). */
+    public record Measure(String sku, Integer weightG, Integer volumeCm3) {
+    }
+
+    /** Measures by internal product id (other modules hold these ids on their own rows). */
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, Measure> measures(java.util.Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return java.util.Map.of();
+        }
+        java.util.Map<Long, Measure> out = new java.util.HashMap<>();
+        products.withIds(productIds).forEach(p -> out.put(p.getId(), new Measure(p.getSku(), p.getWeightG(), p.getVolumeCm3())));
+        return out;
+    }
+
     public record OrderProduct(long id, String publicId, String sku, String name, String baseUom, Long costMinor,
             java.util.Map<String, Integer> factors) {
     }

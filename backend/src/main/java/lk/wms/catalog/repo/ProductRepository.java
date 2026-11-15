@@ -28,6 +28,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findBySku(String sku);
 
+    /** Products by internal id, tenant-filtered (for modules that store product ids). */
+    @Query("select p from Product p where p.id in :ids")
+    java.util.List<Product> withIds(@Param("ids") java.util.Collection<Long> ids);
+
     /** Products with their units in one query (imports update thousands; no per-product unit queries). */
     @Query("select distinct p from Product p left join fetch p.units where p.sku in :skus")
     java.util.List<Product> findBySkuInWithUnits(@Param("skus") java.util.Collection<String> skus);
