@@ -34,7 +34,7 @@ const NAV: NavItem[] = [
   { to: '/app/putaway', label: 'nav.putaway', icon: ArrowDownToLine, permission: 'putaway:execute' },
   { to: '/app/move', label: 'nav.move', icon: ArrowLeftRight, permission: 'inventory:transfer' },
   { to: '/app/adjustments', label: 'nav.adjustments', icon: Scale, permission: 'inventory:read' },
-  { to: '/app/stock', label: 'nav.stock', icon: Package, soon: true },
+  { to: '/app/stock', label: 'nav.stock', icon: Package, permission: 'inventory:read' },
   { to: '/app/users', label: 'nav.users', icon: Users, permission: 'users:read' },
   { to: '/app/roles', label: 'nav.roles', icon: ShieldCheck, permission: 'roles:read' },
   { to: '/app/audit', label: 'nav.audit', icon: ClipboardList, permission: 'audit:read' },

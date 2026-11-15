@@ -20,6 +20,10 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
 
     Optional<Bin> findByWarehouseIdAndCode(long warehouseId, String code);
 
+    /** [id, public_id, code] of these bins (stock screens label rows with them). */
+    @Query("select b.id, b.publicId, b.code from Bin b where b.id in :ids")
+    List<Object[]> labels(@Param("ids") Collection<Long> ids);
+
     /** Every bin of a warehouse with where it stands: for putaway suggestions. */
     interface PlacedBin {
         Long getId();
@@ -62,6 +66,12 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
 
     /** 3D scene: just what the viewer needs per bin, in id order so status flags line up with it. */
     interface SceneBin {
+        Long getId();
+
+        Long getMaxWeightG();
+
+        Long getMaxVolumeCm3();
+
         String getPublicId();
 
         String getCode();

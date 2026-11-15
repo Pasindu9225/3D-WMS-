@@ -46,6 +46,32 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             order by s.receivedAt, s.id""")
     List<Stock> lots(@Param("warehouseId") long warehouseId, @Param("binId") Long binId, @Param("productId") long productId);
 
+    /** Stock rows of a warehouse, optionally one product, a set of bins, or only the receiving area. */
+    @Query("""
+            select s from Stock s
+            where s.warehouseId = :warehouseId and s.qtyOnHand > 0 and (:productId is null or s.productId = :productId)
+              and (:anyBin = true or s.binId in :binIds) and (:receivingOnly = false or s.binId is null)
+            order by s.productId, s.binId, s.receivedAt""")
+    org.springframework.data.domain.Page<Stock> search(@Param("warehouseId") long warehouseId, @Param("productId") Long productId,
+            @Param("anyBin") boolean anyBin, @Param("binIds") Collection<Long> binIds, @Param("receivingOnly") boolean receivingOnly,
+            org.springframework.data.domain.Pageable pageable);
+
+    /** Totals per product: [product_id, on hand, in receiving, bins]. */
+    @Query(value = """
+            select s.productId, sum(s.qtyOnHand), sum(case when s.binId is null then s.qtyOnHand else 0 end), count(distinct s.binId)
+            from Stock s where s.warehouseId = :warehouseId and s.qtyOnHand > 0 and (:anyProduct = true or s.productId in :productIds)
+            group by s.productId order by s.productId""",
+            countQuery = """
+            select count(distinct s.productId) from Stock s
+            where s.warehouseId = :warehouseId and s.qtyOnHand > 0 and (:anyProduct = true or s.productId in :productIds)""")
+    org.springframework.data.domain.Page<Object[]> totalsByProduct(@Param("warehouseId") long warehouseId,
+            @Param("anyProduct") boolean anyProduct, @Param("productIds") Collection<Long> productIds,
+            org.springframework.data.domain.Pageable pageable);
+
+    /** What every bin of a warehouse holds, as [bin_id, product_id, qty_on_hand] (3D fill levels). */
+    @Query("select s.binId, s.productId, s.qtyOnHand from Stock s where s.warehouseId = :warehouseId and s.binId is not null and s.qtyOnHand > 0")
+    List<Object[]> binContents(@Param("warehouseId") long warehouseId);
+
     /** Goods received but not yet put away in one warehouse, oldest first. */
     @Query("select s from Stock s where s.warehouseId = :warehouseId and s.binId is null and s.qtyOnHand > 0 order by s.receivedAt, s.id")
     org.springframework.data.domain.Page<Stock> awaitingPutaway(@Param("warehouseId") long warehouseId,

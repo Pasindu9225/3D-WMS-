@@ -26,6 +26,8 @@ export interface Scene {
   bins: { ids: string[]; codes: string[]; rack: number[]; level: number[]; pos: number[] }
   /** One digit per bin: 1 = blocked, 2 = pick face (added together). */
   flags: string
+  /** How full each bin is, 0 to 100 (1 at least when it holds anything). Missing before stock existed. */
+  fill?: number[]
 }
 
 export const BLOCKED = 1

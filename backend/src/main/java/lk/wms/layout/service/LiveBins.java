@@ -24,9 +24,20 @@ public class LiveBins {
     }
 
     private final SimpMessagingTemplate broker;
+    private final WarehouseService warehouses;
 
-    public LiveBins(SimpMessagingTemplate broker) {
+    public LiveBins(SimpMessagingTemplate broker, WarehouseService warehouses) {
         this.broker = broker;
+        this.warehouses = warehouses;
+    }
+
+    /** Stock moved: viewers fetch fresh fill levels (one tiny /bin-status call, debounced in the browser). */
+    @TransactionalEventListener
+    void on(lk.wms.inventory.service.StockMovementService.StockChanged e) {
+        String id = warehouses.publicIdOf(e.warehouseId());
+        if (id != null) {
+            broker.convertAndSend(topic(id), new Push("STOCK", null, null, null));
+        }
     }
 
     @TransactionalEventListener

@@ -184,6 +184,12 @@ public class ProductService {
         return out;
     }
 
+    /** Internal ids of products matching a search (SKU or barcode prefix, name contains), up to 500. */
+    @Transactional(readOnly = true)
+    public java.util.List<Long> idsMatching(String query) {
+        return products.search(likeText(query), org.springframework.data.domain.PageRequest.of(0, 500)).map(Product::getId).getContent();
+    }
+
     /** A live product by public id, else 404. */
     @Transactional(readOnly = true)
     public Basic basic(String publicId) {

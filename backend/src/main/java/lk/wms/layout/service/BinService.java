@@ -80,6 +80,28 @@ public class BinService {
         return ref(b);
     }
 
+    /** A bin as stock screens show it. */
+    public record BinLabel(String publicId, String code) {
+    }
+
+    /** Labels by internal id (other modules store bin ids on their rows); tenant-filtered. */
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, BinLabel> labels(java.util.Collection<Long> binIds) {
+        java.util.Map<Long, BinLabel> out = new java.util.HashMap<>();
+        if (!binIds.isEmpty()) {
+            bins.labels(binIds).forEach(r -> out.put(((Number) r[0]).longValue(), new BinLabel((String) r[1], (String) r[2])));
+        }
+        return out;
+    }
+
+    /** Internal ids of the bins whose code starts with this text (up to 1,000), after the access check. */
+    @Transactional(readOnly = true)
+    public List<Long> idsByCodePrefix(CurrentUser cu, long warehouseId, String prefix) {
+        warehouses.requireAccess(cu, warehouseId);
+        return bins.findByWarehouseIdAndCodeStartingWith(warehouseId, prefix.trim().toUpperCase(java.util.Locale.ROOT),
+                org.springframework.data.domain.PageRequest.of(0, 1000)).map(Bin::getId).getContent();
+    }
+
     /** A bin a putaway could use: zone type, level, and its distance from where goods arrive. */
     public record Candidate(long id, String publicId, String code, String zoneType, int level, long distanceMm,
             boolean blocked, long maxWeightG, long maxVolumeCm3) {

@@ -23,7 +23,7 @@ export const STATUS_COLOR: Record<BinStatus, string> = {
 }
 
 /**
- * One bin's status. fill (0..1) comes with stock in v0.4; until then every bin is empty. Blocked wins over
+ * One bin's status from its flags and how full it is (fill 0..1, from stock). Blocked wins over
  * everything; an empty pick face shows as a pick face so pickers can see where picking happens.
  */
 export function statusOf(flag: number, fill?: number): BinStatus {
@@ -35,7 +35,9 @@ export function statusOf(flag: number, fill?: number): BinStatus {
 
 /** Colour of every bin, in scene order. flags is the live status string (scene.flags or /bin-status). */
 export function binColors(scene: Scene, mode: ColorMode, flags: string): string[] {
-  if (mode === 'status') return scene.bins.rack.map((_, i) => STATUS_COLOR[statusOf(Number(flags[i] ?? 0))])
+  if (mode === 'status') {
+    return scene.bins.rack.map((_, i) => STATUS_COLOR[statusOf(Number(flags[i] ?? 0), (scene.fill?.[i] ?? 0) / 100)])
+  }
   const zoneType = new Map(scene.zones.map((z) => [z.code, z.type]))
   return scene.bins.rack.map((r) => {
     const type = zoneType.get(scene.racks[r]!.zone)

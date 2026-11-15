@@ -50,10 +50,11 @@ public class SceneService {
     }
 
     public record SceneView(String publishedAt, int[] floor, List<LayoutDocument.Opening> openings, List<ZoneView> zones,
-            List<RackView> racks, BinArrays bins, String flags) {
+            List<RackView> racks, BinArrays bins, String flags, int[] fill) {
     }
 
-    public record StatusView(String publishedAt, String flags) {
+    /** flags as in the scene; fill = how full each bin is, 0 to 100 (1 at least when it holds anything). */
+    public record StatusView(String publishedAt, String flags, int[] fill) {
     }
 
     private final WarehouseService warehouses;
@@ -63,9 +64,12 @@ public class SceneService {
     private final RackLevelRepository levels;
     private final BinRepository bins;
     private final JsonMapper json;
+    private final lk.wms.inventory.service.StockService stock;
 
     public SceneService(WarehouseService warehouses, LayoutVersionRepository versions, ZoneRepository zones,
-            RackRepository racks, RackLevelRepository levels, BinRepository bins, JsonMapper json) {
+            RackRepository racks, RackLevelRepository levels, BinRepository bins, JsonMapper json,
+            lk.wms.inventory.service.StockService stock) {
+        this.stock = stock;
         this.warehouses = warehouses;
         this.versions = versions;
         this.zones = zones;
@@ -122,20 +126,38 @@ public class SceneService {
                     r.getRotationDeg(), r.getWidthMm(), r.getDepthMm(), r.getHeightMm(), binsPerLevel[i], heights));
         }
         return new SceneView(published.getPublishedAt().toString(), flat(doc.floor()), doc.openings(), zoneViews,
-                rackViews, arrays, flags(binRows));
+                rackViews, arrays, flags(binRows), fill(w.id(), binRows));
     }
 
     /** Status only, in the same bin order as the scene; the viewer refetches the scene when publishedAt changes. */
     @Transactional(readOnly = true)
     public StatusView status(CurrentUser cu, String warehouseId) {
         WarehouseRef w = warehouses.requireAccess(cu, warehouseId);
-        return new StatusView(published(w).getPublishedAt().toString(), flags(bins.findByWarehouseIdOrderById(w.id())));
+        List<SceneBin> rows = bins.findByWarehouseIdOrderById(w.id());
+        return new StatusView(published(w).getPublishedAt().toString(), flags(rows), fill(w.id(), rows));
     }
 
     private LayoutVersion published(WarehouseRef w) {
         return versions.findFirstByWarehouseIdAndStatusOrderByPublishedAtDesc(w.id(), LayoutVersion.Status.PUBLISHED)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_PUBLISHED",
                         "This warehouse has no published layout yet"));
+    }
+
+    /** Fullness by weight or volume, whichever is higher; a bin holding goods of unknown size shows as 1%. */
+    private int[] fill(long warehouseId, List<SceneBin> rows) {
+        Map<Long, lk.wms.inventory.service.StockService.Load> loads = stock.binLoads(warehouseId);
+        int[] out = new int[rows.size()];
+        for (int i = 0; i < rows.size(); i++) {
+            SceneBin b = rows.get(i);
+            var load = loads.get(b.getId());
+            if (load == null) {
+                continue;
+            }
+            double byWeight = b.getMaxWeightG() > 0 ? load.weightG().doubleValue() / b.getMaxWeightG() : 0;
+            double byVolume = b.getMaxVolumeCm3() > 0 ? load.volumeCm3().doubleValue() / b.getMaxVolumeCm3() : 0;
+            out[i] = (int) Math.min(100, Math.max(1, Math.ceil(Math.max(byWeight, byVolume) * 100)));
+        }
+        return out;
     }
 
     private static String flags(List<SceneBin> rows) {

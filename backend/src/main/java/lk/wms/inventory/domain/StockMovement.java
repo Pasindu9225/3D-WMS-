@@ -110,4 +110,52 @@ public class StockMovement extends TenantScoped {
     public BigDecimal getQty() {
         return qty;
     }
+
+    public Long getWarehouseId() {
+        return warehouseId;
+    }
+
+    public Long getProductId() {
+        return productId;
+    }
+
+    public String getBatchNo() {
+        return batchNo;
+    }
+
+    public LocalDate getExpiryDate() {
+        return expiryDate;
+    }
+
+    public Long getFromBinId() {
+        return fromBinId;
+    }
+
+    public Long getToBinId() {
+        return toBinId;
+    }
+
+    public boolean isFromReceiving() {
+        return fromReceiving;
+    }
+
+    public boolean isToReceiving() {
+        return toReceiving;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public String getRefType() {
+        return refType;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
 }

@@ -26,3 +26,8 @@ it('lists only the zone types present, or every status', () => {
   expect(legend(scene, 'zone').map((l) => l.key)).toEqual(['PICKING', 'COLD'])
   expect(legend(scene, 'status')).toHaveLength(5)
 })
+
+it('colours bins by how full they are once stock is recorded; blocked still wins', () => {
+  const stocked = { ...scene, fill: [0, 40, 100, 100] }
+  expect(binColors(stocked, 'status', '0001')).toEqual([STATUS_COLOR.EMPTY, STATUS_COLOR.PARTLY, STATUS_COLOR.FULL, STATUS_COLOR.BLOCKED])
+})

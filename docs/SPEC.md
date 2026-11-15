@@ -284,7 +284,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Putaway: system suggests bin (same product first, then closest empty bin in a storage zone, respecting capacity); worker scans bin to confirm
 - [x] `StockMovementService` is the ONLY code that changes stock; row locks and transactions (SEC-26)
 - [x] Bin-to-bin transfer; stock adjustment with reason and manager approval above a value
-- [ ] Stock screens: by product, by bin, movement history; 3D shows real fullness and contents
+- [x] Stock screens: by product, by bin, movement history; 3D shows real fullness and contents
 - [ ] Worker PWA shell: install prompt, camera scanner, task list, big buttons, works on 2 GB phones
 
 **Deliverables:** full inbound flow on phone, stock ledger, stock reports, 3D view with real stock.

@@ -60,6 +60,10 @@ public class StockMovementService {
         }
     }
 
+    /** Published after each move (live 3D views refresh fill levels once the transaction commits). */
+    public record StockChanged(long warehouseId) {
+    }
+
     /** What move() did: MOVED, or ALREADY_DONE for a retried Idempotency-Key. */
     public enum Outcome { MOVED, ALREADY_DONE }
 
@@ -67,8 +71,11 @@ public class StockMovementService {
     private final StockMovementRepository ledger;
     private final BinService bins;
     private final ProductService products;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
-    public StockMovementService(StockRepository stock, StockMovementRepository ledger, BinService bins, ProductService products) {
+    public StockMovementService(StockRepository stock, StockMovementRepository ledger, BinService bins, ProductService products,
+            org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
         this.stock = stock;
         this.ledger = ledger;
         this.bins = bins;
@@ -158,6 +165,7 @@ public class StockMovementService {
             // the same key arrived twice at once: the other request made the move
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_DONE", "This was just done; reload to see it");
         }
+        events.publishEvent(new StockChanged(m.warehouseId()));
         return Outcome.MOVED;
     }
 
