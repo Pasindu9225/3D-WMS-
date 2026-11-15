@@ -16,6 +16,6 @@ export default defineConfig({
     '/ws': { target: 'ws://localhost:8080', ws: true, changeOrigin: false }, // live bin status (STOMP)
   } },
   preview: { port: 5180, strictPort: true },
-  build: { target: 'es2022' },
+  build: { target: 'es2022', manifest: true }, // manifest: lets check-size.mjs measure the worker app
   test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
 })

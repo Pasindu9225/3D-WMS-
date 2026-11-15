@@ -48,6 +48,19 @@ export const router = createBrowserRouter([
           },
         ],
       },
+      {
+        // The installable phone app: same pages for the jobs, its own one-column layout.
+        path: '/worker',
+        lazy: () => import('@/features/worker/WorkerLayout').then((m) => ({ Component: m.WorkerLayout })),
+        children: [
+          { index: true, lazy: () => import('@/features/worker/WorkerHome').then((m) => ({ Component: m.WorkerHome })) },
+          { path: 'receive', lazy: () => import('@/features/inbound/ReceivePage').then((m) => ({ Component: m.ReceivePage })) },
+          { path: 'receive/:id', lazy: () => import('@/features/inbound/ReceivePage').then((m) => ({ Component: m.ReceiptPage })) },
+          { path: 'putaway', lazy: () => import('@/features/inventory/PutawayPage').then((m) => ({ Component: m.PutawayPage })) },
+          { path: 'move', lazy: () => import('@/features/inventory/MoveStockPage').then((m) => ({ Component: m.MoveStockPage })) },
+          { path: 'find', lazy: () => import('@/features/worker/FindPage').then((m) => ({ Component: m.FindPage })) },
+        ],
+      },
       { path: '*', lazy: () => import('./NotFoundPage').then((m) => ({ Component: m.NotFoundPage })) },
     ],
   },

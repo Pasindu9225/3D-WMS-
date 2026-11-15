@@ -7,6 +7,7 @@ import { ApiError } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
+import { ScanButton } from '@/features/worker/Scanner'
 import { usePutaway, useSuggestions, useWaiting, type Waiting } from './api'
 
 const QTY = /^\d{1,7}(\.\d{1,3})?$/
@@ -137,13 +138,21 @@ function PutawayItem({ warehouseId, item, onBack, onDone }: {
         e.preventDefault()
         submit()
       }}>
-        <Field label={t('putaway.scanBin')}>
-          {(p) => <Input {...p} autoFocus autoComplete="off" className="h-12 font-mono text-lg uppercase" maxLength={40}
-            placeholder={t('putaway.scanBinHint')} value={bin} onChange={(e) => {
-              key.current = crypto.randomUUID()
-              setBin(e.target.value)
-            }} />}
-        </Field>
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Field label={t('putaway.scanBin')}>
+              {(p) => <Input {...p} autoFocus autoComplete="off" className="h-12 font-mono text-lg uppercase" maxLength={40}
+                placeholder={t('putaway.scanBinHint')} value={bin} onChange={(e) => {
+                  key.current = crypto.randomUUID()
+                  setBin(e.target.value)
+                }} />}
+            </Field>
+          </div>
+          <ScanButton label={t('scan.open')} onCode={(c) => {
+            key.current = crypto.randomUUID()
+            setBin(c)
+          }} />
+        </div>
         {offList && <p className="text-sm text-muted-foreground">{t('putaway.offList')}</p>}
         {putaway.isError && <FormMessage tone="error">{errorMessage(putaway.error)}</FormMessage>}
         <Button type="submit" className="h-12 text-base" disabled={!qtyOk || !scanned || putaway.isPending}>

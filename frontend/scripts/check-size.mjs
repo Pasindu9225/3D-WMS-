@@ -32,3 +32,25 @@ if (total > BUDGET_KB) {
   console.error('Over budget.')
   process.exit(1)
 }
+
+// Worker phone app (SPEC: under 250 KB gzipped on 2 GB phones): the entry plus the worker layout and home
+// chunks and everything they import statically. Lazy imports (the zxing fallback, 3D) are not counted.
+const WORKER_BUDGET_KB = 250
+const manifest = JSON.parse(readFileSync(join(dist, '.vite', 'manifest.json'), 'utf8'))
+const seen = new Set()
+const visit = (key) => {
+  const entry = manifest[key]
+  if (!entry || seen.has(key)) return
+  seen.add(key)
+  for (const dep of entry.imports ?? []) visit(dep)
+}
+for (const [key, entry] of Object.entries(manifest)) {
+  if (entry.isEntry || /features\/worker\/Worker(Layout|Home)\.tsx$/.test(key)) visit(key)
+}
+let worker = 0
+for (const key of seen) worker += gzipSync(readFileSync(join(dist, manifest[key].file))).length / 1024
+console.log(`${worker.toFixed(1).padStart(8)} KB  worker app first load (gzip), budget ${WORKER_BUDGET_KB} KB`)
+if (worker > WORKER_BUDGET_KB) {
+  console.error('Worker app over budget.')
+  process.exit(1)
+}

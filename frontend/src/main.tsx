@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
+import './lib/install'
 import { router } from '@/app/router'
 import { ME_KEY } from '@/features/auth/session'
 import { ApiError, setSessionExpiredHandler } from '@/lib/api'
@@ -25,6 +26,12 @@ setSessionExpiredHandler(() => {
   queryClient.clear()
   void router.navigate('/login?expired=1', { replace: true })
 })
+
+// The installable worker app works offline-first for its pages only (public/sw.js); never in dev, where
+// files change on every save.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('/sw.js').catch(() => undefined))
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

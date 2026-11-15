@@ -276,7 +276,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Tasks**
 
-- [ ] Tables: `product`, `uom`, `product_uom`, `partner`, `purchase_order`, `po_line`, `receipt`, `receipt_line`, `stock`, `stock_movement`, `task`, `file_object`
+- [x] Tables: `product`, `uom`, `product_uom`, `partner`, `purchase_order`, `po_line`, `receipt`, `receipt_line`, `stock`, `stock_movement`, `file_object` (units live in `product_uom`; `task` moves to v1.0 with picking, see decisions)
 - [x] Product master with barcode, units of measure, size/weight, optional image (SEC-40 to SEC-45)
 - [x] Suppliers (partners); CSV import for products and suppliers (SEC-46)
 - [x] Purchase orders: create, approve, cancel
@@ -285,7 +285,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] `StockMovementService` is the ONLY code that changes stock; row locks and transactions (SEC-26)
 - [x] Bin-to-bin transfer; stock adjustment with reason and manager approval above a value
 - [x] Stock screens: by product, by bin, movement history; 3D shows real fullness and contents
-- [ ] Worker PWA shell: install prompt, camera scanner, task list, big buttons, works on 2 GB phones
+- [x] Worker PWA shell: install prompt, camera scanner, task list, big buttons, works on 2 GB phones
 
 **Deliverables:** full inbound flow on phone, stock ledger, stock reports, 3D view with real stock.
 

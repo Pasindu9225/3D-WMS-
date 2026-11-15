@@ -1,6 +1,6 @@
 import { ArrowDownToLine, ArrowLeftRight, Barcode, Scale, Boxes, FileText, PackageCheck, Truck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
 import { useState, type ComponentType } from 'react'
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import {
@@ -67,6 +67,7 @@ export function AppLayout() {
           </Button>
           <span className="font-semibold md:hidden">{t('app.name')}</span>
           <div className="ml-auto flex items-center gap-1">
+            <Button asChild variant="ghost" size="sm"><Link to="/worker">{t('worker.open')}</Link></Button>
             <ThemeToggle />
             <UserMenu me={me.data} />
           </div>

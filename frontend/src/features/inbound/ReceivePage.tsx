@@ -9,7 +9,9 @@ import { can, useMe } from '@/features/auth/session'
 import { ApiError } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { t } from '@/lib/i18n'
+import { useBase } from '@/lib/base'
 import { useDebounced } from '@/lib/useDebounced'
+import { ScanButton } from '@/features/worker/Scanner'
 import { useReceipt, useReceiptAction, useReceivableOrders, type LineProgress, type Receipt } from './api'
 import { PoStatusBadge } from './PurchaseOrdersPage'
 
@@ -19,11 +21,12 @@ const num = (n: number) => Number(n.toFixed(3)).toLocaleString('en')
 /** /app/receive: approved orders of my warehouses; tap one (or type its number and press Enter) to receive it. */
 export function ReceivePage() {
   const navigate = useNavigate()
+  const base = useBase()
   const [search, setSearch] = useState('')
   const q = useDebounced(search.trim())
   const list = useReceivableOrders(q)
   const open = useReceiptAction()
-  const start = (poId: string) => open.mutate({ kind: 'open', poId }, { onSuccess: (r) => void navigate(`/app/receive/${r.id}`) })
+  const start = (poId: string) => open.mutate({ kind: 'open', poId }, { onSuccess: (r) => void navigate(`${base}/receive/${r.id}`) })
   const items = list.data?.items ?? []
 
   return (
@@ -32,6 +35,7 @@ export function ReceivePage() {
         <h1 className="text-2xl font-semibold">{t('receive.title')}</h1>
         <p className="text-sm text-muted-foreground">{t('receive.hint')}</p>
       </div>
+      <div className="flex gap-2">
       <Input aria-label={t('receive.findPo')} placeholder={t('receive.findPo')} className="h-12 text-base" value={search} maxLength={40}
         autoFocus onChange={(e) => setSearch(e.target.value)}
         onKeyDown={(e) => {
@@ -40,6 +44,8 @@ export function ReceivePage() {
           const only = exact ?? (items.length === 1 ? items[0] : undefined)
           if (only) start(only.id)
         }} />
+        <ScanButton label={t('scan.open')} onCode={setSearch} />
+      </div>
       {(list.isError || open.isError) && <FormMessage tone="error">{errorMessage(list.error ?? open.error)}</FormMessage>}
       <ul className="grid gap-2">
         {items.map((o) => (
@@ -71,13 +77,14 @@ export function ReceiptPage() {
   const { id } = useParams()
   const me = useMe()
   const receipt = useReceipt(id)
+  const base = useBase()
   if (receipt.isPending) return <p className="text-sm text-muted-foreground">{t('app.loading')}</p>
   if (receipt.isError) return <FormMessage tone="error">{errorMessage(receipt.error)}</FormMessage>
   const r = receipt.data
   const editable = r.status === 'OPEN' && can(me.data, 'inbound:receive')
   return (
     <div className="mx-auto grid max-w-2xl gap-4">
-      <Link to="/app/receive" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link to={`${base}/receive`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" /> {t('receive.back')}
       </Link>
       <div className="flex flex-wrap items-center gap-2">
@@ -160,13 +167,21 @@ function ScanForm({ receipt }: { receipt: Receipt }) {
       e.preventDefault()
       submit()
     }}>
-      <Field label={t('receive.code')}>
-        {(p) => <Input {...p} ref={codeRef} autoFocus autoComplete="off" className="h-12 font-mono text-lg" maxLength={64}
-          placeholder={t('receive.codeHint')} value={code} onChange={(e) => {
-            renew()
-            setCode(e.target.value)
-          }} />}
-      </Field>
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <Field label={t('receive.code')}>
+            {(p) => <Input {...p} ref={codeRef} autoFocus autoComplete="off" className="h-12 font-mono text-lg" maxLength={64}
+              placeholder={t('receive.codeHint')} value={code} onChange={(e) => {
+                renew()
+                setCode(e.target.value)
+              }} />}
+          </Field>
+        </div>
+        <ScanButton label={t('scan.open')} onCode={(c) => {
+          renew()
+          setCode(c)
+        }} />
+      </div>
       <div className="flex items-end gap-2">
         <Field label={t('receive.qty')} error={qtyOk ? undefined : t('po.qtyRule')}>
           {(p) => <Input {...p} inputMode="decimal" className="h-12 w-28 text-center text-lg" value={qty} onChange={(e) => {

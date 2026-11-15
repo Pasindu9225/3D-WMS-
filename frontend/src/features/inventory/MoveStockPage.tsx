@@ -6,6 +6,7 @@ import { useWarehouses } from '@/features/warehouses/api'
 import { ApiError } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { t } from '@/lib/i18n'
+import { ScanButton } from '@/features/worker/Scanner'
 import { useTransfer } from './api'
 import { ProductChooser } from './ProductChooser'
 
@@ -75,13 +76,21 @@ export function MoveStockPage() {
         e.preventDefault()
         submit()
       }}>
-        <Field label={t('move.from')}>
-          {(p) => <Input {...p} autoFocus autoComplete="off" className="h-12 font-mono text-lg uppercase" maxLength={40}
-            disabled={fromReceiving} placeholder={t('putaway.scanBinHint')} value={from} onChange={(e) => {
-              changed()
-              setFrom(e.target.value)
-            }} />}
-        </Field>
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Field label={t('move.from')}>
+              {(p) => <Input {...p} autoFocus autoComplete="off" className="h-12 font-mono text-lg uppercase" maxLength={40}
+                disabled={fromReceiving} placeholder={t('putaway.scanBinHint')} value={from} onChange={(e) => {
+                  changed()
+                  setFrom(e.target.value)
+                }} />}
+            </Field>
+          </div>
+          <ScanButton label={t('scan.open')} onCode={(c) => {
+            changed()
+            setFrom(c)
+          }} />
+        </div>
         <label className="-mt-1 flex items-center gap-2 text-sm">
           <input type="checkbox" className="size-5" checked={fromReceiving} onChange={(e) => {
             changed()
@@ -120,13 +129,21 @@ export function MoveStockPage() {
             </Field>
           </div>
         )}
-        <Field label={t('move.to')}>
-          {(p) => <Input {...p} autoComplete="off" className="h-12 font-mono text-lg uppercase" maxLength={40}
-            placeholder={t('putaway.scanBinHint')} value={to} onChange={(e) => {
-              changed()
-              setTo(e.target.value)
-            }} />}
-        </Field>
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Field label={t('move.to')}>
+              {(p) => <Input {...p} autoComplete="off" className="h-12 font-mono text-lg uppercase" maxLength={40}
+                placeholder={t('putaway.scanBinHint')} value={to} onChange={(e) => {
+                  changed()
+                  setTo(e.target.value)
+                }} />}
+            </Field>
+          </div>
+          <ScanButton label={t('scan.open')} onCode={(c) => {
+            changed()
+            setTo(c)
+          }} />
+        </div>
         {transfer.isError && <FormMessage tone="error">{errorMessage(transfer.error)}</FormMessage>}
         {done && !transfer.isError && <FormMessage tone="success">{done}</FormMessage>}
         <Button type="submit" className="h-12 text-base" disabled={!ready}>{transfer.isPending ? t('move.working') : t('move.submit')}</Button>
