@@ -66,6 +66,9 @@ public class StockMovement extends TenantScoped {
     @Column(name = "ref_id")
     private Long refId;
 
+    @Column(name = "client_ref", length = 64)
+    private String clientRef;
+
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
@@ -77,7 +80,7 @@ public class StockMovement extends TenantScoped {
 
     public StockMovement(Type type, long warehouseId, long productId, String batchNo, LocalDate expiryDate, Long fromBinId,
             boolean fromReceiving, Long toBinId, boolean toReceiving, BigDecimal qty, String reason, String refType,
-            Long refId, long userId) {
+            Long refId, String clientRef, long userId) {
         this.type = type;
         this.warehouseId = warehouseId;
         this.productId = productId;
@@ -91,6 +94,7 @@ public class StockMovement extends TenantScoped {
         this.reason = reason;
         this.refType = refType;
         this.refId = refId;
+        this.clientRef = clientRef;
         this.userId = userId;
         this.createdAt = Instant.now();
     }

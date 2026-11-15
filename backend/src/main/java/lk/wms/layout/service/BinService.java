@@ -26,8 +26,13 @@ public class BinService {
     private final AuditService audit;
     private final ApplicationEventPublisher events;
 
+    private final lk.wms.layout.repo.ZoneRepository zones;
+    private final tools.jackson.databind.json.JsonMapper json;
+
     public BinService(BinRepository bins, WarehouseService warehouses, AuditService audit,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events, lk.wms.layout.repo.ZoneRepository zones, tools.jackson.databind.json.JsonMapper json) {
+        this.zones = zones;
+        this.json = json;
         this.bins = bins;
         this.warehouses = warehouses;
         this.audit = audit;
@@ -73,6 +78,45 @@ public class BinService {
         Bin b = bins.findByWarehouseIdAndCode(warehouseId, code)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BIN_NOT_FOUND", "No bin " + code + " in this warehouse"));
         return ref(b);
+    }
+
+    /** A bin a putaway could use: zone type, level, and its distance from where goods arrive. */
+    public record Candidate(long id, String publicId, String code, String zoneType, int level, long distanceMm,
+            boolean blocked, long maxWeightG, long maxVolumeCm3) {
+    }
+
+    /**
+     * Every bin of the warehouse for putaway, nearest first. Distance is from the middle of the receiving zone
+     * (where received goods wait) to the bin's rack, in a straight line; with no receiving zone, from the floor's
+     * top-left corner. ponytail: straight-line, not walking distance around racks; good enough to rank bins.
+     */
+    @Transactional(readOnly = true)
+    public List<Candidate> putawayCandidates(CurrentUser cu, long warehouseId) {
+        warehouses.requireAccess(cu, warehouseId);
+        long[] origin = receivingPoint(warehouseId);
+        return bins.placedBins(warehouseId).stream()
+                .map(b -> new Candidate(b.getId(), b.getPublicId(), b.getCode(), b.getZoneType().name(), b.getLevelNo(),
+                        Math.round(Math.hypot(b.getX() - origin[0], b.getY() - origin[1])), b.getBlocked(), b.getMaxWeightG(),
+                        b.getMaxVolumeCm3()))
+                .sorted(java.util.Comparator.comparingLong(Candidate::distanceMm).thenComparingInt(Candidate::level)
+                        .thenComparing(Candidate::code))
+                .toList();
+    }
+
+    private long[] receivingPoint(long warehouseId) {
+        for (lk.wms.layout.domain.Zone z : zones.findByWarehouseId(warehouseId)) {
+            if (z.getType() == lk.wms.layout.domain.Zone.Type.RECEIVING) {
+                var points = json.readTree(z.getPolygon());
+                long sx = 0;
+                long sy = 0;
+                for (var p : points) {
+                    sx += p.get("x").asLong();
+                    sy += p.get("y").asLong();
+                }
+                return points.isEmpty() ? new long[] {0, 0} : new long[] {sx / points.size(), sy / points.size()};
+            }
+        }
+        return new long[] {0, 0};
     }
 
     private static BinRef ref(Bin b) {

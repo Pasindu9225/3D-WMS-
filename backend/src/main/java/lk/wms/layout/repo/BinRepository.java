@@ -20,6 +20,36 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
 
     Optional<Bin> findByWarehouseIdAndCode(long warehouseId, String code);
 
+    /** Every bin of a warehouse with where it stands: for putaway suggestions. */
+    interface PlacedBin {
+        Long getId();
+
+        String getPublicId();
+
+        String getCode();
+
+        Boolean getBlocked();
+
+        Long getMaxWeightG();
+
+        Long getMaxVolumeCm3();
+
+        Short getLevelNo();
+
+        Integer getX();
+
+        Integer getY();
+
+        lk.wms.layout.domain.Zone.Type getZoneType();
+    }
+
+    @Query("""
+            select b.id as id, b.publicId as publicId, b.code as code, b.blocked as blocked, b.maxWeightG as maxWeightG,
+                   b.maxVolumeCm3 as maxVolumeCm3, l.levelNo as levelNo, r.posXMm as x, r.posYMm as y, z.type as zoneType
+            from Bin b, lk.wms.layout.domain.RackLevel l, lk.wms.layout.domain.Rack r, lk.wms.layout.domain.Zone z
+            where b.levelId = l.id and l.rackId = r.id and r.zoneId = z.id and b.warehouseId = :warehouseId""")
+    List<PlacedBin> placedBins(@Param("warehouseId") long warehouseId);
+
     /** Stock moving into a bin locks it first, so two workers cannot both fill its last space. */
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select b from Bin b where b.id = :id")

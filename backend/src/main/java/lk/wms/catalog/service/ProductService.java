@@ -170,6 +170,30 @@ public class ProductService {
         return out;
     }
 
+    /** A product as stock screens show it. Ids are internal, for other modules' services only. */
+    public record Basic(long id, String publicId, String sku, String name, String baseUom) {
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, Basic> basics(java.util.Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return java.util.Map.of();
+        }
+        java.util.Map<Long, Basic> out = new java.util.HashMap<>();
+        products.withIds(productIds).forEach(p -> out.put(p.getId(), basic(p)));
+        return out;
+    }
+
+    /** A live product by public id, else 404. */
+    @Transactional(readOnly = true)
+    public Basic basic(String publicId) {
+        return basic(find(publicId));
+    }
+
+    private static Basic basic(Product p) {
+        return new Basic(p.getId(), p.getPublicId(), p.getSku(), p.getName(), p.getBaseUom());
+    }
+
     public record OrderProduct(long id, String publicId, String sku, String name, String baseUom, Long costMinor,
             java.util.Map<String, Integer> factors) {
     }

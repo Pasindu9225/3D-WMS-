@@ -50,8 +50,18 @@ public class StockMovementService {
      * (adjustment down, shipping). batchNo / expiry identify the lot and must match on both sides.
      */
     public record Move(Kind type, long warehouseId, long productId, String batchNo, LocalDate expiry,
-            Place from, Place to, BigDecimal qty, String reason, String refType, Long refId, long userId) {
+            Place from, Place to, BigDecimal qty, String reason, String refType, Long refId, long userId,
+            String clientRef) {
+
+        /** A move the server makes itself (no phone retry to guard against). */
+        public Move(Kind type, long warehouseId, long productId, String batchNo, LocalDate expiry, Place from, Place to,
+                BigDecimal qty, String reason, String refType, Long refId, long userId) {
+            this(type, warehouseId, productId, batchNo, expiry, from, to, qty, reason, refType, refId, userId, null);
+        }
     }
+
+    /** What move() did: MOVED, or ALREADY_DONE for a retried Idempotency-Key. */
+    public enum Outcome { MOVED, ALREADY_DONE }
 
     private final StockRepository stock;
     private final StockMovementRepository ledger;
@@ -66,7 +76,10 @@ public class StockMovementService {
     }
 
     @Transactional
-    public void move(Move m) {
+    public Outcome move(Move m) {
+        if (m.clientRef() != null && ledger.existsByClientRef(m.clientRef())) {
+            return Outcome.ALREADY_DONE;
+        }
         if (m.from() == null && m.to() == null) {
             throw new IllegalArgumentException("a move needs a from or a to");
         }
@@ -138,7 +151,14 @@ public class StockMovementService {
         ledger.save(new StockMovement(StockMovement.Type.valueOf(m.type().name()), m.warehouseId(), m.productId(), batch, m.expiry(),
                 m.from() == null ? null : m.from().binId(), m.from() != null && m.from().receiving(),
                 m.to() == null ? null : m.to().binId(), m.to() != null && m.to().receiving(), qty,
-                blankToNull(m.reason()), m.refType(), m.refId(), m.userId()));
+                blankToNull(m.reason()), m.refType(), m.refId(), m.clientRef(), m.userId()));
+        try {
+            ledger.flush();
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // the same key arrived twice at once: the other request made the move
+            throw new ApiException(HttpStatus.CONFLICT, "ALREADY_DONE", "This was just done; reload to see it");
+        }
+        return Outcome.MOVED;
     }
 
     /**
