@@ -28,6 +28,12 @@ public class TenantService {
         return tenants.lockMaxWarehouses(tenantId).orElseThrow();
     }
 
+    /** Stock adjustments worth more than this (cents) need a manager's approval (default LKR 10,000). */
+    @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
+    public long adjustApprovalLimit(long tenantId) {
+        return tenants.findAdjustApprovalMinor(tenantId).orElse(1_000_000L);
+    }
+
     /** F8: a suspended (or unknown) company cannot sign in, refresh or use a live session. */
     @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
     public boolean isActive(long tenantId) {

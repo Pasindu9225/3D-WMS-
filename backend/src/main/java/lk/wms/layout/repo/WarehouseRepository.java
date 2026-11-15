@@ -36,6 +36,9 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Long> {
     @Query("select count(w) from Warehouse w")
     long countActive();
 
+    @Query("select w.code from Warehouse w where w.id = :id")
+    Optional<String> codeOf(@Param("id") long id);
+
     /** Public id for internal id (a query, so the tenant filter applies). */
     @Query("select w.publicId from Warehouse w where w.id = :id")
     Optional<String> publicIdOf(@Param("id") long id);

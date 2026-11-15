@@ -171,7 +171,7 @@ public class ProductService {
     }
 
     /** A product as stock screens show it. Ids are internal, for other modules' services only. */
-    public record Basic(long id, String publicId, String sku, String name, String baseUom) {
+    public record Basic(long id, String publicId, String sku, String name, String baseUom, Long costMinor) {
     }
 
     @Transactional(readOnly = true)
@@ -191,7 +191,7 @@ public class ProductService {
     }
 
     private static Basic basic(Product p) {
-        return new Basic(p.getId(), p.getPublicId(), p.getSku(), p.getName(), p.getBaseUom());
+        return new Basic(p.getId(), p.getPublicId(), p.getSku(), p.getName(), p.getBaseUom(), p.getCostMinor());
     }
 
     public record OrderProduct(long id, String publicId, String sku, String name, String baseUom, Long costMinor,

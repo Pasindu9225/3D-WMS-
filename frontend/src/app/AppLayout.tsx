@@ -1,4 +1,4 @@
-import { ArrowDownToLine, Barcode, Boxes, FileText, PackageCheck, Truck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
+import { ArrowDownToLine, ArrowLeftRight, Barcode, Scale, Boxes, FileText, PackageCheck, Truck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
 import { useState, type ComponentType } from 'react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -32,6 +32,8 @@ const NAV: NavItem[] = [
   { to: '/app/purchase-orders', label: 'nav.purchaseOrders', icon: FileText, permission: 'inbound:read' },
   { to: '/app/receive', label: 'nav.receive', icon: PackageCheck, permission: 'inbound:receive' },
   { to: '/app/putaway', label: 'nav.putaway', icon: ArrowDownToLine, permission: 'putaway:execute' },
+  { to: '/app/move', label: 'nav.move', icon: ArrowLeftRight, permission: 'inventory:transfer' },
+  { to: '/app/adjustments', label: 'nav.adjustments', icon: Scale, permission: 'inventory:read' },
   { to: '/app/stock', label: 'nav.stock', icon: Package, soon: true },
   { to: '/app/users', label: 'nav.users', icon: Users, permission: 'users:read' },
   { to: '/app/roles', label: 'nav.roles', icon: ShieldCheck, permission: 'roles:read' },

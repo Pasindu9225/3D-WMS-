@@ -68,3 +68,100 @@ export function usePutaway() {
     },
   })
 }
+
+export interface Moved {
+  fromBin: string | null
+  toBin: string
+  sku: string
+  qty: number
+  batchNo: string | null
+  expiryDate: string | null
+  alreadyDone: boolean
+}
+
+export interface TransferInput {
+  warehouseId: string
+  productId: string
+  qty: number
+  fromBin?: string
+  toBin: string
+  batchNo?: string
+  expiryDate?: string
+}
+
+/** Bin-to-bin move. key: one per move, repeated on a retry so it counts once. */
+export function useTransfer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ key, ...body }: TransferInput & { key: string }) =>
+      api<Moved>('/transfers', { method: 'POST', body, headers: { 'Idempotency-Key': key } }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['putaway'] }),
+  })
+}
+
+export type AdjustmentStatus = 'PENDING' | 'APPLIED' | 'REJECTED'
+export type AdjustmentReason = 'DAMAGED' | 'LOST' | 'FOUND' | 'EXPIRED' | 'COUNT_CORRECTION' | 'OTHER'
+export const REASONS: AdjustmentReason[] = ['DAMAGED', 'LOST', 'FOUND', 'EXPIRED', 'COUNT_CORRECTION', 'OTHER']
+
+export interface Adjustment {
+  id: string
+  number: string
+  status: AdjustmentStatus
+  warehouseCode: string | null
+  binCode: string | null
+  sku: string
+  productName: string
+  baseUom: string
+  batchNo: string | null
+  expiryDate: string | null
+  direction: 'IN' | 'OUT'
+  qty: number
+  reason: AdjustmentReason
+  note: string | null
+  /** Cents; null when the product has no cost. */
+  valueMinor: number | null
+  requestedBy: string | null
+  requestedAt: string
+  decidedBy: string | null
+  decidedAt: string | null
+  decisionNote: string | null
+  version: number
+}
+
+export interface AdjustmentInput {
+  warehouseId: string
+  binCode?: string
+  productId: string
+  direction: 'IN' | 'OUT'
+  qty: number
+  reason: AdjustmentReason
+  note?: string
+  batchNo?: string
+  expiryDate?: string
+}
+
+export function useAdjustments(status: AdjustmentStatus | '', page: number) {
+  const params = new URLSearchParams({ page: String(page), size: '25' })
+  if (status) params.set('status', status)
+  return useQuery({
+    queryKey: ['adjustments', status, page],
+    queryFn: () => api<Page<Adjustment>>(`/adjustments?${params}`),
+  })
+}
+
+/** Ask for an adjustment, approve or reject one. Every answer is the adjustment as it now stands. */
+export function useAdjustmentAction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (a: { kind: 'request'; key: string; body: AdjustmentInput }
+      | { kind: 'approve'; id: string; version: number } | { kind: 'reject'; id: string; version: number; note: string }) => {
+      if (a.kind === 'request') return api<Adjustment>('/adjustments', { method: 'POST', body: a.body, headers: { 'Idempotency-Key': a.key } })
+      const body = a.kind === 'reject' ? { version: a.version, note: a.note } : { version: a.version }
+      return api<Adjustment>(`/adjustments/${a.id}/${a.kind}`, { method: 'POST', body })
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['adjustments'] })
+      void qc.invalidateQueries({ queryKey: ['putaway'] })
+    },
+  })
+}

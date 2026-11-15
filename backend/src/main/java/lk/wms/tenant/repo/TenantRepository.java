@@ -10,6 +10,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface TenantRepository extends JpaRepository<Tenant, Long> {
 
+    @Query("select t.adjustApprovalMinor from Tenant t where t.id = :id")
+    Optional<Long> findAdjustApprovalMinor(@Param("id") long id);
+
     @Query("select t.status from Tenant t where t.id = :id")
     Optional<Tenant.Status> findStatus(@Param("id") long id);
 

@@ -44,6 +44,9 @@ public class Tenant {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "adjust_approval_minor", nullable = false)
+    private long adjustApprovalMinor = 1_000_000;
+
     protected Tenant() {
     }
 

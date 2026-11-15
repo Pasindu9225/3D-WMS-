@@ -86,6 +86,12 @@ public class WarehouseService {
         return warehouses.publicIdOf(warehouseId).orElse(null);
     }
 
+    /** Code of a warehouse, or null once it is archived. */
+    @Transactional(readOnly = true)
+    public String codeOf(long warehouseId) {
+        return warehouses.codeOf(warehouseId).orElse(null);
+    }
+
     /** Warehouses this user may work in, or null for a company admin (all of them). For filtering lists. */
     @Transactional(readOnly = true)
     public List<Long> assignedIds(CurrentUser cu) {

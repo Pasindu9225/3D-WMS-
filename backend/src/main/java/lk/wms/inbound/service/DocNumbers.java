@@ -9,15 +9,15 @@ import org.springframework.stereotype.Component;
  * document: the counter row stays locked until commit, so numbers never repeat (a rolled-back document leaves a gap).
  */
 @Component
-class DocNumbers {
+public class DocNumbers {
 
     private final DocCounterRepository counters;
 
-    DocNumbers(DocCounterRepository counters) {
+    public DocNumbers(DocCounterRepository counters) {
         this.counters = counters;
     }
 
-    String next(CurrentUser cu, String kind) {
+    public String next(CurrentUser cu, String kind) {
         counters.bump(cu.tenantId(), kind);
         return String.format("%s-%06d", kind, counters.taken(kind));
     }

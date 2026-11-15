@@ -39,6 +39,13 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     @Query(value = "SELECT product_id, qty_on_hand FROM stock WHERE bin_id = :binId FOR SHARE", nativeQuery = true)
     List<Object[]> contentsForUpdate(@Param("binId") long binId);
 
+    /** The lots of a product in one bin (or, with binId null, in the receiving area), oldest first. */
+    @Query("""
+            select s from Stock s where s.warehouseId = :warehouseId and s.productId = :productId and s.qtyOnHand > 0
+              and ((:binId is null and s.binId is null) or s.binId = :binId)
+            order by s.receivedAt, s.id""")
+    List<Stock> lots(@Param("warehouseId") long warehouseId, @Param("binId") Long binId, @Param("productId") long productId);
+
     /** Goods received but not yet put away in one warehouse, oldest first. */
     @Query("select s from Stock s where s.warehouseId = :warehouseId and s.binId is null and s.qtyOnHand > 0 order by s.receivedAt, s.id")
     org.springframework.data.domain.Page<Stock> awaitingPutaway(@Param("warehouseId") long warehouseId,
