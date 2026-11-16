@@ -35,7 +35,7 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-61** (v0.1): Security headers — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-62** (v0.1): CORS allow-list, no wildcard — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [x] **SEC-63** (v0.1): Global exception handler: generic errors, no stack traces — task 2, ErrorHandlingTest
-- [x] **SEC-64** (v0.1): Hide server information — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
+- [x] **SEC-64** (v0.1): Hide server information — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit; v1.0: Actuator on a localhost-only port in prod, no Swagger (ProductionProfileTest, NoSwaggerTest)
 - [x] **SEC-65** (v0.1): Request limits — task 5, SecurityHardeningTest/RateLimitTest/ArchUnit
 - [ ] **SEC-66** (v1.0): HTTPS everywhere
 - [x] **SEC-67** (v0.1): Graceful shutdown and 404 for unknown routes — task 2, ErrorHandlingTest
