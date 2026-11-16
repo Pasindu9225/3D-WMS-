@@ -12,7 +12,7 @@ import { useMovements, useProductTotals, useStockRows, type ProductTotal } from 
 type Tab = 'products' | 'bins' | 'movements'
 const TYPES = ['RECEIVE', 'PUTAWAY', 'TRANSFER', 'ADJUST'] as const
 const num = (n: number) => Number(Number(n).toFixed(3)).toLocaleString('en')
-const place = (code: string | null) => (code === 'RECEIVING' ? t('move.receiving') : code ?? '—')
+const place = (code: string | null) => (code === 'RECEIVING' ? t('move.receiving') : code === 'DISPATCH' ? t('stock.dispatch') : code ?? '—')
 
 /** /app/stock: stock by product, by bin, and the movement history of one warehouse. */
 export function StockPage() {
@@ -88,6 +88,7 @@ function ByProduct({ warehouseId, onOpen }: { warehouseId: string | undefined; o
             <Th className="text-right">{t('stock.col.onHand')}</Th>
             <Th className="hidden text-right sm:table-cell">{t('stock.col.reserved')}</Th>
             <Th className="hidden text-right sm:table-cell">{t('stock.col.inReceiving')}</Th>
+            <Th className="hidden text-right md:table-cell">{t('stock.col.inDispatch')}</Th>
             <Th className="hidden text-right sm:table-cell">{t('stock.col.bins')}</Th>
           </tr>
         </thead>
@@ -102,6 +103,7 @@ function ByProduct({ warehouseId, onOpen }: { warehouseId: string | undefined; o
               <td className="text-right tabular-nums">{num(p.onHand)} <span className="text-xs text-muted-foreground">{p.baseUom}</span></td>
               <td className="hidden text-right tabular-nums sm:table-cell">{num(p.reserved)}</td>
               <td className="hidden text-right tabular-nums sm:table-cell">{num(p.inReceiving)}</td>
+              <td className="hidden text-right tabular-nums md:table-cell">{num(p.inDispatch)}</td>
               <td className="hidden text-right tabular-nums sm:table-cell">{p.bins}</td>
             </Tr>
           ))}

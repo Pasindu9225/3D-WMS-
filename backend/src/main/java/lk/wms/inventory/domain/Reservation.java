@@ -70,6 +70,11 @@ public class Reservation extends TenantScoped {
         this.createdAt = Instant.now();
     }
 
+    /** Picked: this much is no longer set aside. */
+    public void reduce(BigDecimal picked) {
+        qty = qty.subtract(picked);
+    }
+
     /** Same stock place (bin, product, batch, expiry) as this stock row. */
     public boolean isAt(Stock s) {
         return binId.equals(s.getBinId()) && productId.equals(s.getProductId())

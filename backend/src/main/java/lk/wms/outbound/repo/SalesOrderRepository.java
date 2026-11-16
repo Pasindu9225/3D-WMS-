@@ -16,6 +16,10 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
     @Query("select distinct o from SalesOrder o left join fetch o.lines where o.publicId = :publicId")
     Optional<SalesOrder> findByPublicId(@Param("publicId") String publicId);
 
+    /** Orders by internal id (pick lists point at them). */
+    @Query("select o from SalesOrder o where o.id in :ids")
+    List<SalesOrder> byInternalIds(@Param("ids") Collection<Long> ids);
+
     /** Customer refs already used, for a CSV import that names several customers. */
     @Query("select o.customerId, o.customerRef from SalesOrder o where o.customerId in :customerIds and o.customerRef in :refs")
     List<Object[]> refsTaken(@Param("customerIds") Collection<Long> customerIds, @Param("refs") Collection<String> refs);

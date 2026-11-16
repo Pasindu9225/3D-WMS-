@@ -154,6 +154,12 @@ public class SalesOrder extends TenantScoped {
         this.releasedAt = Instant.now();
     }
 
+    /** A pick was made: PICKING, or PICKED once the pick list is done. */
+    public void picking(boolean done) {
+        this.status = done ? Status.PICKED : Status.PICKING;
+        this.updatedAt = Instant.now();
+    }
+
     public void cancel(long userId, String reason) {
         this.status = Status.CANCELLED;
         this.cancelledBy = userId;

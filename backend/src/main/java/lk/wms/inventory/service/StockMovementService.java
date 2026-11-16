@@ -34,17 +34,31 @@ public class StockMovementService {
     /** Why stock moves; the public face of the ledger's movement type. */
     public enum Kind { RECEIVE, PUTAWAY, TRANSFER, ADJUST, PICK, SHIP, RETURN, COUNT }
 
-    /** A side of a move: a bin, or the receiving area of the warehouse (bin null). */
-    public record Place(Long binId) {
-        public static final Place RECEIVING = new Place(null);
+    /** A side of a move: a bin, or the receiving or dispatch area of the warehouse (no bin). */
+    public record Place(Long binId, String area) {
+        public static final Place RECEIVING = new Place(null, "RECEIVING");
+        public static final Place DISPATCH = new Place(null, "DISPATCH");
 
         public static Place bin(long binId) {
-            return new Place(binId);
+            return new Place(binId, "BIN");
         }
 
         boolean receiving() {
-            return binId == null;
+            return "RECEIVING".equals(area);
         }
+
+        boolean dispatch() {
+            return "DISPATCH".equals(area);
+        }
+
+        /** Lock order: the two areas first, then bins by id. */
+        long sortKey() {
+            return binId != null ? binId + 2 : receiving() ? 0 : 1;
+        }
+    }
+
+    /** The reservation a pick takes from: its document line. */
+    public record Reserved(String refType, long refId, int line) {
     }
 
     /**
@@ -53,12 +67,18 @@ public class StockMovementService {
      */
     public record Move(Kind type, long warehouseId, long productId, String batchNo, LocalDate expiry,
             Place from, Place to, BigDecimal qty, String reason, String refType, Long refId, long userId,
-            String clientRef) {
+            String clientRef, Reserved reserved) {
+
+        /** A move that takes free stock (not reserved for anyone). */
+        public Move(Kind type, long warehouseId, long productId, String batchNo, LocalDate expiry, Place from, Place to,
+                BigDecimal qty, String reason, String refType, Long refId, long userId, String clientRef) {
+            this(type, warehouseId, productId, batchNo, expiry, from, to, qty, reason, refType, refId, userId, clientRef, null);
+        }
 
         /** A move the server makes itself (no phone retry to guard against). */
         public Move(Kind type, long warehouseId, long productId, String batchNo, LocalDate expiry, Place from, Place to,
                 BigDecimal qty, String reason, String refType, Long refId, long userId) {
-            this(type, warehouseId, productId, batchNo, expiry, from, to, qty, reason, refType, refId, userId, null);
+            this(type, warehouseId, productId, batchNo, expiry, from, to, qty, reason, refType, refId, userId, null, null);
         }
     }
 
@@ -114,7 +134,7 @@ public class StockMovementService {
 
         // 1. The target bin first (one global order: bin, then stock rows).
         BinService.BinRef bin = null;
-        if (m.to() != null && !m.to().receiving()) {
+        if (m.to() != null && m.to().binId() != null) {
             bin = bins.lockForStock(m.to().binId());
             if (bin.warehouseId() != m.warehouseId()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "BIN_OTHER_WAREHOUSE", "That bin is in another warehouse");
@@ -132,13 +152,13 @@ public class StockMovementService {
         if (m.to() != null) {
             sides.add(m.to());
         }
-        sides.sort(Comparator.comparing((Place p) -> p.binId() == null ? 0L : p.binId()));
+        sides.sort(Comparator.comparingLong(Place::sortKey));
         Instant now = Instant.now();
         Stock from = null;
         Stock to = null;
         for (Place p : sides) {
-            stock.ensure(tenantId, m.warehouseId(), p.binId(), m.productId(), batch, m.expiry(), now);
-            Stock row = stock.lockPlace(tenantId, m.warehouseId(), p.binId(), m.productId(), batch, m.expiry()).orElseThrow();
+            stock.ensure(tenantId, m.warehouseId(), p.binId(), p.area(), m.productId(), batch, m.expiry(), now);
+            Stock row = stock.lockPlace(tenantId, m.warehouseId(), p.binId(), p.area(), m.productId(), batch, m.expiry()).orElseThrow();
             if (p.equals(m.from())) {
                 from = row;
             } else {
@@ -146,7 +166,10 @@ public class StockMovementService {
             }
         }
 
-        // 3. Enough to take?
+        // 3. Enough to take? A pick first hands back the units its own line had set aside here.
+        if (from != null && m.reserved() != null) {
+            takeFromReservation(m.reserved(), from, qty);
+        }
         if (from != null) {
             if (from.available().compareTo(qty) < 0) {
                 throw new ApiException(HttpStatus.CONFLICT, "NOT_ENOUGH_STOCK", "Only "
@@ -168,8 +191,8 @@ public class StockMovementService {
 
         // 5. The ledger line.
         ledger.save(new StockMovement(StockMovement.Type.valueOf(m.type().name()), m.warehouseId(), m.productId(), batch, m.expiry(),
-                m.from() == null ? null : m.from().binId(), m.from() != null && m.from().receiving(),
-                m.to() == null ? null : m.to().binId(), m.to() != null && m.to().receiving(), qty,
+                m.from() == null ? null : m.from().binId(), m.from() != null && m.from().receiving(), m.from() != null && m.from().dispatch(),
+                m.to() == null ? null : m.to().binId(), m.to() != null && m.to().receiving(), m.to() != null && m.to().dispatch(), qty,
                 blankToNull(m.reason()), m.refType(), m.refId(), m.clientRef(), m.userId()));
         try {
             ledger.flush();
@@ -281,12 +304,67 @@ public class StockMovementService {
         List<Reservation> sorted = new ArrayList<>(held);
         sorted.sort(Comparator.comparing(Reservation::getBinId));
         for (Reservation r : sorted) {
-            stock.lockPlace(tenantId, r.getWarehouseId(), r.getBinId(), r.getProductId(), r.getBatchNo(), r.getExpiryDate())
+            stock.lockPlace(tenantId, r.getWarehouseId(), r.getBinId(), "BIN", r.getProductId(), r.getBatchNo(), r.getExpiryDate())
                     .ifPresent(s -> s.unreserve(r.getQty()));
         }
         reservations.deleteAll(held);
         stock.flush();
         events.publishEvent(new StockChanged(held.get(0).getWarehouseId()));
+    }
+
+    /** True when a move with this Idempotency-Key is already in the ledger (a phone retried). */
+    @Transactional(readOnly = true)
+    public boolean isDone(String clientRef) {
+        return ledger.existsByClientRef(clientRef);
+    }
+
+    /**
+     * Frees what one document line still has set aside in one place (a short pick). The stock rows are locked in
+     * bin order. Returns how much was freed.
+     */
+    @Transactional
+    public BigDecimal unreservePlace(String refType, long refId, int line, long binId, String batchNo, LocalDate expiry) {
+        List<Reservation> held = new ArrayList<>(reservations.findByRefTypeAndRefIdOrderByRefLineAscIdAsc(refType, refId).stream()
+                .filter(r -> r.getRefLine() == line && r.getBinId() == binId && java.util.Objects.equals(r.getBatchNo(), batchNo)
+                        && java.util.Objects.equals(r.getExpiryDate(), expiry)).toList());
+        if (held.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        long tenantId = TenantContext.require();
+        held.sort(Comparator.comparing(Reservation::getBinId));
+        BigDecimal freed = BigDecimal.ZERO;
+        for (Reservation r : held) {
+            stock.lockPlace(tenantId, r.getWarehouseId(), r.getBinId(), "BIN", r.getProductId(), r.getBatchNo(), r.getExpiryDate())
+                    .ifPresent(s -> s.unreserve(r.getQty()));
+            freed = freed.add(r.getQty());
+        }
+        reservations.deleteAll(held);
+        stock.flush();
+        events.publishEvent(new StockChanged(held.get(0).getWarehouseId()));
+        return freed;
+    }
+
+    /** A pick takes units its line reserved in this place: they stop being reserved, then leave like any move. */
+    private void takeFromReservation(Reserved ref, Stock from, BigDecimal qty) {
+        List<Reservation> held = reservations.findByRefTypeAndRefIdOrderByRefLineAscIdAsc(ref.refType(), ref.refId()).stream()
+                .filter(r -> r.getRefLine() == ref.line() && r.isAt(from)).toList();
+        BigDecimal reserved = held.stream().map(Reservation::getQty).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (reserved.compareTo(qty) < 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "OVER_PICK", "Only " + plain(reserved) + " left to pick here");
+        }
+        BigDecimal left = qty;
+        for (Reservation r : held) {
+            BigDecimal take = left.min(r.getQty());
+            r.reduce(take);
+            if (r.getQty().signum() == 0) {
+                reservations.delete(r);
+            }
+            left = left.subtract(take);
+            if (left.signum() == 0) {
+                break;
+            }
+        }
+        from.unreserve(qty);
     }
 
     /** What a document has set aside, line by line. */

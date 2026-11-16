@@ -33,7 +33,7 @@ public class StockService {
     }
 
     public record ProductTotal(String productId, String sku, String name, String baseUom, BigDecimal onHand,
-            BigDecimal inReceiving, long bins, BigDecimal reserved) {
+            BigDecimal inReceiving, long bins, BigDecimal reserved, BigDecimal inDispatch) {
     }
 
     public record MovementRow(long id, String type, String sku, String name, String baseUom, String batchNo,
@@ -47,6 +47,7 @@ public class StockService {
 
     /** Shown for the receiving area wherever a bin code would be. */
     public static final String RECEIVING = "RECEIVING";
+    public static final String DISPATCH = "DISPATCH";
 
     private final StockRepository stock;
     private final StockMovementRepository ledger;
@@ -96,7 +97,7 @@ public class StockService {
             ProductService.Basic p = names.get(s.getProductId());
             BinService.BinLabel b = s.getBinId() == null ? null : labels.get(s.getBinId());
             return new StockRow(p == null ? null : p.publicId(), p == null ? "?" : p.sku(), p == null ? "" : p.name(),
-                    p == null ? "" : p.baseUom(), b == null ? null : b.publicId(), b == null ? RECEIVING : b.code(),
+                    p == null ? "" : p.baseUom(), b == null ? null : b.publicId(), b == null ? s.getArea() : b.code(),
                     s.getBatchNo(), s.getExpiryDate(), s.getQtyOnHand(), s.getQtyReserved(), s.getReceivedAt());
         });
     }
@@ -113,7 +114,7 @@ public class StockService {
         return page.map(r -> {
             ProductService.Basic p = names.get(((Number) r[0]).longValue());
             return new ProductTotal(p == null ? null : p.publicId(), p == null ? "?" : p.sku(), p == null ? "" : p.name(),
-                    p == null ? "" : p.baseUom(), (BigDecimal) r[1], (BigDecimal) r[2], ((Number) r[3]).longValue(), (BigDecimal) r[4]);
+                    p == null ? "" : p.baseUom(), (BigDecimal) r[1], (BigDecimal) r[2], ((Number) r[3]).longValue(), (BigDecimal) r[4], (BigDecimal) r[5]);
         });
     }
 
@@ -148,7 +149,8 @@ public class StockService {
             UserService.UserView u = people.get(m.getUserId());
             return new MovementRow(m.getId(), m.getType().name(), p == null ? "?" : p.sku(), p == null ? "" : p.name(),
                     p == null ? "" : p.baseUom(), m.getBatchNo(), m.getExpiryDate(),
-                    side(m.getFromBinId(), m.isFromReceiving(), labels), side(m.getToBinId(), m.isToReceiving(), labels),
+                    side(m.getFromBinId(), m.isFromReceiving(), m.isFromDispatch(), labels),
+                    side(m.getToBinId(), m.isToReceiving(), m.isToDispatch(), labels),
                     m.getQty(), m.getReason(), m.getRefType(), u == null ? null : u.fullName(), m.getCreatedAt());
         });
     }
@@ -171,11 +173,11 @@ public class StockService {
         return out;
     }
 
-    private static String side(Long binId, boolean receiving, Map<Long, BinService.BinLabel> labels) {
+    private static String side(Long binId, boolean receiving, boolean dispatch, Map<Long, BinService.BinLabel> labels) {
         if (binId != null) {
             BinService.BinLabel b = labels.get(binId);
             return b == null ? "?" : b.code();
         }
-        return receiving ? RECEIVING : null;
+        return receiving ? RECEIVING : dispatch ? DISPATCH : null;
     }
 }

@@ -20,19 +20,19 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
      * row is write-locked until commit. Gives every movement a row to lock, in a fixed order, before it changes.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = false)
-    @Query(value = "INSERT INTO stock (tenant_id, warehouse_id, bin_id, product_id, batch_no, expiry_date, qty_on_hand,"
-            + " qty_reserved, received_at) VALUES (:tenantId, :warehouseId, :binId, :productId, :batchNo, :expiry, 0, 0, :now)"
+    @Query(value = "INSERT INTO stock (tenant_id, warehouse_id, bin_id, area, product_id, batch_no, expiry_date, qty_on_hand,"
+            + " qty_reserved, received_at) VALUES (:tenantId, :warehouseId, :binId, :area, :productId, :batchNo, :expiry, 0, 0, :now)"
             + " ON DUPLICATE KEY UPDATE qty_on_hand = qty_on_hand", nativeQuery = true)
     int ensure(@Param("tenantId") long tenantId, @Param("warehouseId") long warehouseId, @Param("binId") Long binId,
-            @Param("productId") long productId, @Param("batchNo") String batchNo, @Param("expiry") LocalDate expiry,
+            @Param("area") String area, @Param("productId") long productId, @Param("batchNo") String batchNo, @Param("expiry") LocalDate expiry,
             @Param("now") Instant now);
 
     /** The row for one place, product, batch and expiry, write-locked (the unique key's stand-in columns find it). */
     @Query(value = "SELECT * FROM stock WHERE tenant_id = :tenantId AND warehouse_id = :warehouseId"
-            + " AND bin_key = IFNULL(:binId, 0) AND product_id = :productId AND batch_key = IFNULL(:batchNo, '')"
+            + " AND bin_key = IFNULL(:binId, 0) AND area = :area AND product_id = :productId AND batch_key = IFNULL(:batchNo, '')"
             + " AND expiry_key = IFNULL(:expiry, DATE '1000-01-01') FOR UPDATE", nativeQuery = true)
     Optional<Stock> lockPlace(@Param("tenantId") long tenantId, @Param("warehouseId") long warehouseId,
-            @Param("binId") Long binId, @Param("productId") long productId, @Param("batchNo") String batchNo,
+            @Param("binId") Long binId, @Param("area") String area, @Param("productId") long productId, @Param("batchNo") String batchNo,
             @Param("expiry") LocalDate expiry);
 
     /**
@@ -55,7 +55,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     /** The lots of a product in one bin (or, with binId null, in the receiving area), oldest first. */
     @Query("""
             select s from Stock s where s.warehouseId = :warehouseId and s.productId = :productId and s.qtyOnHand > 0
-              and ((:binId is null and s.binId is null) or s.binId = :binId)
+              and ((:binId is null and s.area = 'RECEIVING') or s.binId = :binId)
             order by s.receivedAt, s.id""")
     List<Stock> lots(@Param("warehouseId") long warehouseId, @Param("binId") Long binId, @Param("productId") long productId);
 
@@ -63,16 +63,16 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     @Query("""
             select s from Stock s
             where s.warehouseId = :warehouseId and s.qtyOnHand > 0 and (:productId is null or s.productId = :productId)
-              and (:anyBin = true or s.binId in :binIds) and (:receivingOnly = false or s.binId is null)
+              and (:anyBin = true or s.binId in :binIds) and (:receivingOnly = false or s.area = 'RECEIVING')
             order by s.productId, s.binId, s.receivedAt""")
     org.springframework.data.domain.Page<Stock> search(@Param("warehouseId") long warehouseId, @Param("productId") Long productId,
             @Param("anyBin") boolean anyBin, @Param("binIds") Collection<Long> binIds, @Param("receivingOnly") boolean receivingOnly,
             org.springframework.data.domain.Pageable pageable);
 
-    /** Totals per product: [product_id, on hand, in receiving, bins, reserved]. */
+    /** Totals per product: [product_id, on hand, in receiving, bins, reserved, in dispatch]. */
     @Query(value = """
-            select s.productId, sum(s.qtyOnHand), sum(case when s.binId is null then s.qtyOnHand else 0 end), count(distinct s.binId),
-                   sum(s.qtyReserved)
+            select s.productId, sum(s.qtyOnHand), sum(case when s.area = 'RECEIVING' then s.qtyOnHand else 0 end), count(distinct s.binId),
+                   sum(s.qtyReserved), sum(case when s.area = 'DISPATCH' then s.qtyOnHand else 0 end)
             from Stock s where s.warehouseId = :warehouseId and s.qtyOnHand > 0 and (:anyProduct = true or s.productId in :productIds)
             group by s.productId order by s.productId""",
             countQuery = """
@@ -87,7 +87,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     List<Object[]> binContents(@Param("warehouseId") long warehouseId);
 
     /** Goods received but not yet put away in one warehouse, oldest first. */
-    @Query("select s from Stock s where s.warehouseId = :warehouseId and s.binId is null and s.qtyOnHand > 0 order by s.receivedAt, s.id")
+    @Query("select s from Stock s where s.warehouseId = :warehouseId and s.area = 'RECEIVING' and s.qtyOnHand > 0 order by s.receivedAt, s.id")
     org.springframework.data.domain.Page<Stock> awaitingPutaway(@Param("warehouseId") long warehouseId,
             org.springframework.data.domain.Pageable pageable);
 

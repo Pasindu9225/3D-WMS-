@@ -191,6 +191,8 @@ export interface ProductTotal {
   bins: number
   /** Set aside for released sales orders. */
   reserved: number
+  /** Picked and waiting to be shipped. */
+  inDispatch: number
 }
 
 export interface MovementRow {

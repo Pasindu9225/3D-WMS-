@@ -72,7 +72,7 @@ public class SalesOrderService {
     public record Detail(String id, String number, String status, String customerCode, String customerName,
             String customerRef, String warehouseId, String warehouseCode, String shipTo, LocalDate requestedDate,
             String note, Instant createdAt, Instant releasedAt, Instant cancelledAt, String cancelReason, List<LineView> lines,
-            List<ReservedView> reserved, int version) {
+            List<ReservedView> reserved, PickService.Detail pick, int version) {
     }
 
     static final String KIND = "SO";
@@ -86,10 +86,13 @@ public class SalesOrderService {
     private final WarehouseService warehouses;
     private final AuditService audit;
     private final StockMovementService stock;
+    private final PickService picks;
 
     public SalesOrderService(SalesOrderRepository orders, DocNumbers numbers, PartnerService partners,
-            ProductService products, WarehouseService warehouses, AuditService audit, StockMovementService stock) {
+            ProductService products, WarehouseService warehouses, AuditService audit, StockMovementService stock,
+            PickService picks) {
         this.stock = stock;
+        this.picks = picks;
         this.orders = orders;
         this.numbers = numbers;
         this.partners = partners;
@@ -148,6 +151,10 @@ public class SalesOrderService {
         List<Need> needs = o.getLines().stream().map(l -> new Need(l.getLineNo(), l.getProductId(), l.orderedBase(),
                 l.getSku() + " (" + baseUom.getOrDefault(l.getProductId(), l.getUom()) + ")")).toList();
         List<Allocation> got = stock.reserve(o.getWarehouseId(), REF, o.getId(), needs, cu.userId());
+        Map<Integer, PickService.LineInfo> info = new HashMap<>();
+        o.getLines().forEach(l -> info.put(l.getLineNo(), new PickService.LineInfo(l.getSku(), l.getProductName(),
+                baseUom.getOrDefault(l.getProductId(), l.getUom()))));
+        picks.createFor(cu, o, got, info);
         o.release(cu.userId());
         orders.flush(); // version check: a second release of the same version fails here and rolls back its reservations
         audit.record(cu.tenantId(), cu.userId(), "SO_RELEASED", "sales_order", o.getPublicId(), null,
@@ -163,6 +170,7 @@ public class SalesOrderService {
             throw new ApiException(HttpStatus.CONFLICT, "SO_CANNOT_CANCEL", "Only a draft or released order can be cancelled");
         }
         if (o.getStatus() == Status.RELEASED) {
+            picks.dropFor(o); // refuses when picking has already begun
             stock.unreserve(REF, o.getId());
         }
         o.cancel(cu.userId(), reason.trim());
@@ -325,6 +333,6 @@ public class SalesOrderService {
         return new Detail(o.getPublicId(), o.getNumber(), o.getStatus().name(), o.getCustomerCode(), o.getCustomerName(),
                 o.getCustomerRef(), warehouses.publicIdOf(o.getWarehouseId()), o.getWarehouseCode(), o.getShipTo(),
                 o.getRequestedDate(), o.getNote(), o.getCreatedAt(), o.getReleasedAt(), o.getCancelledAt(), o.getCancelReason(),
-                lines, reserved, o.getVersion());
+                lines, reserved, o.getStatus() == Status.DRAFT ? null : picks.forOrder(o), o.getVersion());
     }
 }

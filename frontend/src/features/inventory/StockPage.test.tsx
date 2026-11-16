@@ -13,7 +13,7 @@ beforeEach(() => {
     urls.push(url)
     if (url.startsWith('/api/v1/warehouses')) return Response.json(page([{ id: 'w1', code: 'MAIN', name: 'Main' }]))
     if (url.startsWith('/api/v1/stock/products')) {
-      return Response.json(page([{ productId: 'p1', sku: 'OIL-1L', name: 'Coconut oil', baseUom: 'EA', onHand: 24, inReceiving: 14, bins: 1 }]))
+      return Response.json(page([{ productId: 'p1', sku: 'OIL-1L', name: 'Coconut oil', baseUom: 'EA', onHand: 24, inReceiving: 14, bins: 1, reserved: 0, inDispatch: 0 }]))
     }
     if (url.startsWith('/api/v1/stock?')) {
       return Response.json(page([

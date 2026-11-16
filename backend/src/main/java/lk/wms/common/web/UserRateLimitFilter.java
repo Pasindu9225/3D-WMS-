@@ -41,6 +41,6 @@ public class UserRateLimitFilter extends OncePerRequestFilter {
     static boolean isScan(HttpServletRequest request) {
         String p = request.getRequestURI();
         return ("POST".equals(request.getMethod()) && (p.matches("/api/v1/receipts/[^/]+/lines") || p.equals("/api/v1/putaway")
-                || p.equals("/api/v1/transfers"))) || p.startsWith("/api/v1/products/by-barcode/");
+                || p.equals("/api/v1/transfers") || p.matches("/api/v1/pick-lists/[^/]+/lines/\\d+/confirm"))) || p.startsWith("/api/v1/products/by-barcode/");
     }
 }

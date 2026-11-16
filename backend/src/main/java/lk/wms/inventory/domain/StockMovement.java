@@ -54,6 +54,12 @@ public class StockMovement extends TenantScoped {
     @Column(name = "to_receiving", nullable = false)
     private boolean toReceiving;
 
+    @Column(name = "from_dispatch", nullable = false)
+    private boolean fromDispatch;
+
+    @Column(name = "to_dispatch", nullable = false)
+    private boolean toDispatch;
+
     @Column(nullable = false, precision = 14, scale = 3)
     private BigDecimal qty;
 
@@ -79,8 +85,10 @@ public class StockMovement extends TenantScoped {
     }
 
     public StockMovement(Type type, long warehouseId, long productId, String batchNo, LocalDate expiryDate, Long fromBinId,
-            boolean fromReceiving, Long toBinId, boolean toReceiving, BigDecimal qty, String reason, String refType,
-            Long refId, String clientRef, long userId) {
+            boolean fromReceiving, boolean fromDispatch, Long toBinId, boolean toReceiving, boolean toDispatch, BigDecimal qty,
+            String reason, String refType, Long refId, String clientRef, long userId) {
+        this.fromDispatch = fromDispatch;
+        this.toDispatch = toDispatch;
         this.type = type;
         this.warehouseId = warehouseId;
         this.productId = productId;
@@ -141,6 +149,14 @@ public class StockMovement extends TenantScoped {
 
     public boolean isToReceiving() {
         return toReceiving;
+    }
+
+    public boolean isFromDispatch() {
+        return fromDispatch;
+    }
+
+    public boolean isToDispatch() {
+        return toDispatch;
     }
 
     public String getReason() {

@@ -16,7 +16,7 @@ import type { Page } from '@/features/users/api'
 import { useWarehouses } from '@/features/warehouses/api'
 import { api, ApiError } from '@/lib/api'
 import { errorMessage, fieldErrors } from '@/lib/errors'
-import { t } from '@/lib/i18n'
+import { t, type MessageKey } from '@/lib/i18n'
 import { useSalesOrder, useSoAction, type SalesOrder } from './api'
 import { SoStatusBadge } from './SalesOrdersPage'
 
@@ -119,6 +119,26 @@ function SoView({ so }: { so: SalesOrder }) {
           ))}
         </tbody>
       </Table>
+      {so.pick && (
+        <section className="grid gap-2">
+          <h2 className="text-sm font-medium">{t('so.pickTitle', { number: so.pick.number })} · {t(`pick.status.${so.pick.status}` as MessageKey)}</h2>
+          <Table>
+            <thead>
+              <tr><Th>{t('stock.col.place')}</Th><Th>{t('po.line.product')}</Th><Th className="text-right">{t('so.picked')}</Th></tr>
+            </thead>
+            <tbody>
+              {so.pick.lines.map((l) => (
+                <tr key={l.seq} className="border-t">
+                  <td className="px-3 py-2 font-mono text-sm">{l.binCode}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{l.sku}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{Number(l.qtyPicked)} / {Number(l.qtyToPick)} {l.baseUom}
+                    {l.status === 'SHORT' && <span className="ml-1 text-destructive">{t('pick.short')}</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </section>
+      )}
       {so.reserved.length > 0 && (
         <section className="grid gap-2">
           <h2 className="text-sm font-medium">{t('so.reservedTitle')}</h2>

@@ -47,6 +47,8 @@ export interface SalesOrder {
   lines: SoLine[]
   /** Stock set aside once released: where, which lot, how much (base units). */
   reserved: { lineNo: number; sku: string; binCode: string | null; batchNo: string | null; expiryDate: string | null; qty: number }[]
+  /** The pick list once released (null for drafts). */
+  pick: PickList | null
   version: number
 }
 
@@ -99,6 +101,78 @@ export function useSoAction() {
       void qc.invalidateQueries({ queryKey: ['sales-orders'] })
       void qc.invalidateQueries({ queryKey: ['stock'] })
       void qc.invalidateQueries({ queryKey: ['stock-products'] })
+    },
+  })
+}
+
+export interface PickLineView {
+  seq: number
+  soLineNo: number
+  sku: string
+  productName: string
+  baseUom: string
+  binCode: string
+  batchNo: string | null
+  expiryDate: string | null
+  qtyToPick: number
+  qtyPicked: number
+  status: 'OPEN' | 'PICKED' | 'SHORT'
+  shortReason: string | null
+}
+
+export interface PickList {
+  id: string
+  number: string
+  status: 'OPEN' | 'IN_PROGRESS' | 'DONE'
+  orderId: string
+  orderNumber: string
+  customerName: string
+  warehouseCode: string
+  lines: PickLineView[]
+  openLines: number
+}
+
+export interface PickSummary {
+  id: string
+  number: string
+  status: PickList['status']
+  orderNumber: string
+  customerName: string
+  warehouseCode: string
+  lines: number
+  openLines: number
+}
+
+/** Pick lists not finished yet, oldest first: the picker's to-do list. */
+export function usePickLists(enabled = true) {
+  return useQuery({
+    queryKey: ['pick-lists'],
+    queryFn: () => api<Page<PickSummary>>('/pick-lists?size=50'),
+    enabled,
+  })
+}
+
+export function usePickList(id: string | undefined) {
+  return useQuery({ queryKey: ['pick-list', id], queryFn: () => api<PickList>(`/pick-lists/${id}`), enabled: !!id })
+}
+
+export type ShortReason = 'NOT_THERE' | 'DAMAGED'
+
+/** Confirm (with an Idempotency-Key, so a phone retry moves nothing twice) or close a line short. */
+export function usePickAction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (a: { kind: 'confirm'; id: string; seq: number; key: string; binCode: string; code: string; qty: number }
+      | { kind: 'short'; id: string; seq: number; reason: ShortReason }) =>
+      a.kind === 'confirm'
+        ? api<PickList>(`/pick-lists/${a.id}/lines/${a.seq}/confirm`, {
+          method: 'POST', headers: { 'Idempotency-Key': a.key }, body: { binCode: a.binCode, code: a.code, qty: a.qty },
+        })
+        : api<PickList>(`/pick-lists/${a.id}/lines/${a.seq}/short`, { method: 'POST', body: { reason: a.reason } }),
+    onSuccess: (p) => {
+      qc.setQueryData(['pick-list', p.id], p)
+      void qc.invalidateQueries({ queryKey: ['pick-lists'] })
+      void qc.invalidateQueries({ queryKey: ['sales-order', p.orderId] })
     },
   })
 }

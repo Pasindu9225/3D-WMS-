@@ -55,7 +55,7 @@ export function FindPage() {
           <ul className="divide-y rounded-lg border">
             {productStock.data?.items.map((s, i) => (
               <li key={i} className="flex justify-between px-3 py-2">
-                <span className="font-mono text-sm">{s.binCode === 'RECEIVING' ? t('move.receiving') : s.binCode}</span>
+                <span className="font-mono text-sm">{s.binCode === 'RECEIVING' ? t('move.receiving') : s.binCode === 'DISPATCH' ? t('stock.dispatch') : s.binCode}</span>
                 <span className="tabular-nums">{num(s.qtyOnHand)} {s.baseUom}</span>
               </li>
             ))}

@@ -12,7 +12,7 @@ import java.time.LocalDate;
 import lk.wms.common.tenant.TenantScoped;
 
 /**
- * How much of one product (batch, expiry) is in one place: a bin, or the receiving area when binId is null.
+ * How much of one product (batch, expiry) is in one place: a bin, the receiving area or the dispatch area.
  * Rows are created by StockMovementService's upsert and changed only there, under a row lock (SEC-26).
  */
 @Entity
@@ -28,6 +28,10 @@ public class Stock extends TenantScoped {
 
     @Column(name = "bin_id", updatable = false)
     private Long binId;
+
+    /** BIN, RECEIVING or DISPATCH (the two areas have no bin). */
+    @Column(nullable = false, length = 10, updatable = false)
+    private String area;
 
     @Column(name = "product_id", nullable = false, updatable = false)
     private Long productId;
@@ -87,6 +91,10 @@ public class Stock extends TenantScoped {
 
     public Long getBinId() {
         return binId;
+    }
+
+    public String getArea() {
+        return area;
     }
 
     public Long getProductId() {
