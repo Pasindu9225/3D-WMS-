@@ -74,9 +74,12 @@ export function useProductImage() {
 /** Image URL with a version so a replaced picture is not shown from the browser cache. */
 export const imageUrl = (p: Product) => `/api/v1/products/${p.id}/image?v=${p.version}`
 
+/** Suppliers and customers share one shape and one set of endpoints. */
+export type PartnerKind = 'suppliers' | 'customers'
+
 export interface Supplier {
   id: string
-  type: 'SUPPLIER'
+  type: 'SUPPLIER' | 'CUSTOMER'
   code: string
   name: string
   contactName: string | null
@@ -88,30 +91,30 @@ export interface Supplier {
 
 export type SupplierInput = Pick<Supplier, 'name' | 'contactName' | 'phone' | 'email' | 'address'> & { code?: string; version?: number }
 
-export function useSuppliers(q: string, page: number) {
+export function useSuppliers(q: string, page: number, kind: PartnerKind = 'suppliers') {
   const params = new URLSearchParams({ page: String(page), size: String(PRODUCT_PAGE_SIZE) })
   if (q) params.set('q', q)
   return useQuery({
-    queryKey: ['suppliers', q, page],
-    queryFn: () => api<Page<Supplier>>(`/suppliers?${params}`),
+    queryKey: [kind, q, page],
+    queryFn: () => api<Page<Supplier>>(`/${kind}?${params}`),
     placeholderData: keepPreviousData,
   })
 }
 
-export function useSaveSupplier() {
+export function useSaveSupplier(kind: PartnerKind = 'suppliers') {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, ...body }: SupplierInput & { id?: string }) =>
-      id ? api<Supplier>(`/suppliers/${id}`, { method: 'PUT', body }) : api<Supplier>('/suppliers', { method: 'POST', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+      id ? api<Supplier>(`/${kind}/${id}`, { method: 'PUT', body }) : api<Supplier>(`/${kind}`, { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [kind] }),
   })
 }
 
-export function useArchiveSupplier() {
+export function useArchiveSupplier(kind: PartnerKind = 'suppliers') {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => api<void>(`/suppliers/${id}/archive`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+    mutationFn: (id: string) => api<void>(`/${kind}/${id}/archive`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [kind] }),
   })
 }
 
@@ -123,7 +126,9 @@ export interface ImportResult {
   errors: { row: number; field: string; message: string }[]
 }
 
-export function useImport(what: 'products' | 'suppliers') {
+export type ImportKind = 'products' | PartnerKind | 'sales-orders'
+
+export function useImport(what: ImportKind) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (file: File) => {

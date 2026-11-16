@@ -24,7 +24,10 @@ export const router = createBrowserRouter([
           { path: '3d-perf', lazy: () => import('@/features/view3d/PerfPage').then((m) => ({ Component: m.PerfPage })) },
           { path: '3d', lazy: () => import('@/features/view3d/View3DPage').then((m) => ({ Component: m.View3DIndexPage })) },
           { path: 'warehouses/:id/3d', lazy: () => import('@/features/view3d/View3DPage').then((m) => ({ Component: m.View3DPage })) },
-          { path: 'suppliers', lazy: () => import('@/features/catalog/SuppliersPage').then((m) => ({ Component: m.SuppliersPage })) },
+          { path: 'suppliers', lazy: () => import('@/features/catalog/PartnersPage').then((m) => ({ Component: m.SuppliersPage })) },
+          { path: 'customers', lazy: () => import('@/features/catalog/PartnersPage').then((m) => ({ Component: m.CustomersPage })) },
+          { path: 'sales-orders', lazy: () => import('@/features/outbound/SalesOrdersPage').then((m) => ({ Component: m.SalesOrdersPage })) },
+          { path: 'sales-orders/:id', lazy: () => import('@/features/outbound/SalesOrderPage').then((m) => ({ Component: m.SalesOrderPage })) },
           { path: 'purchase-orders', lazy: () => import('@/features/inbound/PurchaseOrdersPage').then((m) => ({ Component: m.PurchaseOrdersPage })) },
           {
             path: 'purchase-orders/:id',

@@ -13,7 +13,7 @@ public record ImportResult(boolean saved, int created, int updated, List<RowErro
     public record RowError(int row, String field, String message) {
     }
 
-    static ImportResult of(int created, int updated, List<RowError> errors) {
+    public static ImportResult of(int created, int updated, List<RowError> errors) {
         if (errors.isEmpty()) {
             return new ImportResult(true, created, updated, List.of());
         }

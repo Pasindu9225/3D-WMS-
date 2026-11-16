@@ -79,7 +79,15 @@ public class WarehouseService {
         return new WarehouseRef(w.getId(), w.getPublicId(), w.getCode());
     }
 
-    /** Same check by internal ID, for records that point at a warehouse (bins, later stock). */
+    /** Same, by warehouse code (CSV imports name warehouses by code). */
+    @Transactional(readOnly = true)
+    public WarehouseRef requireAccessByCode(CurrentUser cu, String code) {
+        Warehouse w = warehouses.findByCode(code)
+                .filter(found -> cu.isTenantAdmin() || warehouses.isAssigned(found.getId(), cu.userId()))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "WAREHOUSE_NOT_FOUND", "Warehouse " + code + " not found"));
+        return new WarehouseRef(w.getId(), w.getPublicId(), w.getCode());
+    }
+
     /** Public id of a warehouse, or null once it is archived. */
     @Transactional(readOnly = true)
     public String publicIdOf(long warehouseId) {

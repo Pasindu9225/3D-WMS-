@@ -15,6 +15,8 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Long> {
 
     Optional<Warehouse> findByPublicId(String publicId);
 
+    Optional<Warehouse> findByCode(String code);
+
     /** Serialises layout saves and publishes of one warehouse. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select w from Warehouse w where w.publicId = :publicId")

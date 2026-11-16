@@ -9,20 +9,24 @@ import { Field, FormMessage, Input } from '@/components/ui/input'
 import { Pager, Table, Th, Tr } from '@/components/ui/table'
 import { can, useMe } from '@/features/auth/session'
 import { errorMessage, fieldErrors } from '@/lib/errors'
-import { t } from '@/lib/i18n'
+import { t, type MessageKey } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
-import { PRODUCT_PAGE_SIZE, useArchiveSupplier, useSaveSupplier, useSuppliers, type Supplier } from './api'
+import { PRODUCT_PAGE_SIZE, useArchiveSupplier, useSaveSupplier, useSuppliers, type PartnerKind, type Supplier } from './api'
 import { ImportDialog } from './ImportDialog'
 
-/** Suppliers: who the company buys from (purchase orders and receiving use them). */
-export function SuppliersPage() {
+export const SuppliersPage = () => <PartnersPage kind="suppliers" />
+export const CustomersPage = () => <PartnersPage kind="customers" />
+
+/** Suppliers (who the company buys from) or customers (who it ships to): one list, one dialog. */
+function PartnersPage({ kind }: { kind: PartnerKind }) {
+  const k = (key: string) => `${kind}.${key}` as MessageKey
   const me = useMe()
   const manage = can(me.data, 'catalog:manage')
   const [search, setSearch] = useState('')
   const q = useDebounced(search.trim())
   const [page, setPage] = useState(0)
-  const list = useSuppliers(q, page)
-  const archive = useArchiveSupplier()
+  const list = useSuppliers(q, page, kind)
+  const archive = useArchiveSupplier(kind)
   const [editing, setEditing] = useState<Supplier | 'new' | null>(null)
   const [archiving, setArchiving] = useState<Supplier | null>(null)
   const [importing, setImporting] = useState(false)
@@ -32,17 +36,17 @@ export function SuppliersPage() {
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">{t('suppliers.title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('suppliers.hint')}</p>
+          <h1 className="text-2xl font-semibold">{t(k('title'))}</h1>
+          <p className="text-sm text-muted-foreground">{t(k('hint'))}</p>
         </div>
         {manage && (
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setImporting(true)}><FileUp /> {t('import.button')}</Button>
-            <Button onClick={() => setEditing('new')}><Plus /> {t('suppliers.new')}</Button>
+            <Button onClick={() => setEditing('new')}><Plus /> {t(k('new'))}</Button>
           </div>
         )}
       </div>
-      <Input aria-label={t('suppliers.search')} placeholder={t('suppliers.search')} value={search} maxLength={200} className="max-w-sm"
+      <Input aria-label={t(k('search'))} placeholder={t(k('search'))} value={search} maxLength={200} className="max-w-sm"
         onChange={(e) => {
           setSearch(e.target.value)
           setPage(0)
@@ -69,15 +73,15 @@ export function SuppliersPage() {
               <td className="whitespace-nowrap text-right">
                 {manage && (
                   <>
-                    <Button variant="ghost" size="icon" aria-label={t('suppliers.edit', { code: s.code })} onClick={() => setEditing(s)}><Pencil /></Button>
-                    <Button variant="ghost" size="icon" aria-label={t('suppliers.archive', { code: s.code })} onClick={() => setArchiving(s)}><Archive /></Button>
+                    <Button variant="ghost" size="icon" aria-label={t(k('edit'), { code: s.code })} onClick={() => setEditing(s)}><Pencil /></Button>
+                    <Button variant="ghost" size="icon" aria-label={t(k('archive'), { code: s.code })} onClick={() => setArchiving(s)}><Archive /></Button>
                   </>
                 )}
               </td>
             </Tr>
           ))}
           {data && data.items.length === 0 && (
-            <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">{q ? t('suppliers.noMatch') : t('suppliers.empty')}</td></tr>
+            <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">{q ? t(k('noMatch')) : t(k('empty'))}</td></tr>
           )}
         </tbody>
       </Table>
@@ -89,15 +93,15 @@ export function SuppliersPage() {
             range: t('common.pageOf', { from: data.page * data.size + 1, to: data.page * data.size + data.items.length, total: data.total }),
           }} />
       )}
-      {editing && <SupplierDialog supplier={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
-      {importing && <ImportDialog what="suppliers" onClose={() => setImporting(false)} />}
+      {editing && <SupplierDialog kind={kind} supplier={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {importing && <ImportDialog what={kind} onClose={() => setImporting(false)} />}
       {archiving && (
-        <Dialog open onOpenChange={(o) => !o && setArchiving(null)} title={t('suppliers.archiveTitle')}
+        <Dialog open onOpenChange={(o) => !o && setArchiving(null)} title={t(k('archiveTitle'))}
           description={t('suppliers.archiveConfirm', { code: archiving.code })}>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setArchiving(null)}>{t('common.cancel')}</Button>
             <Button variant="destructive" disabled={archive.isPending}
-              onClick={() => archive.mutate(archiving.id, { onSuccess: () => setArchiving(null) })}>{t('suppliers.archiveTitle')}</Button>
+              onClick={() => archive.mutate(archiving.id, { onSuccess: () => setArchiving(null) })}>{t(k('archiveTitle'))}</Button>
           </div>
         </Dialog>
       )}
@@ -115,8 +119,8 @@ const schema = z.object({
 })
 type Values = z.input<typeof schema>
 
-function SupplierDialog({ supplier, onClose }: { supplier: Supplier | null; onClose: () => void }) {
-  const save = useSaveSupplier()
+function SupplierDialog({ kind, supplier, onClose }: { kind: PartnerKind; supplier: Supplier | null; onClose: () => void }) {
+  const save = useSaveSupplier(kind)
   const form = useForm<Values, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -131,7 +135,7 @@ function SupplierDialog({ supplier, onClose }: { supplier: Supplier | null; onCl
     contactName: v.contactName || null, phone: v.phone || null, email: v.email || null, address: v.address || null,
   }, { onSuccess: onClose }))
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()} title={supplier ? t('suppliers.editTitle') : t('suppliers.new')}>
+    <Dialog open onOpenChange={(o) => !o && onClose()} title={t(`${kind}.${supplier ? 'editTitle' : 'new'}` as MessageKey)}>
       <form noValidate className="grid gap-4" onSubmit={submit}>
         {save.isError && Object.keys(server).length === 0 && <FormMessage tone="error">{errorMessage(save.error)}</FormMessage>}
         <div className="grid grid-cols-[9rem_1fr] gap-3">

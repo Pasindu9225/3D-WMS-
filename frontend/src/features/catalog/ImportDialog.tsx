@@ -5,13 +5,13 @@ import { FormMessage } from '@/components/ui/input'
 import { Table, Th } from '@/components/ui/table'
 import { errorMessage } from '@/lib/errors'
 import { t, type MessageKey } from '@/lib/i18n'
-import { useImport } from './api'
+import { useImport, type ImportKind } from './api'
 
 /**
  * CSV import (products or suppliers): download the template, pick a file, then either everything is saved or
  * nothing is and the rows to fix are listed. The server checks the file (SEC-46); this only shows the outcome.
  */
-export function ImportDialog({ what, onClose }: { what: 'products' | 'suppliers'; onClose: () => void }) {
+export function ImportDialog({ what, onClose }: { what: ImportKind; onClose: () => void }) {
   const upload = useImport(what)
   const result = upload.data
   return (

@@ -142,7 +142,7 @@ function PoView({ po }: { po: PurchaseOrder }) {
   )
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+export function Fact({ label, value }: { label: string; value: string }) {
   return <div><dt className="text-muted-foreground">{label}</dt><dd className="font-medium">{value}</dd></div>
 }
 
@@ -318,7 +318,7 @@ function OrderTotal({ control }: { control: Control<Values> }) {
 }
 
 /** Type a SKU, barcode or name; pick from the matches to add a line. */
-function ProductPicker({ onPick, taken }: { onPick: (p: Product) => void; taken: string[] }) {
+export function ProductPicker({ onPick, taken }: { onPick: (p: Product) => void; taken: string[] }) {
   const [text, setText] = useState('')
   const q = useDebounced(text.trim())
   const found = useProducts(q, 0)

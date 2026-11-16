@@ -1,4 +1,4 @@
-package lk.wms.catalog.api;
+package lk.wms.catalog.service;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
@@ -16,13 +16,13 @@ import org.springframework.http.HttpStatus;
  * Reads CSV rows by header name and collects per-row, per-column errors, so the user gets one list of
  * everything to fix. Each row becomes the same request record the API uses and passes the same Bean Validation.
  */
-final class CsvRows {
+public final class CsvRows {
 
     private final List<List<String>> rows;
     private final Map<String, Integer> columns = new HashMap<>();
-    final List<RowError> errors = new java.util.ArrayList<>();
+    public final List<RowError> errors = new java.util.ArrayList<>();
 
-    CsvRows(List<List<String>> rows, List<String> known, List<String> required) {
+    public CsvRows(List<List<String>> rows, List<String> known, List<String> required) {
         this.rows = rows;
         List<String> header = rows.get(0);
         for (int i = 0; i < header.size(); i++) {
@@ -40,16 +40,16 @@ final class CsvRows {
         }
     }
 
-    int size() {
+    public int size() {
         return rows.size() - 1;
     }
 
     /** Spreadsheet row number of data row i (header is row 1). */
-    static int rowNumber(int i) {
+    public static int rowNumber(int i) {
         return i + 2;
     }
 
-    String text(int i, String column) {
+    public String text(int i, String column) {
         Integer c = columns.get(column);
         List<String> row = rows.get(i + 1);
         if (c == null || c >= row.size()) {
@@ -62,13 +62,13 @@ final class CsvRows {
         return v.isEmpty() ? null : v;
     }
 
-    String upper(int i, String column) {
+    public String upper(int i, String column) {
         String v = text(i, column);
         return v == null ? null : v.toUpperCase(Locale.ROOT);
     }
 
     /** Decimal times a factor, as a whole number (kg x 1000 = g); null when blank, error when not a number. */
-    Long scaled(int i, String column, int factor) {
+    public Long scaled(int i, String column, int factor) {
         String v = text(i, column);
         if (v == null) {
             return null;
@@ -82,7 +82,7 @@ final class CsvRows {
         }
     }
 
-    boolean yesNo(int i, String column) {
+    public boolean yesNo(int i, String column) {
         String v = text(i, column);
         if (v == null) {
             return false;
@@ -97,12 +97,12 @@ final class CsvRows {
         };
     }
 
-    void error(int i, String column, String message) {
+    public void error(int i, String column, String message) {
         errors.add(new RowError(rowNumber(i), column, message));
     }
 
     /** Bean Validation of the row's request; returns true when it is valid. */
-    <T> boolean valid(Validator validator, int i, T request, Map<String, String> fieldToColumn) {
+    public <T> boolean valid(Validator validator, int i, T request, Map<String, String> fieldToColumn) {
         Set<ConstraintViolation<T>> violations = validator.validate(request);
         for (ConstraintViolation<T> v : violations) {
             String field = v.getPropertyPath().toString();
@@ -114,14 +114,14 @@ final class CsvRows {
     }
 
     /** SEC-45: imports count as uploads (20 per user per minute). */
-    static void uploadAllowed(lk.wms.common.web.RateLimiter limiter, lk.wms.common.security.CurrentUser cu) {
+    public static void uploadAllowed(lk.wms.common.web.RateLimiter limiter, lk.wms.common.security.CurrentUser cu) {
         if (limiter.tryConsume(lk.wms.common.web.RateLimiter.Scope.UPLOAD, Long.toString(cu.userId())) > 0) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_UPLOADS", "Too many uploads; wait a minute");
         }
     }
 
     /** A CSV download (UTF-8 with a byte-order mark so Excel shows Sinhala/Tamil text correctly). */
-    static org.springframework.http.ResponseEntity<byte[]> csvFile(String name, String body) {
+    public static org.springframework.http.ResponseEntity<byte[]> csvFile(String name, String body) {
         return org.springframework.http.ResponseEntity.ok()
                 .contentType(new org.springframework.http.MediaType("text", "csv", java.nio.charset.StandardCharsets.UTF_8))
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,

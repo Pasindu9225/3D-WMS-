@@ -56,6 +56,26 @@ public class PartnerService {
         return new SupplierRef(p.getId(), p.getCode(), p.getName());
     }
 
+    /** For sales orders: a live customer, with the address used as the default ship-to. */
+    public record CustomerRef(long id, String code, String name, String address) {
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerRef customerByCode(String code) {
+        CustomerRef c = customersByCode(List.of(code)).get(code);
+        if (c == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "CUSTOMER_NOT_FOUND", "Customer " + code + " not found");
+        }
+        return c;
+    }
+
+    /** Live customers by code (the ones not found are missing from the map). */
+    @Transactional(readOnly = true)
+    public Map<String, CustomerRef> customersByCode(java.util.Collection<String> codes) {
+        return partners.findByTypeAndCodeIn(Partner.Type.CUSTOMER, codes).stream()
+                .collect(Collectors.toMap(Partner::getCode, p -> new CustomerRef(p.getId(), p.getCode(), p.getName(), p.getAddress())));
+    }
+
     @Transactional
     public PartnerView create(CurrentUser cu, Partner.Type type, String code, PartnerSpec s) {
         Partner p = new Partner(type, code);

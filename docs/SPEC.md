@@ -300,7 +300,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 **Tasks**
 
 - [ ] Tables: `sales_order`, `so_line`, `reservation`, `pick_list`, `pick_line`, `shipment`
-- [ ] Customers (partners); sales orders: create, CSV import, cancel
+- [x] Customers (partners); sales orders: create, CSV import, cancel
 - [ ] Stock reservation on order release (FIFO by receive date)
 - [ ] Pick list per order; picker scans bin and product; short-pick handling
 - [ ] Packing screen: verify by scan, print packing slip and delivery note PDF
