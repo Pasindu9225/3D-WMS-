@@ -305,7 +305,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Pick list per order; picker scans bin and product; short-pick handling
 - [x] Packing screen: verify by scan, print packing slip and delivery note PDF
 - [x] Dispatch: mark shipped, stock leaves, movement recorded
-- [ ] Supervisor task board: assign, re-assign, priorities, live status
+- [x] Supervisor task board: assign, re-assign, priorities, live status
 - [ ] Dashboard: stock value, low stock, today's receipts and shipments, bin utilisation %, KPIs (dock-to-stock time, lines picked per hour)
 - [ ] Exports: stock, movements, orders to Excel and PDF (streamed)
 - [ ] Deployment: Nginx + HTTPS, systemd services, `backup.sh` with daily encrypted dumps, restore guide (SEC-66, SEC-83, SEC-84). Nginx must: send CSP/HSTS/nosniff/frame headers for the web app, keep `Host` (`proxy_set_header Host $host`), set `X-Forwarded-For`/`-Proto`, and never forward `/actuator` (security review v0.1, F12)

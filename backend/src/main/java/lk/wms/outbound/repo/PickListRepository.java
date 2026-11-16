@@ -24,10 +24,20 @@ public interface PickListRepository extends JpaRepository<PickList, Long> {
 
     Optional<PickList> findByOrderId(Long orderId);
 
-    /** Lists in these warehouses (allWarehouses for a company admin) in these statuses, oldest first. */
+    /**
+     * Lists in these warehouses (allWarehouses for a company admin) in these statuses: urgent first, then high, then
+     * oldest. A picker (forUser set) sees lists given to them and lists given to nobody; a supervisor (null) sees all.
+     */
     @Query("""
             select p from PickList p
-            where (:allWarehouses = true or p.warehouseId in :warehouseIds) and p.status in :statuses""")
+            where (:allWarehouses = true or p.warehouseId in :warehouseIds) and p.status in :statuses
+              and (:forUser is null or p.assignedTo is null or p.assignedTo = :forUser)
+            order by case p.priority when lk.wms.outbound.domain.PickList.Priority.URGENT then 0
+                                     when lk.wms.outbound.domain.PickList.Priority.HIGH then 1 else 2 end, p.id""")
     Page<PickList> search(@Param("allWarehouses") boolean allWarehouses, @Param("warehouseIds") Collection<Long> warehouseIds,
-            @Param("statuses") Collection<PickList.Status> statuses, Pageable pageable);
+            @Param("statuses") Collection<PickList.Status> statuses, @Param("forUser") Long forUser, Pageable pageable);
+
+    /** How many lists of a warehouse are in a status (done ones only since a moment, e.g. today). */
+    @Query("select count(p) from PickList p where p.warehouseId = :warehouseId and p.status = :status and (:since is null or p.doneAt >= :since)")
+    long countIn(@Param("warehouseId") long warehouseId, @Param("status") PickList.Status status, @Param("since") java.time.Instant since);
 }

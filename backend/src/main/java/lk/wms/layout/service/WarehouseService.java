@@ -100,6 +100,12 @@ public class WarehouseService {
         return warehouses.codeOf(warehouseId).orElse(null);
     }
 
+    /** Users assigned to a warehouse (internal ids); company admins work everywhere and are not listed. */
+    @Transactional(readOnly = true)
+    public List<Long> userIdsIn(long warehouseId) {
+        return access.findUserIds(warehouseId);
+    }
+
     /** Warehouses this user may work in, or null for a company admin (all of them). For filtering lists. */
     @Transactional(readOnly = true)
     public List<Long> assignedIds(CurrentUser cu) {

@@ -134,6 +134,8 @@ export interface PickList {
   warehouseCode: string
   lines: PickLineView[]
   openLines: number
+  priority: Priority
+  assignee: Person | null
 }
 
 export interface PickSummary {
@@ -145,6 +147,10 @@ export interface PickSummary {
   warehouseCode: string
   lines: number
   openLines: number
+  priority: Priority
+  assignee: Person | null
+  startedBy: Person | null
+  createdAt: string
 }
 
 /** Pick lists not finished yet, oldest first: the picker's to-do list. */
@@ -255,6 +261,58 @@ export function useDispatch() {
       api<Shipment>('/shipments', { method: 'POST', body }),
     onSuccess: () => {
       for (const key of ['to-dispatch', 'shipments', 'sales-orders', 'sales-order', 'stock', 'stock-products']) void qc.invalidateQueries({ queryKey: [key] })
+    },
+  })
+}
+
+export type Priority = 'URGENT' | 'HIGH' | 'NORMAL'
+export const PRIORITIES: Priority[] = ['URGENT', 'HIGH', 'NORMAL']
+
+export interface Person {
+  id: string
+  name: string
+}
+
+export interface Board {
+  toRelease: number
+  toPick: number
+  picking: number
+  pickedToday: number
+  toPack: number
+  toDispatch: number
+  inReceiving: number
+  lists: PickSummary[]
+}
+
+/** The supervisor board; refreshed every 10 seconds while open. */
+export function useBoard(warehouseId: string | undefined) {
+  return useQuery({
+    queryKey: ['task-board', warehouseId],
+    queryFn: () => api<Board>(`/task-board?warehouse=${warehouseId}`),
+    enabled: !!warehouseId,
+    refetchInterval: 10_000,
+  })
+}
+
+export function usePickers(warehouseId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['pickers', warehouseId],
+    queryFn: () => api<Person[]>(`/task-board/pickers?warehouse=${warehouseId}`),
+    enabled: enabled && !!warehouseId,
+  })
+}
+
+/** Give a list to someone (null = anyone) or change its priority. */
+export function useBoardAction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (a: { kind: 'assign'; id: string; userId: string | null } | { kind: 'priority'; id: string; priority: Priority }) =>
+      a.kind === 'assign'
+        ? api<PickList>(`/pick-lists/${a.id}/assign`, { method: 'POST', body: { userId: a.userId } })
+        : api<PickList>(`/pick-lists/${a.id}/priority`, { method: 'POST', body: { priority: a.priority } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['task-board'] })
+      void qc.invalidateQueries({ queryKey: ['pick-lists'] })
     },
   })
 }

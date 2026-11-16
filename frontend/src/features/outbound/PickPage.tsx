@@ -9,6 +9,7 @@ import { useBase } from '@/lib/base'
 import { errorMessage } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { usePickAction, usePickList, usePickLists, type PickLineView, type PickList, type ShortReason } from './api'
+import { PriorityBadge } from './TaskBoardPage'
 
 const QTY = /^\d{1,7}(\.\d{1,3})?$/
 const num = (n: number) => Number(Number(n).toFixed(3)).toLocaleString('en')
@@ -36,7 +37,7 @@ function PickLists() {
             <Link to={`${base}/pick/${p.id}`} className="flex items-center gap-3 rounded-lg border bg-card p-4 hover:bg-secondary">
               <ClipboardList className="size-6 shrink-0 text-primary" />
               <span className="min-w-0 flex-1">
-                <span className="font-mono font-semibold">{p.number}</span> · {p.orderNumber}
+                <span className="font-mono font-semibold">{p.number}</span> · {p.orderNumber} <PriorityBadge priority={p.priority} />
                 <span className="block truncate text-sm text-muted-foreground">{p.customerName} · {p.warehouseCode}</span>
               </span>
               <span className="text-sm tabular-nums">{t('pick.linesLeft', { n: p.openLines, of: p.lines })}</span>

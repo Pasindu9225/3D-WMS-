@@ -119,6 +119,16 @@ public class UserService {
                 .collect(Collectors.toMap(AppUser::getId, u -> view(u, List.of())));
     }
 
+    /** An active user who holds a permission; admin = company admin (works in every warehouse). */
+    public record Holder(long id, String publicId, String fullName, boolean admin) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<Holder> holdersOf(long tenantId, String permission) {
+        return users.holdersOf(tenantId, permission).stream().map(r -> new Holder(((Number) r[0]).longValue(), (String) r[1],
+                (String) r[2], ((Number) r[3]).intValue() == 1)).toList();
+    }
+
     /** Every user of the caller's company (internal IDs), e.g. to give everyone the first warehouse. */
     @Transactional(readOnly = true)
     public List<Long> allUserIds() {

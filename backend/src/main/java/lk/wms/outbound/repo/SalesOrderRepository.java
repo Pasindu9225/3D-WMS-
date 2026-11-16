@@ -23,6 +23,8 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
 
     List<SalesOrder> findByShipmentIdOrderById(Long shipmentId);
 
+    long countByWarehouseIdAndStatus(Long warehouseId, SalesOrder.Status status);
+
     /** Orders by internal id (pick lists point at them). */
     @Query("select o from SalesOrder o where o.id in :ids")
     List<SalesOrder> byInternalIds(@Param("ids") Collection<Long> ids);

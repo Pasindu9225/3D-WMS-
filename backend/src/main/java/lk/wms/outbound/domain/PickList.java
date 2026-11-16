@@ -27,6 +27,8 @@ public class PickList extends TenantScoped {
 
     public enum Status { OPEN, IN_PROGRESS, DONE }
 
+    public enum Priority { URGENT, HIGH, NORMAL }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -47,6 +49,16 @@ public class PickList extends TenantScoped {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Status status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Priority priority = Priority.NORMAL;
+
+    @Column(name = "assigned_to")
+    private Long assignedTo;
+
+    @Column(name = "assigned_at")
+    private Instant assignedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -94,6 +106,32 @@ public class PickList extends TenantScoped {
         if (!open) {
             doneAt = Instant.now();
         }
+    }
+
+    /** Gives the list to one picker, or to anyone (null). */
+    public void assign(Long userId) {
+        assignedTo = userId;
+        assignedAt = userId == null ? null : Instant.now();
+    }
+
+    public void prioritise(Priority p) {
+        priority = p;
+    }
+
+    public Priority getPriority() {
+        return priority;
+    }
+
+    public Long getAssignedTo() {
+        return assignedTo;
+    }
+
+    public Instant getDoneAt() {
+        return doneAt;
+    }
+
+    public Long getStartedBy() {
+        return startedBy;
     }
 
     public Long getId() {

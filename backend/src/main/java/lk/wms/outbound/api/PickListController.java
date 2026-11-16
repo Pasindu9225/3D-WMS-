@@ -43,6 +43,13 @@ public class PickListController {
     public record ShortRequest(@NotNull ShortReason reason) {
     }
 
+    /** userId null = anyone may pick it. */
+    public record AssignRequest(@Size(max = 26) String userId) {
+    }
+
+    public record PriorityRequest(@NotNull PickList.Priority priority) {
+    }
+
     private final PickService picks;
 
     public PickListController(PickService picks) {
@@ -72,6 +79,18 @@ public class PickListController {
             @RequestHeader(value = "Idempotency-Key", required = false) @Pattern(regexp = "[A-Za-z0-9-]{8,64}") String key,
             @Valid @RequestBody ConfirmRequest body) {
         return picks.confirm(CurrentUser.require(), id, seq, body.binCode(), body.code(), body.qty(), key);
+    }
+
+    @PostMapping("/{id}/assign")
+    @PreAuthorize("hasAuthority('tasks:assign')")
+    public Detail assign(@PathVariable @Size(max = 26) String id, @Valid @RequestBody AssignRequest body) {
+        return picks.assign(CurrentUser.require(), id, body.userId());
+    }
+
+    @PostMapping("/{id}/priority")
+    @PreAuthorize("hasAuthority('tasks:assign')")
+    public Detail priority(@PathVariable @Size(max = 26) String id, @Valid @RequestBody PriorityRequest body) {
+        return picks.prioritise(CurrentUser.require(), id, body.priority());
     }
 
     @PostMapping("/{id}/lines/{seq}/short")

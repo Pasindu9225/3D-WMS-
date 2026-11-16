@@ -46,6 +46,14 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
             + " WHERE ur.user_id = :userId ORDER BY r.code", nativeQuery = true)
     List<String> findRoleCodes(@Param("userId") long userId);
 
+    /** [id, public_id, full_name, is_admin] of active users of a company holding a permission. */
+    @Query(value = "SELECT u.id, u.public_id, u.full_name, MAX(r.code = 'TENANT_ADMIN') FROM app_user u"
+            + " JOIN user_role ur ON ur.user_id = u.id JOIN role r ON r.id = ur.role_id"
+            + " WHERE u.tenant_id = :tenantId AND u.status = 'ACTIVE' AND u.id IN (SELECT ur2.user_id FROM user_role ur2"
+            + " JOIN role_permission rp ON rp.role_id = ur2.role_id JOIN permission p ON p.id = rp.permission_id WHERE p.code = :permission)"
+            + " GROUP BY u.id, u.public_id, u.full_name ORDER BY u.full_name", nativeQuery = true)
+    List<Object[]> holdersOf(@Param("tenantId") long tenantId, @Param("permission") String permission);
+
     @Query(value = "SELECT DISTINCT p.code FROM user_role ur"
             + " JOIN role_permission rp ON rp.role_id = ur.role_id"
             + " JOIN permission p ON p.id = rp.permission_id"

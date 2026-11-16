@@ -104,6 +104,12 @@ public class StockService {
 
     /** Totals per product in a warehouse, optionally only products matching a search. */
     @Transactional(readOnly = true)
+    /** How many lots wait in the receiving area of a warehouse (the task board). */
+    public long awaitingPutaway(long warehouseId) {
+        return stock.awaitingPutaway(warehouseId, org.springframework.data.domain.PageRequest.of(0, 1)).getTotalElements();
+    }
+
+    @Transactional(readOnly = true)
     public Page<ProductTotal> byProduct(CurrentUser cu, String warehouseId, String query, Pageable pageable) {
         WarehouseService.WarehouseRef w = warehouses.requireAccess(cu, warehouseId);
         boolean any = query == null || query.isBlank();

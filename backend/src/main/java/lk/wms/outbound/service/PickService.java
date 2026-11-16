@@ -49,16 +49,29 @@ public class PickService {
     }
 
     public record Detail(String id, String number, String status, String orderId, String orderNumber, String customerName,
-            String warehouseCode, List<LineView> lines, int openLines) {
+            String warehouseCode, List<LineView> lines, int openLines, String priority, Person assignee) {
     }
 
     public record Summary(String id, String number, String status, String orderNumber, String customerName,
-            String warehouseCode, int lines, int openLines) {
+            String warehouseCode, int lines, int openLines, String priority, Person assignee, Person startedBy,
+            java.time.Instant createdAt) {
+    }
+
+    /** Someone on the board: public id and name. */
+    public record Person(String id, String name) {
+    }
+
+    /** The supervisor's view of one warehouse: what waits where, and the open pick lists. */
+    public record Board(long toRelease, long toPick, long picking, long pickedToday, long toPack, long toDispatch,
+            long inReceiving, List<Summary> lists) {
     }
 
     public enum ShortReason { NOT_THERE, DAMAGED }
 
     static final String KIND = "PL";
+    static final String ASSIGN = "tasks:assign";
+    // ponytail: Sri Lanka day for "done today"; a per-company time zone when a customer outside it signs up.
+    private static final java.time.ZoneId ZONE = java.time.ZoneId.of("Asia/Colombo");
 
     private final PickListRepository lists;
     private final SalesOrderRepository orders;
@@ -67,9 +80,14 @@ public class PickService {
     private final WarehouseService warehouses;
     private final StockMovementService stock;
     private final AuditService audit;
+    private final lk.wms.auth.service.UserService users;
+    private final lk.wms.inventory.service.StockService stockViews;
 
     public PickService(PickListRepository lists, SalesOrderRepository orders, DocNumbers numbers, ProductService products,
-            WarehouseService warehouses, StockMovementService stock, AuditService audit) {
+            WarehouseService warehouses, StockMovementService stock, AuditService audit, lk.wms.auth.service.UserService users,
+            lk.wms.inventory.service.StockService stockViews) {
+        this.users = users;
+        this.stockViews = stockViews;
         this.lists = lists;
         this.orders = orders;
         this.numbers = numbers;
@@ -106,17 +124,106 @@ public class PickService {
         return lists.findByOrderId(o.getId()).map(p -> detail(p, o)).orElse(null);
     }
 
+    /** A picker sees lists given to them or to nobody; a supervisor (tasks:assign) sees all. Urgent first. */
     @Transactional(readOnly = true)
     public Page<Summary> list(CurrentUser cu, List<PickList.Status> statuses, Pageable pageable) {
         List<Long> ids = warehouses.assignedIds(cu);
-        Page<PickList> page = lists.search(ids == null, ids == null || ids.isEmpty() ? List.of(-1L) : ids, statuses, pageable);
+        Long forUser = cu.permissions().contains(ASSIGN) ? null : cu.userId();
+        return summaries(lists.search(ids == null, ids == null || ids.isEmpty() ? List.of(-1L) : ids, statuses, forUser, pageable));
+    }
+
+    /** One warehouse at a glance: counts per stage and every open pick list with its priority and picker. */
+    @Transactional(readOnly = true)
+    public Board board(CurrentUser cu, String warehouseId) {
+        WarehouseService.WarehouseRef wh = warehouses.requireAccess(cu, warehouseId);
+        java.time.Instant today = java.time.LocalDate.now(ZONE).atStartOfDay(ZONE).toInstant();
+        List<Summary> open = summaries(lists.search(false, List.of(wh.id()), List.of(PickList.Status.OPEN, PickList.Status.IN_PROGRESS),
+                null, org.springframework.data.domain.PageRequest.of(0, 100))).getContent();
+        return new Board(orders.countByWarehouseIdAndStatus(wh.id(), SalesOrder.Status.DRAFT),
+                lists.countIn(wh.id(), PickList.Status.OPEN, null), lists.countIn(wh.id(), PickList.Status.IN_PROGRESS, null),
+                lists.countIn(wh.id(), PickList.Status.DONE, today),
+                orders.countByWarehouseIdAndStatus(wh.id(), SalesOrder.Status.PICKED),
+                orders.countByWarehouseIdAndStatus(wh.id(), SalesOrder.Status.PACKED), stockViews.awaitingPutaway(wh.id()), open);
+    }
+
+    /** People who can be given a pick list in this warehouse: pickers assigned to it, and company admins. */
+    @Transactional(readOnly = true)
+    public List<Person> pickers(CurrentUser cu, String warehouseId) {
+        WarehouseService.WarehouseRef wh = warehouses.requireAccess(cu, warehouseId);
+        java.util.Set<Long> here = new java.util.HashSet<>(warehouses.userIdsIn(wh.id()));
+        return users.holdersOf(cu.tenantId(), "picking:execute").stream().filter(h -> h.admin() || here.contains(h.id()))
+                .map(h -> new Person(h.publicId(), h.fullName())).toList();
+    }
+
+    /** Gives a list to one picker of its warehouse, or back to anyone (null). Done lists stay as they are. */
+    @Transactional
+    public Detail assign(CurrentUser cu, String publicId, String userPublicId) {
+        PickList p = lists.lockByPublicId(publicId).orElse(null);
+        access(cu, p);
+        if (p.getStatus() == PickList.Status.DONE) {
+            throw new ApiException(HttpStatus.CONFLICT, "PICK_LIST_DONE", "This pick list is finished");
+        }
+        Long before = p.getAssignedTo();
+        Long to = null;
+        if (userPublicId != null) {
+            java.util.Set<Long> here = new java.util.HashSet<>(warehouses.userIdsIn(p.getWarehouseId()));
+            to = users.holdersOf(cu.tenantId(), "picking:execute").stream()
+                    .filter(h -> h.publicId().equals(userPublicId) && (h.admin() || here.contains(h.id()))).map(lk.wms.auth.service.UserService.Holder::id)
+                    .findFirst().orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "USER_NOT_PICKER",
+                            "That person cannot pick in this warehouse"));
+        }
+        p.assign(to);
+        lists.flush();
+        Map<String, Object> change = new java.util.HashMap<>();
+        change.put("from", before == null ? "anyone" : before);
+        change.put("to", to == null ? "anyone" : to);
+        audit.record(cu.tenantId(), cu.userId(), "PICK_ASSIGNED", "pick_list", p.getPublicId(), null, change);
+        return detail(p, order(p));
+    }
+
+    @Transactional
+    public Detail prioritise(CurrentUser cu, String publicId, PickList.Priority priority) {
+        PickList p = lists.lockByPublicId(publicId).orElse(null);
+        access(cu, p);
+        PickList.Priority before = p.getPriority();
+        p.prioritise(priority);
+        lists.flush();
+        audit.record(cu.tenantId(), cu.userId(), "PICK_PRIORITY", "pick_list", p.getPublicId(), null,
+                Map.of("from", before.name(), "to", priority.name()));
+        return detail(p, order(p));
+    }
+
+    private Page<Summary> summaries(Page<PickList> page) {
         Map<Long, SalesOrder> byId = orders.byInternalIds(page.getContent().stream().map(PickList::getOrderId).toList())
                 .stream().collect(Collectors.toMap(SalesOrder::getId, Function.identity()));
+        java.util.Set<Long> people = new java.util.HashSet<>();
+        page.getContent().forEach(p -> {
+            if (p.getAssignedTo() != null) {
+                people.add(p.getAssignedTo());
+            }
+            if (p.getStartedBy() != null) {
+                people.add(p.getStartedBy());
+            }
+        });
+        Map<Long, lk.wms.auth.service.UserService.UserView> names = users.viewsByInternalId(people);
         return page.map(p -> {
             SalesOrder o = byId.get(p.getOrderId());
             return new Summary(p.getPublicId(), p.getNumber(), p.getStatus().name(), o.getNumber(), o.getCustomerName(),
-                    o.getWarehouseCode(), p.getLines().size(), open(p));
+                    o.getWarehouseCode(), p.getLines().size(), open(p), p.getPriority().name(), person(names, p.getAssignedTo()),
+                    person(names, p.getStartedBy()), p.getCreatedAt());
         });
+    }
+
+    private static Person person(Map<Long, lk.wms.auth.service.UserService.UserView> names, Long id) {
+        lk.wms.auth.service.UserService.UserView u = id == null ? null : names.get(id);
+        return u == null ? null : new Person(u.id(), u.fullName());
+    }
+
+    /** A list given to someone else is theirs to pick (a supervisor may still step in). */
+    private static void mine(CurrentUser cu, PickList p) {
+        if (p.getAssignedTo() != null && p.getAssignedTo() != cu.userId() && !cu.permissions().contains(ASSIGN)) {
+            throw new ApiException(HttpStatus.CONFLICT, "NOT_YOUR_LIST", "This pick list is given to someone else");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -135,6 +242,7 @@ public class PickService {
         PickList p = lists.lockByPublicId(publicId).orElse(null);
         access(cu, p);
         SalesOrder o = order(p);
+        mine(cu, p);
         if (clientRef != null && stock.isDone(clientRef)) {
             return detail(p, o);
         }
@@ -166,6 +274,7 @@ public class PickService {
         PickList p = lists.lockByPublicId(publicId).orElse(null);
         access(cu, p);
         SalesOrder o = order(p);
+        mine(cu, p);
         PickLine line = openLine(p, seq);
         BigDecimal missing = line.left();
         stock.unreservePlace(SalesOrderService.REF, o.getId(), line.getSoLineNo(), line.getBinId(), line.getBatchNo(), line.getExpiryDate());
@@ -215,7 +324,8 @@ public class PickService {
                 l.getProductName(), l.getBaseUom(), l.getBinCode(), l.getBatchNo(), l.getExpiryDate(), l.getQtyToPick(),
                 l.getQtyPicked(), l.getStatus().name(), l.getShortReason())).toList();
         return new Detail(p.getPublicId(), p.getNumber(), p.getStatus().name(), o.getPublicId(), o.getNumber(), o.getCustomerName(),
-                o.getWarehouseCode(), lines, open(p));
+                o.getWarehouseCode(), lines, open(p), p.getPriority().name(),
+                person(users.viewsByInternalId(p.getAssignedTo() == null ? List.of() : List.of(p.getAssignedTo())), p.getAssignedTo()));
     }
 
     private static String plain(BigDecimal v) {
