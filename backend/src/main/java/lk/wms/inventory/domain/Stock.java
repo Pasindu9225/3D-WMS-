@@ -58,6 +58,16 @@ public class Stock extends TenantScoped {
         qtyOnHand = qtyOnHand.subtract(qty);
     }
 
+    /** Sets units aside for an order line (the caller checked available()). */
+    public void reserve(BigDecimal qty) {
+        qtyReserved = qtyReserved.add(qty);
+    }
+
+    /** Frees units set aside (never below zero). */
+    public void unreserve(BigDecimal qty) {
+        qtyReserved = qtyReserved.subtract(qty).max(BigDecimal.ZERO);
+    }
+
     /** What can be moved: on hand minus what picking has reserved. */
     public BigDecimal available() {
         return qtyOnHand.subtract(qtyReserved);

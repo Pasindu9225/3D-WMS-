@@ -11,8 +11,10 @@ import java.util.Map;
 import lk.wms.catalog.service.ProductService;
 import lk.wms.common.errors.ApiException;
 import lk.wms.common.tenant.TenantContext;
+import lk.wms.inventory.domain.Reservation;
 import lk.wms.inventory.domain.Stock;
 import lk.wms.inventory.domain.StockMovement;
+import lk.wms.inventory.repo.ReservationRepository;
 import lk.wms.inventory.repo.StockMovementRepository;
 import lk.wms.inventory.repo.StockRepository;
 import lk.wms.layout.service.BinService;
@@ -67,16 +69,26 @@ public class StockMovementService {
     /** What move() did: MOVED, or ALREADY_DONE for a retried Idempotency-Key. */
     public enum Outcome { MOVED, ALREADY_DONE }
 
+    /** What one document line needs, in base units; label names it in a shortage message (e.g. "RICE-5KG (BAG)"). */
+    public record Need(int line, long productId, BigDecimal qty, String label) {
+    }
+
+    /** Where the stock of a line was set aside. */
+    public record Allocation(int line, long productId, long binId, String binCode, String batchNo, LocalDate expiry, BigDecimal qty) {
+    }
+
     private final StockRepository stock;
+    private final ReservationRepository reservations;
     private final StockMovementRepository ledger;
     private final BinService bins;
     private final ProductService products;
     private final org.springframework.context.ApplicationEventPublisher events;
 
-    public StockMovementService(StockRepository stock, StockMovementRepository ledger, BinService bins, ProductService products,
+    public StockMovementService(StockRepository stock, ReservationRepository reservations, StockMovementRepository ledger, BinService bins, ProductService products,
             org.springframework.context.ApplicationEventPublisher events) {
         this.events = events;
         this.stock = stock;
+        this.reservations = reservations;
         this.ledger = ledger;
         this.bins = bins;
         this.products = products;
@@ -198,6 +210,97 @@ public class StockMovementService {
             throw new ApiException(HttpStatus.CONFLICT, "BIN_FULL", "Bin " + bin.code() + " has no room for that ("
                     + (tooHeavy ? "weight" : "volume") + ")");
         }
+    }
+
+    /**
+     * Sets stock aside for every line of a document, oldest receipt first (FIFO), all or nothing. Only stock in
+     * bins that are not blocked counts; the receiving area never does. Rows are locked one by one in bin order,
+     * the same order move() uses, so a release and a transfer cannot deadlock; amounts are read after the locks.
+     * When any line is short nothing is reserved and NOT_ENOUGH_STOCK lists every shortage.
+     */
+    @Transactional
+    public List<Allocation> reserve(long warehouseId, String refType, long refId, List<Need> needs, long userId) {
+        List<Long> productIds = needs.stream().map(Need::productId).distinct().toList();
+        List<Stock> rows = new ArrayList<>();
+        for (Long id : stock.reservableIds(warehouseId, productIds)) {
+            stock.lockById(id).filter(s -> s.available().signum() > 0).ifPresent(rows::add);
+        }
+        Map<Long, BinService.BinLabel> labels = bins.labels(rows.stream().map(Stock::getBinId).distinct().toList());
+        rows.removeIf(s -> labels.get(s.getBinId()) == null || labels.get(s.getBinId()).blocked());
+        rows.sort(Comparator.comparing(Stock::getReceivedAt).thenComparing(s -> labels.get(s.getBinId()).code()));
+
+        Map<Stock, BigDecimal> free = new java.util.LinkedHashMap<>();
+        rows.forEach(r -> free.put(r, r.available()));
+        List<Allocation> out = new ArrayList<>();
+        Map<Allocation, Stock> placeOf = new java.util.IdentityHashMap<>();
+        List<String> shortages = new ArrayList<>();
+        for (Need n : needs) {
+            BigDecimal want = n.qty().setScale(3, RoundingMode.UNNECESSARY);
+            BigDecimal left = want;
+            for (Map.Entry<Stock, BigDecimal> e : free.entrySet()) {
+                if (left.signum() == 0) {
+                    break;
+                }
+                Stock s = e.getKey();
+                if (s.getProductId() != n.productId() || e.getValue().signum() == 0) {
+                    continue;
+                }
+                BigDecimal take = left.min(e.getValue());
+                e.setValue(e.getValue().subtract(take));
+                left = left.subtract(take);
+                Allocation a = new Allocation(n.line(), n.productId(), s.getBinId(), labels.get(s.getBinId()).code(),
+                        s.getBatchNo(), s.getExpiryDate(), take);
+                out.add(a);
+                placeOf.put(a, s);
+            }
+            if (left.signum() > 0) {
+                shortages.add(n.label() + ": need " + plain(want) + ", " + plain(want.subtract(left)) + " free in bins");
+            }
+        }
+        if (!shortages.isEmpty()) {
+            throw new ApiException(HttpStatus.CONFLICT, "NOT_ENOUGH_STOCK", String.join("; ", shortages));
+        }
+        for (Allocation a : out) {
+            Stock s = placeOf.get(a);
+            s.reserve(a.qty());
+            reservations.save(new Reservation(s, a.qty(), refType, refId, a.line(), userId));
+        }
+        stock.flush();
+        events.publishEvent(new StockChanged(warehouseId));
+        return out;
+    }
+
+    /** Frees everything a document has set aside (rows locked in bin order). Doing it twice changes nothing. */
+    @Transactional
+    public void unreserve(String refType, long refId) {
+        List<Reservation> held = reservations.findByRefTypeAndRefIdOrderByRefLineAscIdAsc(refType, refId);
+        if (held.isEmpty()) {
+            return;
+        }
+        long tenantId = TenantContext.require();
+        List<Reservation> sorted = new ArrayList<>(held);
+        sorted.sort(Comparator.comparing(Reservation::getBinId));
+        for (Reservation r : sorted) {
+            stock.lockPlace(tenantId, r.getWarehouseId(), r.getBinId(), r.getProductId(), r.getBatchNo(), r.getExpiryDate())
+                    .ifPresent(s -> s.unreserve(r.getQty()));
+        }
+        reservations.deleteAll(held);
+        stock.flush();
+        events.publishEvent(new StockChanged(held.get(0).getWarehouseId()));
+    }
+
+    /** What a document has set aside, line by line. */
+    @Transactional(readOnly = true)
+    public List<Allocation> reserved(String refType, long refId) {
+        List<Reservation> held = reservations.findByRefTypeAndRefIdOrderByRefLineAscIdAsc(refType, refId);
+        Map<Long, BinService.BinLabel> labels = bins.labels(held.stream().map(Reservation::getBinId).distinct().toList());
+        return held.stream().map(r -> new Allocation(r.getRefLine(), r.getProductId(), r.getBinId(),
+                labels.containsKey(r.getBinId()) ? labels.get(r.getBinId()).code() : null, r.getBatchNo(), r.getExpiryDate(), r.getQty()))
+                .toList();
+    }
+
+    private static String plain(BigDecimal v) {
+        return v.stripTrailingZeros().toPlainString();
     }
 
     private static BigDecimal times(BigDecimal qty, Integer perUnit) {

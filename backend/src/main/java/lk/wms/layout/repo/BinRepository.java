@@ -20,8 +20,8 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
 
     Optional<Bin> findByWarehouseIdAndCode(long warehouseId, String code);
 
-    /** [id, public_id, code] of these bins (stock screens label rows with them). */
-    @Query("select b.id, b.publicId, b.code from Bin b where b.id in :ids")
+    /** [id, public_id, code, blocked] of these bins (stock screens label rows with them). */
+    @Query("select b.id, b.publicId, b.code, b.blocked from Bin b where b.id in :ids")
     List<Object[]> labels(@Param("ids") Collection<Long> ids);
 
     /** Every bin of a warehouse with where it stands: for putaway suggestions. */

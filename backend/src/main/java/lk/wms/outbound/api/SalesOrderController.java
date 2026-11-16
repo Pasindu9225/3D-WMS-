@@ -93,6 +93,9 @@ public class SalesOrderController {
             @NotNull @Valid LineRequest line) {
     }
 
+    public record VersionRequest(@NotNull @Min(0) Integer version) {
+    }
+
     public record CancelRequest(@NotNull @Min(0) Integer version, @NotBlank @Size(max = 200) String reason) {
     }
 
@@ -138,6 +141,12 @@ public class SalesOrderController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VERSION_REQUIRED", "Send the version you edited");
         }
         return orders.update(CurrentUser.require(), id, body.version(), body.spec());
+    }
+
+    @PostMapping("/{id}/release")
+    @PreAuthorize("hasAuthority('outbound:manage')")
+    public Detail release(@PathVariable @Size(max = 26) String id, @Valid @RequestBody VersionRequest body) {
+        return orders.release(CurrentUser.require(), id, body.version());
     }
 
     @PostMapping("/{id}/cancel")

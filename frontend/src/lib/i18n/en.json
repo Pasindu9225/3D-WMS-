@@ -831,5 +831,13 @@
   "action.SO_CREATED": "Sales order created",
   "action.SO_UPDATED": "Sales order changed",
   "action.SO_CANCELLED": "Sales order cancelled",
-  "action.SO_IMPORTED": "Sales orders imported"
+  "action.SO_IMPORTED": "Sales orders imported",
+  "so.release": "Release for picking",
+  "so.releasing": "Reserving stock…",
+  "so.short": "Not enough stock in bins to release this order. Short: {list}. Put away goods still in receiving, or change the order.",
+  "so.reservedTitle": "Reserved stock (base units, oldest first)",
+  "so.cancelReleasedHint": "The reserved stock becomes free again and the order stays in the list as cancelled. This cannot be undone.",
+  "stock.col.reserved": "Reserved",
+  "action.SO_RELEASED": "Sales order released",
+  "error.STALE": "Someone else changed this just now. Reload and try again."
 }

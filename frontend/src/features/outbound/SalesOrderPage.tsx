@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Trash2, X } from 'lucide-react'
+import { ArrowLeft, PackageCheck, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -14,7 +14,7 @@ import type { Product, Supplier } from '@/features/catalog/api'
 import { Fact, ProductPicker } from '@/features/inbound/PurchaseOrderPage'
 import type { Page } from '@/features/users/api'
 import { useWarehouses } from '@/features/warehouses/api'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { errorMessage, fieldErrors } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { useSalesOrder, useSoAction, type SalesOrder } from './api'
@@ -44,7 +44,7 @@ export function SalesOrderPage() {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">{order ? order.number : t('so.new')}</h1>
         {order && <SoStatusBadge status={order.status} />}
-        {order && manage && order.status === 'DRAFT' && <CancelButton so={order} />}
+        {order && manage && (order.status === 'DRAFT' || order.status === 'RELEASED') && <Actions so={order} />}
       </div>
       {order?.status === 'CANCELLED' && <FormMessage tone="error">{t('po.cancelledBecause', { reason: order.cancelReason ?? '' })}</FormMessage>}
       {editable ? <SoForm key={order?.version ?? 'new'} so={order} /> : order && <SoView so={order} />}
@@ -52,16 +52,28 @@ export function SalesOrderPage() {
   )
 }
 
-function CancelButton({ so }: { so: SalesOrder }) {
+/** A shortage on release names each short product; other errors use the usual messages. */
+function releaseError(error: unknown): string {
+  return error instanceof ApiError && error.code === 'NOT_ENOUGH_STOCK' ? t('so.short', { list: error.message }) : errorMessage(error)
+}
+
+function Actions({ so }: { so: SalesOrder }) {
   const action = useSoAction()
+  const release = useSoAction()
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   return (
-    <div className="ml-auto">
+    <div className="ml-auto flex flex-wrap justify-end gap-2">
+      {so.status === 'DRAFT' && (
+        <Button disabled={release.isPending} onClick={() => release.mutate({ kind: 'release', id: so.id, version: so.version })}>
+          <PackageCheck /> {release.isPending ? t('so.releasing') : t('so.release')}
+        </Button>
+      )}
       <Button variant="outline" onClick={() => setOpen(true)}><X /> {t('po.cancelOrder')}</Button>
+      {release.isError && <p role="alert" className="w-full text-right text-sm text-destructive">{releaseError(release.error)}</p>}
       {open && (
         <Dialog open onOpenChange={(o) => !o && setOpen(false)} title={t('po.cancelTitle', { number: so.number })}
-          description={t('po.cancelHint')}>
+          description={so.status === 'RELEASED' ? t('so.cancelReleasedHint') : t('po.cancelHint')}>
           <form className="grid gap-3" onSubmit={(e) => {
             e.preventDefault()
             if (reason.trim()) action.mutate({ kind: 'cancel', id: so.id, version: so.version, reason: reason.trim() },
@@ -107,6 +119,27 @@ function SoView({ so }: { so: SalesOrder }) {
           ))}
         </tbody>
       </Table>
+      {so.reserved.length > 0 && (
+        <section className="grid gap-2">
+          <h2 className="text-sm font-medium">{t('so.reservedTitle')}</h2>
+          <Table>
+            <thead>
+              <tr><Th>{t('po.line.product')}</Th><Th>{t('stock.col.place')}</Th><Th className="hidden sm:table-cell">{t('stock.col.lot')}</Th>
+                <Th className="text-right">{t('stock.col.qty')}</Th></tr>
+            </thead>
+            <tbody>
+              {so.reserved.map((r, i) => (
+                <tr key={i} className="border-t">
+                  <td className="px-3 py-2 font-mono text-xs">{r.sku}</td>
+                  <td className="px-3 py-2 font-mono text-sm">{r.binCode ?? '—'}</td>
+                  <td className="hidden px-3 py-2 text-sm text-muted-foreground sm:table-cell">{[r.batchNo, r.expiryDate].filter(Boolean).join(' · ') || '—'}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{Number(r.qty)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </section>
+      )}
     </div>
   )
 }
@@ -128,11 +161,18 @@ const schema = z.object({
 })
 type Values = z.infer<typeof schema>
 
+/** The pick lists load first: a select mounted before its options exist would show "Choose…" instead of the saved value. */
 function SoForm({ so }: { so: SalesOrder | null }) {
-  const navigate = useNavigate()
-  const save = useSoAction()
   const customers = useQuery({ queryKey: ['customers', 'all'], queryFn: () => api<Page<Supplier>>('/customers?size=100&sort=name') })
   const warehouses = useWarehouses()
+  if (customers.isError || warehouses.isError) return <FormMessage tone="error">{errorMessage(customers.error ?? warehouses.error)}</FormMessage>
+  if (!customers.data || !warehouses.data) return <p className="text-sm text-muted-foreground">{t('app.loading')}</p>
+  return <SoFields so={so} customers={customers.data.items} warehouses={warehouses.data.items} />
+}
+
+function SoFields({ so, customers, warehouses }: { so: SalesOrder | null; customers: Supplier[]; warehouses: { id: string; code: string; name: string }[] }) {
+  const navigate = useNavigate()
+  const save = useSoAction()
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -147,7 +187,7 @@ function SoForm({ so }: { so: SalesOrder | null }) {
   })
   const lines = useFieldArray({ control: form.control, name: 'lines' })
   const code = useWatch({ control: form.control, name: 'customerCode' })
-  const address = customers.data?.items.find((c) => c.code === code)?.address
+  const address = customers.find((c) => c.code === code)?.address
   const { errors } = form.formState
   const server = fieldErrors(save.error)
   const submit = form.handleSubmit((v) => save.mutate({
@@ -174,10 +214,10 @@ function SoForm({ so }: { so: SalesOrder | null }) {
           {(p) => (
             <select {...p} className={SELECT} {...form.register('customerCode')}>
               <option value="">{t('po.pick')}</option>
-              {so && !customers.data?.items.some((c) => c.code === so.customerCode) && (
+              {so && !customers.some((c) => c.code === so.customerCode) && (
                 <option value={so.customerCode}>{so.customerName}</option>
               )}
-              {customers.data?.items.map((c) => <option key={c.id} value={c.code}>{c.name} ({c.code})</option>)}
+              {customers.map((c) => <option key={c.id} value={c.code}>{c.name} ({c.code})</option>)}
             </select>
           )}
         </Field>
@@ -188,7 +228,7 @@ function SoForm({ so }: { so: SalesOrder | null }) {
           {(p) => (
             <select {...p} className={SELECT} {...form.register('warehouseId')}>
               <option value="">{t('po.pick')}</option>
-              {warehouses.data?.items.map((w) => <option key={w.id} value={w.id}>{w.code} · {w.name}</option>)}
+              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} · {w.name}</option>)}
             </select>
           )}
         </Field>

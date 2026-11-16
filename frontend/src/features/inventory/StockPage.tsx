@@ -86,6 +86,7 @@ function ByProduct({ warehouseId, onOpen }: { warehouseId: string | undefined; o
           <tr>
             <Th>{t('stock.col.product')}</Th>
             <Th className="text-right">{t('stock.col.onHand')}</Th>
+            <Th className="hidden text-right sm:table-cell">{t('stock.col.reserved')}</Th>
             <Th className="hidden text-right sm:table-cell">{t('stock.col.inReceiving')}</Th>
             <Th className="hidden text-right sm:table-cell">{t('stock.col.bins')}</Th>
           </tr>
@@ -99,6 +100,7 @@ function ByProduct({ warehouseId, onOpen }: { warehouseId: string | undefined; o
                 </button>
               </td>
               <td className="text-right tabular-nums">{num(p.onHand)} <span className="text-xs text-muted-foreground">{p.baseUom}</span></td>
+              <td className="hidden text-right tabular-nums sm:table-cell">{num(p.reserved)}</td>
               <td className="hidden text-right tabular-nums sm:table-cell">{num(p.inReceiving)}</td>
               <td className="hidden text-right tabular-nums sm:table-cell">{p.bins}</td>
             </Tr>
@@ -167,6 +169,7 @@ function StockRows({ data, error, showProduct }: {
             <Th>{t('stock.col.place')}</Th>
             {showProduct && <Th>{t('stock.col.product')}</Th>}
             <Th className="hidden md:table-cell">{t('stock.col.lot')}</Th>
+            <Th className="hidden text-right sm:table-cell">{t('stock.col.reserved')}</Th>
             <Th className="text-right">{t('stock.col.qty')}</Th>
           </tr>
         </thead>
@@ -176,11 +179,12 @@ function StockRows({ data, error, showProduct }: {
               <td className="font-mono text-sm">{place(s.binCode)}</td>
               {showProduct && <td><span className="font-mono text-xs">{s.sku}</span> {s.name}</td>}
               <td className="hidden text-sm text-muted-foreground md:table-cell">{[s.batchNo, s.expiryDate].filter(Boolean).join(' · ') || '—'}</td>
+              <td className="hidden text-right tabular-nums sm:table-cell">{num(s.qtyReserved)}</td>
               <td className="text-right tabular-nums">{num(s.qtyOnHand)} <span className="text-xs text-muted-foreground">{s.baseUom}</span></td>
             </Tr>
           ))}
           {data && data.items.length === 0 && (
-            <tr><td colSpan={showProduct ? 4 : 3} className="py-8 text-center text-muted-foreground">{t('stock.empty')}</td></tr>
+            <tr><td colSpan={showProduct ? 5 : 4} className="py-8 text-center text-muted-foreground">{t('stock.empty')}</td></tr>
           )}
         </tbody>
       </Table>

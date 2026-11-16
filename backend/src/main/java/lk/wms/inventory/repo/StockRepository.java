@@ -35,6 +35,19 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             @Param("binId") Long binId, @Param("productId") long productId, @Param("batchNo") String batchNo,
             @Param("expiry") LocalDate expiry);
 
+    /**
+     * Ids of stock rows in bins that still have something free for these products, in bin order: the order the
+     * caller then locks them in (ids only, so no stale entity copies are left in the session).
+     */
+    @Query("select s.id from Stock s where s.warehouseId = :warehouseId and s.productId in :productIds and s.binId is not null"
+            + " and s.qtyOnHand > s.qtyReserved order by s.binId, s.id")
+    List<Long> reservableIds(@Param("warehouseId") long warehouseId, @Param("productIds") Collection<Long> productIds);
+
+    /** One stock row, write-locked. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from Stock s where s.id = :id")
+    Optional<Stock> lockById(@Param("id") long id);
+
     /** What a bin holds now as [product_id, qty_on_hand], read with locks (capacity check, bin row already locked). */
     @Query(value = "SELECT product_id, qty_on_hand FROM stock WHERE bin_id = :binId FOR SHARE", nativeQuery = true)
     List<Object[]> contentsForUpdate(@Param("binId") long binId);
@@ -56,9 +69,10 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             @Param("anyBin") boolean anyBin, @Param("binIds") Collection<Long> binIds, @Param("receivingOnly") boolean receivingOnly,
             org.springframework.data.domain.Pageable pageable);
 
-    /** Totals per product: [product_id, on hand, in receiving, bins]. */
+    /** Totals per product: [product_id, on hand, in receiving, bins, reserved]. */
     @Query(value = """
-            select s.productId, sum(s.qtyOnHand), sum(case when s.binId is null then s.qtyOnHand else 0 end), count(distinct s.binId)
+            select s.productId, sum(s.qtyOnHand), sum(case when s.binId is null then s.qtyOnHand else 0 end), count(distinct s.binId),
+                   sum(s.qtyReserved)
             from Stock s where s.warehouseId = :warehouseId and s.qtyOnHand > 0 and (:anyProduct = true or s.productId in :productIds)
             group by s.productId order by s.productId""",
             countQuery = """

@@ -61,6 +61,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied", request);
     }
 
+    /** Two people saved the same record at once (@Version); the later one reloads and tries again. */
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    ResponseEntity<Object> handleStale(Exception ex, WebRequest request) {
+        return problem(HttpStatus.CONFLICT, "STALE", "Someone else changed this just now; reload it", request);
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<Object> handleUnexpected(Exception ex, WebRequest request) {
         log.error("Unhandled error", ex);

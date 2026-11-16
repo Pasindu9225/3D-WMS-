@@ -81,7 +81,7 @@ public class BinService {
     }
 
     /** A bin as stock screens show it. */
-    public record BinLabel(String publicId, String code) {
+    public record BinLabel(String publicId, String code, boolean blocked) {
     }
 
     /** Labels by internal id (other modules store bin ids on their rows); tenant-filtered. */
@@ -89,7 +89,7 @@ public class BinService {
     public java.util.Map<Long, BinLabel> labels(java.util.Collection<Long> binIds) {
         java.util.Map<Long, BinLabel> out = new java.util.HashMap<>();
         if (!binIds.isEmpty()) {
-            bins.labels(binIds).forEach(r -> out.put(((Number) r[0]).longValue(), new BinLabel((String) r[1], (String) r[2])));
+            bins.labels(binIds).forEach(r -> out.put(((Number) r[0]).longValue(), new BinLabel((String) r[1], (String) r[2], (Boolean) r[3])));
         }
         return out;
     }

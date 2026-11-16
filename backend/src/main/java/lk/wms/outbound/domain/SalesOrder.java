@@ -87,6 +87,12 @@ public class SalesOrder extends TenantScoped {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @Column(name = "released_by")
+    private Long releasedBy;
+
+    @Column(name = "released_at")
+    private Instant releasedAt;
+
     @Column(name = "cancelled_by")
     private Long cancelledBy;
 
@@ -140,6 +146,12 @@ public class SalesOrder extends TenantScoped {
         if (id != null) {
             this.updatedAt = Instant.now();
         }
+    }
+
+    public void release(long userId) {
+        this.status = Status.RELEASED;
+        this.releasedBy = userId;
+        this.releasedAt = Instant.now();
     }
 
     public void cancel(long userId, String reason) {
@@ -207,6 +219,10 @@ public class SalesOrder extends TenantScoped {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getReleasedAt() {
+        return releasedAt;
     }
 
     public Instant getCancelledAt() {

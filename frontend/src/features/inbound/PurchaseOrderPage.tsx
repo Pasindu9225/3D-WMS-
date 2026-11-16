@@ -172,11 +172,18 @@ function unitCost(l: LineValues): number | null {
   return l.baseCostMinor === null ? null : l.baseCostMinor * f
 }
 
+/** The pick lists load first: a select mounted before its options exist would show "Choose…" instead of the saved value. */
 function PoForm({ po }: { po: PurchaseOrder | null }) {
-  const navigate = useNavigate()
-  const save = usePoAction()
   const suppliers = useQuery({ queryKey: ['suppliers', 'all'], queryFn: () => api<Page<Supplier>>('/suppliers?size=100&sort=name') })
   const warehouses = useWarehouses()
+  if (suppliers.isError || warehouses.isError) return <FormMessage tone="error">{errorMessage(suppliers.error ?? warehouses.error)}</FormMessage>
+  if (!suppliers.data || !warehouses.data) return <p className="text-sm text-muted-foreground">{t('app.loading')}</p>
+  return <PoFields po={po} suppliers={suppliers.data.items} warehouses={warehouses.data.items} />
+}
+
+function PoFields({ po, suppliers, warehouses }: { po: PurchaseOrder | null; suppliers: Supplier[]; warehouses: { id: string; code: string; name: string }[] }) {
+  const navigate = useNavigate()
+  const save = usePoAction()
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -216,10 +223,10 @@ function PoForm({ po }: { po: PurchaseOrder | null }) {
           {(p) => (
             <select {...p} className={SELECT} {...form.register('supplierCode')}>
               <option value="">{t('po.pick')}</option>
-              {po && !suppliers.data?.items.some((s) => s.code === po.supplierCode) && (
+              {po && !suppliers.some((s) => s.code === po.supplierCode) && (
                 <option value={po.supplierCode}>{po.supplierName}</option>
               )}
-              {suppliers.data?.items.map((s) => <option key={s.id} value={s.code}>{s.name} ({s.code})</option>)}
+              {suppliers.map((s) => <option key={s.id} value={s.code}>{s.name} ({s.code})</option>)}
             </select>
           )}
         </Field>
@@ -227,7 +234,7 @@ function PoForm({ po }: { po: PurchaseOrder | null }) {
           {(p) => (
             <select {...p} className={SELECT} {...form.register('warehouseId')}>
               <option value="">{t('po.pick')}</option>
-              {warehouses.data?.items.map((w) => <option key={w.id} value={w.id}>{w.code} · {w.name}</option>)}
+              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} · {w.name}</option>)}
             </select>
           )}
         </Field>

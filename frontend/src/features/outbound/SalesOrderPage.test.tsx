@@ -60,3 +60,39 @@ it('picks a customer (their address is the default ship-to), adds cases and save
     lines: [{ sku: 'OIL-1L', uom: 'CASE', qty: 10 }],
   }))
 })
+
+it('releases a draft, lists the reserved stock, and names what is short when it cannot', async () => {
+  const draft = {
+    id: 'so1', number: 'SO-000001', status: 'DRAFT', customerCode: 'CUS-1', customerName: 'Kandy Super', customerRef: null,
+    warehouseId: 'w1', warehouseCode: 'MAIN', shipTo: null, requestedDate: null, note: null, createdAt: '', releasedAt: null,
+    cancelledAt: null, cancelReason: null, lines: [{ lineNo: 1, sku: 'OIL-1L', productName: 'Coconut oil', uom: 'CASE', factor: 12, qty: 2 }],
+    reserved: [], version: 0,
+  }
+  let short = true
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit = {}) => {
+    if (url === '/api/v1/auth/me') return Response.json({ id: 'u', email: 'a@b.lk', displayName: 'A', permissions: ['outbound:read', 'outbound:manage'] })
+    if (url.startsWith('/api/v1/customers') || url.startsWith('/api/v1/warehouses')) return Response.json(page([]))
+    if (url === '/api/v1/sales-orders/so1') return Response.json(draft)
+    if (url === '/api/v1/sales-orders/so1/release' && init.method === 'POST') {
+      if (short) return Response.json({ code: 'NOT_ENOUGH_STOCK', detail: 'OIL-1L (EA): need 24, 10 free in bins' }, { status: 409 })
+      return Response.json({ ...draft, status: 'RELEASED', version: 1,
+        reserved: [{ lineNo: 1, sku: 'OIL-1L', binCode: 'A-01-01-01', batchNo: null, expiryDate: null, qty: 24 }] })
+    }
+    return new Response(null, { status: 404 })
+  }))
+  const user = userEvent.setup()
+  const router = createMemoryRouter([{ path: '/app/sales-orders/:id', Component: SalesOrderPage }], { initialEntries: ['/app/sales-orders/so1'] })
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
+  await user.click(await screen.findByRole('button', { name: 'Release for picking' }))
+  expect(await screen.findByText(/Short: OIL-1L \(EA\): need 24, 10 free in bins/)).toBeInTheDocument()
+  short = false
+  await user.click(screen.getByRole('button', { name: 'Release for picking' }))
+  expect(await screen.findByText('Released')).toBeInTheDocument()
+  expect(screen.getByText('A-01-01-01')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Release for picking' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Cancel order' })).toBeInTheDocument()
+})

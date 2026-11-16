@@ -189,6 +189,8 @@ export interface ProductTotal {
   onHand: number
   inReceiving: number
   bins: number
+  /** Set aside for released sales orders. */
+  reserved: number
 }
 
 export interface MovementRow {

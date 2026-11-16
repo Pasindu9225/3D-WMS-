@@ -21,6 +21,9 @@ import lk.wms.common.audit.AuditService;
 import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
 import lk.wms.inbound.service.DocNumbers;
+import lk.wms.inventory.service.StockMovementService;
+import lk.wms.inventory.service.StockMovementService.Allocation;
+import lk.wms.inventory.service.StockMovementService.Need;
 import lk.wms.layout.service.WarehouseService;
 import lk.wms.outbound.domain.SalesOrder;
 import lk.wms.outbound.domain.SalesOrder.Header;
@@ -62,12 +65,18 @@ public class SalesOrderService {
     public record LineView(int lineNo, String sku, String productName, String uom, int factor, BigDecimal qty) {
     }
 
+    /** Stock set aside for a line: where, which lot, how much (base units). */
+    public record ReservedView(int lineNo, String sku, String binCode, String batchNo, LocalDate expiryDate, BigDecimal qty) {
+    }
+
     public record Detail(String id, String number, String status, String customerCode, String customerName,
             String customerRef, String warehouseId, String warehouseCode, String shipTo, LocalDate requestedDate,
-            String note, Instant createdAt, Instant cancelledAt, String cancelReason, List<LineView> lines, int version) {
+            String note, Instant createdAt, Instant releasedAt, Instant cancelledAt, String cancelReason, List<LineView> lines,
+            List<ReservedView> reserved, int version) {
     }
 
     static final String KIND = "SO";
+    static final String REF = "SO";
     static final int MAX_LINES = 200;
 
     private final SalesOrderRepository orders;
@@ -76,9 +85,11 @@ public class SalesOrderService {
     private final ProductService products;
     private final WarehouseService warehouses;
     private final AuditService audit;
+    private final StockMovementService stock;
 
     public SalesOrderService(SalesOrderRepository orders, DocNumbers numbers, PartnerService partners,
-            ProductService products, WarehouseService warehouses, AuditService audit) {
+            ProductService products, WarehouseService warehouses, AuditService audit, StockMovementService stock) {
+        this.stock = stock;
         this.orders = orders;
         this.numbers = numbers;
         this.partners = partners;
@@ -121,12 +132,38 @@ public class SalesOrderService {
         return detail(o);
     }
 
-    // ponytail: drafts only until task 3 adds release; then a released order cancels too and frees its reservations.
+    /**
+     * Releases a draft for picking: every line is reserved in full (FIFO by receive date) or nothing is, and the
+     * error lists what is short. The order row is version-checked, so two clicks cannot release it twice.
+     */
+    @Transactional
+    public Detail release(CurrentUser cu, String publicId, int version) {
+        SalesOrder o = current(cu, publicId, version);
+        if (o.getStatus() != Status.DRAFT) {
+            throw new ApiException(HttpStatus.CONFLICT, "SO_NOT_DRAFT", "Only a draft order can be released");
+        }
+        warehouses.requireAccess(cu, o.getWarehouseId()); // still live and still this user's
+        Map<Long, String> baseUom = new HashMap<>();
+        products.forOrder(o.getLines().stream().map(SoLine::getSku).toList()).values().forEach(p -> baseUom.put(p.id(), p.baseUom()));
+        List<Need> needs = o.getLines().stream().map(l -> new Need(l.getLineNo(), l.getProductId(), l.orderedBase(),
+                l.getSku() + " (" + baseUom.getOrDefault(l.getProductId(), l.getUom()) + ")")).toList();
+        List<Allocation> got = stock.reserve(o.getWarehouseId(), REF, o.getId(), needs, cu.userId());
+        o.release(cu.userId());
+        orders.flush(); // version check: a second release of the same version fails here and rolls back its reservations
+        audit.record(cu.tenantId(), cu.userId(), "SO_RELEASED", "sales_order", o.getPublicId(), null,
+                Map.of("number", o.getNumber(), "reserved", got.stream().map(a -> Map.of("line", a.line(), "bin", a.binCode(),
+                        "qty", a.qty())).toList()));
+        return detail(o);
+    }
+
     @Transactional
     public Detail cancel(CurrentUser cu, String publicId, int version, String reason) {
         SalesOrder o = current(cu, publicId, version);
-        if (o.getStatus() != Status.DRAFT) {
-            throw new ApiException(HttpStatus.CONFLICT, "SO_CANNOT_CANCEL", "Only a draft order can be cancelled");
+        if (o.getStatus() != Status.DRAFT && o.getStatus() != Status.RELEASED) {
+            throw new ApiException(HttpStatus.CONFLICT, "SO_CANNOT_CANCEL", "Only a draft or released order can be cancelled");
+        }
+        if (o.getStatus() == Status.RELEASED) {
+            stock.unreserve(REF, o.getId());
         }
         o.cancel(cu.userId(), reason.trim());
         orders.flush();
@@ -280,9 +317,14 @@ public class SalesOrderService {
     private Detail detail(SalesOrder o) {
         List<LineView> lines = o.getLines().stream().map(l -> new LineView(l.getLineNo(), l.getSku(), l.getProductName(),
                 l.getUom(), l.getFactor(), l.getQty())).toList();
+        Map<Integer, String> skuOf = new HashMap<>();
+        o.getLines().forEach(l -> skuOf.put(l.getLineNo(), l.getSku()));
+        List<ReservedView> reserved = o.getStatus() == Status.DRAFT || o.getStatus() == Status.CANCELLED ? List.of()
+                : stock.reserved(REF, o.getId()).stream().map(a -> new ReservedView(a.line(), skuOf.get(a.line()), a.binCode(),
+                        a.batchNo(), a.expiry(), a.qty())).toList();
         return new Detail(o.getPublicId(), o.getNumber(), o.getStatus().name(), o.getCustomerCode(), o.getCustomerName(),
                 o.getCustomerRef(), warehouses.publicIdOf(o.getWarehouseId()), o.getWarehouseCode(), o.getShipTo(),
-                o.getRequestedDate(), o.getNote(), o.getCreatedAt(), o.getCancelledAt(), o.getCancelReason(), lines,
-                o.getVersion());
+                o.getRequestedDate(), o.getNote(), o.getCreatedAt(), o.getReleasedAt(), o.getCancelledAt(), o.getCancelReason(),
+                lines, reserved, o.getVersion());
     }
 }

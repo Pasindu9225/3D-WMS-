@@ -42,8 +42,11 @@ export interface SalesOrder {
   note: string | null
   createdAt: string
   cancelledAt: string | null
+  releasedAt: string | null
   cancelReason: string | null
   lines: SoLine[]
+  /** Stock set aside once released: where, which lot, how much (base units). */
+  reserved: { lineNo: number; sku: string; binCode: string | null; batchNo: string | null; expiryDate: string | null; qty: number }[]
   version: number
 }
 
@@ -80,18 +83,22 @@ export function useSalesOrder(id: string | undefined) {
   })
 }
 
-/** Save (create or edit a draft) or cancel; every change refreshes the list and the order. */
+/** Save (create or edit a draft), release (reserve stock) or cancel; every change refreshes the list and the order. */
 export function useSoAction() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (a: { kind: 'save'; id?: string; body: SoInput } | { kind: 'cancel'; id: string; version: number; reason: string }) =>
-      a.kind === 'cancel'
+    mutationFn: (a: { kind: 'save'; id?: string; body: SoInput } | { kind: 'release'; id: string; version: number }
+      | { kind: 'cancel'; id: string; version: number; reason: string }) =>
+      a.kind === 'release' ? api<SalesOrder>(`/sales-orders/${a.id}/release`, { method: 'POST', body: { version: a.version } })
+      : a.kind === 'cancel'
         ? api<SalesOrder>(`/sales-orders/${a.id}/cancel`, { method: 'POST', body: { version: a.version, reason: a.reason } })
         : a.id ? api<SalesOrder>(`/sales-orders/${a.id}`, { method: 'PUT', body: a.body })
           : api<SalesOrder>('/sales-orders', { method: 'POST', body: a.body }),
     onSuccess: (so) => {
       qc.setQueryData(['sales-order', so.id], so)
       void qc.invalidateQueries({ queryKey: ['sales-orders'] })
+      void qc.invalidateQueries({ queryKey: ['stock'] })
+      void qc.invalidateQueries({ queryKey: ['stock-products'] })
     },
   })
 }

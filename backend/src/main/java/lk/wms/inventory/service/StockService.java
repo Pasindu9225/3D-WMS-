@@ -33,7 +33,7 @@ public class StockService {
     }
 
     public record ProductTotal(String productId, String sku, String name, String baseUom, BigDecimal onHand,
-            BigDecimal inReceiving, long bins) {
+            BigDecimal inReceiving, long bins, BigDecimal reserved) {
     }
 
     public record MovementRow(long id, String type, String sku, String name, String baseUom, String batchNo,
@@ -113,7 +113,7 @@ public class StockService {
         return page.map(r -> {
             ProductService.Basic p = names.get(((Number) r[0]).longValue());
             return new ProductTotal(p == null ? null : p.publicId(), p == null ? "?" : p.sku(), p == null ? "" : p.name(),
-                    p == null ? "" : p.baseUom(), (BigDecimal) r[1], (BigDecimal) r[2], ((Number) r[3]).longValue());
+                    p == null ? "" : p.baseUom(), (BigDecimal) r[1], (BigDecimal) r[2], ((Number) r[3]).longValue(), (BigDecimal) r[4]);
         });
     }
 
