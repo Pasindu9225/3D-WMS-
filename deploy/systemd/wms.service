@@ -1,0 +1,36 @@
+# /etc/systemd/system/wms.service — the WMS backend. Enable: systemctl enable --now wms
+[Unit]
+Description=3D WMS backend
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=wms
+Group=wms
+WorkingDirectory=/opt/wms
+# Secrets and settings (mode 600, owner wms): WMS_APP_PASSWORD, WMS_FLYWAY_PASSWORD, WMS_APP_BASE_URL ...
+EnvironmentFile=/etc/wms/wms.env
+Environment=SPRING_PROFILES_ACTIVE=prod
+ExecStart=/usr/bin/java -Xms256m -Xmx512m -XX:+ExitOnOutOfMemoryError -jar /opt/wms/wms.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# Hardening: the service sees the system read-only except its own folders.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/log/wms /var/lib/wms
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

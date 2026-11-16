@@ -26,3 +26,8 @@ Thumbs.db
 
 # local test accounts for browser checks (never committed)
 .local/
+
+# local rehearsal certificate and backups (never committed)
+deploy/local/certs/
+deploy/local/backups/
+deploy/local/zap/

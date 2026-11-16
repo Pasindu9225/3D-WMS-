@@ -1,0 +1,11 @@
+# /etc/systemd/system/wms-backup.service — one backup run (started by wms-backup.timer)
+[Unit]
+Description=3D WMS encrypted backup
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/wms/backup.sh
+Nice=10
+IOSchedulingClass=idle

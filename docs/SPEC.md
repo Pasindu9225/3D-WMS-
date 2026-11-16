@@ -308,9 +308,9 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Supervisor task board: assign, re-assign, priorities, live status
 - [x] Dashboard: stock value, low stock, today's receipts and shipments, bin utilisation %, KPIs (dock-to-stock time, lines picked per hour)
 - [x] Exports: stock, movements, orders to Excel and PDF (streamed)
-- [ ] Deployment: Nginx + HTTPS, systemd services, `backup.sh` with daily encrypted dumps, restore guide (SEC-66, SEC-83, SEC-84). Nginx must: send CSP/HSTS/nosniff/frame headers for the web app, keep `Host` (`proxy_set_header Host $host`), set `X-Forwarded-For`/`-Proto`, and never forward `/actuator` (security review v0.1, F12)
+- [ ] Deployment: Nginx + HTTPS, systemd services, `backup.sh` with daily encrypted dumps, restore guide (SEC-66, SEC-83, SEC-84). Nginx must: send CSP/HSTS/nosniff/frame headers for the web app, keep `Host` (`proxy_set_header Host $host`), set `X-Forwarded-For`/`-Proto`, and never forward `/actuator` (security review v0.1, F12) — files ready in deploy/ and rehearsed locally 2026-11-17 (nginx, TLS, backup and restore); server install pending
 - [x] Production profile: Swagger off, Actuator localhost only, log rotation
-- [ ] OWASP ZAP baseline scan; fix all high findings (SEC-85)
+- [x] OWASP ZAP baseline scan; fix all high findings (SEC-85) — docs/zap-baseline-v1.0.md (local rehearsal; repeat on the server)
 - [ ] User guide (short, with screenshots) for admin and workers
 
 **Deliverables:** MVP live on a VPS or the pilot's office PC; admin guide and worker guide; security checklist fully ticked.
