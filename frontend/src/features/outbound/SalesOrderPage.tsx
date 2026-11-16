@@ -103,6 +103,10 @@ function SoView({ so }: { so: SalesOrder }) {
         <Fact label={t('po.col.warehouse')} value={so.warehouseCode} />
         <Fact label={t('so.col.requested')} value={so.requestedDate ?? '—'} />
       </dl>
+      {so.shipped && (
+        <FormMessage tone="success">{t('so.shippedInfo', { number: so.shipped.number, at: new Date(so.shipped.at).toLocaleString(),
+          who: [so.shipped.vehicleNo, so.shipped.driverName].filter(Boolean).join(' · ') || '—' })}</FormMessage>
+      )}
       {so.deliveryNoteNo && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm">
           <span>{t('so.packedInfo', { dn: so.deliveryNoteNo, cartons: so.cartons ?? 0 })}</span>

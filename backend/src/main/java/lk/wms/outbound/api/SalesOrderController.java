@@ -112,12 +112,15 @@ public class SalesOrderController {
 
     private final SalesOrderService orders;
     private final PackService packs;
+    private final lk.wms.outbound.service.ShipmentService shipments;
     private final Validator validator;
     private final RateLimiter limiter;
 
-    public SalesOrderController(SalesOrderService orders, PackService packs, Validator validator, RateLimiter limiter) {
+    public SalesOrderController(SalesOrderService orders, PackService packs, lk.wms.outbound.service.ShipmentService shipments,
+            Validator validator, RateLimiter limiter) {
         this.orders = orders;
         this.packs = packs;
+        this.shipments = shipments;
         this.validator = validator;
         this.limiter = limiter;
     }
@@ -139,6 +142,14 @@ public class SalesOrderController {
     @PreAuthorize("hasAnyAuthority('packing:execute', 'outbound:read')")
     public PageResponse<Summary> toPack(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
         return PageResponse.of(packs.toPack(CurrentUser.require(), PageResponse.request(page, size, null, Map.of(),
+                Sort.by(Sort.Direction.ASC, "id"))), s -> s);
+    }
+
+    /** Packed orders waiting for a vehicle, oldest first. */
+    @GetMapping("/to-dispatch")
+    @PreAuthorize("hasAnyAuthority('dispatch:execute', 'outbound:read')")
+    public PageResponse<Summary> toDispatch(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return PageResponse.of(shipments.toDispatch(CurrentUser.require(), PageResponse.request(page, size, null, Map.of(),
                 Sort.by(Sort.Direction.ASC, "id"))), s -> s);
     }
 

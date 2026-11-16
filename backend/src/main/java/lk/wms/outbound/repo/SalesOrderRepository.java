@@ -16,6 +16,13 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
     @Query("select distinct o from SalesOrder o left join fetch o.lines where o.publicId = :publicId")
     Optional<SalesOrder> findByPublicId(@Param("publicId") String publicId);
 
+    /** These orders, write-locked in id order (dispatch: a fixed lock order, so two dispatchers never deadlock). */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from SalesOrder o where o.publicId in :ids order by o.id")
+    List<SalesOrder> lockByPublicIds(@Param("ids") Collection<String> ids);
+
+    List<SalesOrder> findByShipmentIdOrderById(Long shipmentId);
+
     /** Orders by internal id (pick lists point at them). */
     @Query("select o from SalesOrder o where o.id in :ids")
     List<SalesOrder> byInternalIds(@Param("ids") Collection<Long> ids);

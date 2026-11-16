@@ -107,6 +107,12 @@ public class SalesOrder extends TenantScoped {
     @Column(name = "packed_at")
     private Instant packedAt;
 
+    @Column(name = "shipment_id")
+    private Long shipmentId;
+
+    @Column(name = "shipped_at")
+    private Instant shippedAt;
+
     @Column(name = "cancelled_by")
     private Long cancelledBy;
 
@@ -181,6 +187,12 @@ public class SalesOrder extends TenantScoped {
         this.weightG = weightG;
         this.packedBy = userId;
         this.packedAt = Instant.now();
+    }
+
+    public void ship(long shipmentId) {
+        this.status = Status.SHIPPED;
+        this.shipmentId = shipmentId;
+        this.shippedAt = Instant.now();
     }
 
     public void cancel(long userId, String reason) {
@@ -272,6 +284,14 @@ public class SalesOrder extends TenantScoped {
 
     public Instant getPackedAt() {
         return packedAt;
+    }
+
+    public Long getShipmentId() {
+        return shipmentId;
+    }
+
+    public Instant getShippedAt() {
+        return shippedAt;
     }
 
     public Instant getCancelledAt() {

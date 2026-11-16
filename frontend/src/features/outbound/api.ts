@@ -52,6 +52,7 @@ export interface SalesOrder {
   deliveryNoteNo: string | null
   cartons: number | null
   packedAt: string | null
+  shipped: { shipmentId: string; number: string; vehicleNo: string | null; driverName: string | null; at: string } | null
   version: number
 }
 
@@ -227,3 +228,33 @@ export function useFinishPack() {
 /** The two papers that travel with a packed order. */
 export const packingSlipUrl = (id: string) => `/api/v1/sales-orders/${id}/packing-slip.pdf`
 export const deliveryNoteUrl = (id: string) => `/api/v1/sales-orders/${id}/delivery-note.pdf`
+
+export interface Shipment {
+  id: string
+  number: string
+  warehouseCode: string | null
+  vehicleNo: string | null
+  driverName: string | null
+  note: string | null
+  createdAt: string
+  orders: { id: string; number: string; customerName: string; deliveryNoteNo: string | null; cartons: number | null }[]
+}
+
+export function useToDispatch(enabled = true) {
+  return useQuery({ queryKey: ['to-dispatch'], queryFn: () => api<Page<SoSummary>>('/sales-orders/to-dispatch?size=100'), enabled })
+}
+
+export function useShipments() {
+  return useQuery({ queryKey: ['shipments'], queryFn: () => api<Page<Shipment>>('/shipments?size=10') })
+}
+
+export function useDispatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { warehouseId: string; orderIds: string[]; vehicleNo: string | null; driverName: string | null; note: string | null }) =>
+      api<Shipment>('/shipments', { method: 'POST', body }),
+    onSuccess: () => {
+      for (const key of ['to-dispatch', 'shipments', 'sales-orders', 'sales-order', 'stock', 'stock-products']) void qc.invalidateQueries({ queryKey: [key] })
+    },
+  })
+}

@@ -73,7 +73,11 @@ public class SalesOrderService {
             String customerRef, String warehouseId, String warehouseCode, String shipTo, LocalDate requestedDate,
             String note, Instant createdAt, Instant releasedAt, Instant cancelledAt, String cancelReason, List<LineView> lines,
             List<ReservedView> reserved, PickService.Detail pick, String deliveryNoteNo, Integer cartons, Instant packedAt,
-            int version) {
+            Shipped shipped, int version) {
+    }
+
+    /** The trip an order left on. */
+    public record Shipped(String shipmentId, String number, String vehicleNo, String driverName, Instant at) {
     }
 
     static final String KIND = "SO";
@@ -88,12 +92,14 @@ public class SalesOrderService {
     private final AuditService audit;
     private final StockMovementService stock;
     private final PickService picks;
+    private final ShipmentService shipments;
 
     public SalesOrderService(SalesOrderRepository orders, DocNumbers numbers, PartnerService partners,
             ProductService products, WarehouseService warehouses, AuditService audit, StockMovementService stock,
-            PickService picks) {
+            PickService picks, ShipmentService shipments) {
         this.stock = stock;
         this.picks = picks;
+        this.shipments = shipments;
         this.orders = orders;
         this.numbers = numbers;
         this.partners = partners;
@@ -318,6 +324,14 @@ public class SalesOrderService {
         return o;
     }
 
+    private Shipped shipped(SalesOrder o) {
+        if (o.getShipmentId() == null) {
+            return null;
+        }
+        lk.wms.outbound.domain.Shipment s = shipments.byIds(List.of(o.getShipmentId())).get(o.getShipmentId());
+        return new Shipped(s.getPublicId(), s.getNumber(), s.getVehicleNo(), s.getDriverName(), o.getShippedAt());
+    }
+
     static Summary summary(SalesOrder o) {
         return new Summary(o.getPublicId(), o.getNumber(), o.getStatus().name(), o.getCustomerCode(), o.getCustomerName(),
                 o.getCustomerRef(), o.getWarehouseCode(), o.getRequestedDate(), o.getLineCount(), o.getCreatedAt());
@@ -335,6 +349,6 @@ public class SalesOrderService {
                 o.getCustomerRef(), warehouses.publicIdOf(o.getWarehouseId()), o.getWarehouseCode(), o.getShipTo(),
                 o.getRequestedDate(), o.getNote(), o.getCreatedAt(), o.getReleasedAt(), o.getCancelledAt(), o.getCancelReason(),
                 lines, reserved, o.getStatus() == Status.DRAFT ? null : picks.forOrder(o), o.getDeliveryNoteNo(), o.getCartons(),
-                o.getPackedAt(), o.getVersion());
+                o.getPackedAt(), shipped(o), o.getVersion());
     }
 }
