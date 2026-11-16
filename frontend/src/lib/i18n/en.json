@@ -987,5 +987,13 @@
   "dash.h": "{h} h",
   "dash.hMin": "{h} h {m} min",
   "products.reorderField": "Reorder point (base units)",
-  "products.reorderRule": "A number like 20, up to 3 decimals"
+  "products.reorderRule": "A number like 20, up to 3 decimals",
+  "export.excel": "Excel",
+  "export.pdf": "PDF",
+  "export.excelOf": "Download {what} as Excel",
+  "export.pdfOf": "Download {what} as PDF",
+  "export.what.stock": "stock",
+  "export.what.movements": "movements",
+  "export.what.orders": "sales orders",
+  "error.EXPORT_TOO_LARGE": "That is too many rows for one file. Narrow the dates, or use Excel instead of PDF."
 }

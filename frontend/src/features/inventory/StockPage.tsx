@@ -7,6 +7,7 @@ import { errorMessage } from '@/lib/errors'
 import { t, type MessageKey } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useDebounced } from '@/lib/useDebounced'
+import { ExportLinks } from '@/features/report/ExportLinks'
 import { useMovements, useProductTotals, useStockRows, type ProductTotal } from './api'
 
 type Tab = 'products' | 'bins' | 'movements'
@@ -29,6 +30,8 @@ export function StockPage() {
           <h1 className="text-2xl font-semibold">{t('stock.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('stock.hint')}</p>
         </div>
+        <span className="flex flex-wrap items-center gap-3">
+          {warehouseId && <ExportLinks what="stock" params={{ warehouse: warehouseId }} />}
         {(warehouses.data?.items.length ?? 0) > 1 && (
           <select aria-label={t('putaway.warehouse')} className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             value={warehouseId ?? ''} onChange={(e) => {
@@ -38,6 +41,7 @@ export function StockPage() {
             {warehouses.data?.items.map((w) => <option key={w.id} value={w.id}>{w.code} · {w.name}</option>)}
           </select>
         )}
+        </span>
       </div>
       <div role="tablist" className="flex gap-1 border-b">
         {(['products', 'bins', 'movements'] as const).map((k) => (
@@ -203,6 +207,7 @@ function Movements({ warehouseId }: { warehouseId: string | undefined }) {
   return (
     <>
       <div className="flex flex-wrap items-end gap-3 text-sm">
+        {warehouseId && <span className="order-last ml-auto"><ExportLinks what="movements" params={{ warehouse: warehouseId, type: type || undefined, from: from || undefined, to: to || undefined }} /></span>}
         <label className="grid gap-1">{t('stock.type')}
           <select className="h-10 rounded-md border border-input bg-background px-3" value={type} onChange={(e) => {
             setType(e.target.value)

@@ -145,6 +145,12 @@ public class StockService {
         });
     }
 
+    /** The ledger with the movement type by name (other modules do not see the ledger entity). */
+    @Transactional(readOnly = true)
+    public Page<MovementRow> movements(CurrentUser cu, String warehouseId, String type, LocalDate from, LocalDate to, Pageable pageable) {
+        return movements(cu, warehouseId, null, null, type == null ? null : StockMovement.Type.valueOf(type), from, to, pageable);
+    }
+
     /** The ledger, newest first. Dates are whole days (UTC); to is inclusive. */
     @Transactional(readOnly = true)
     public Page<MovementRow> movements(CurrentUser cu, String warehouseId, String productId, String binId,

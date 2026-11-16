@@ -115,6 +115,12 @@ public class SalesOrderService {
                 ProductService.likeText(query), pageable).map(SalesOrderService::summary);
     }
 
+    /** The same list with the status by name (null = all), for other modules. */
+    @Transactional(readOnly = true)
+    public Page<Summary> list(CurrentUser cu, String status, String query, Pageable pageable) {
+        return list(cu, status == null ? List.of(Status.values()) : List.of(Status.valueOf(status)), query, pageable);
+    }
+
     @Transactional(readOnly = true)
     public Detail get(CurrentUser cu, String publicId) {
         return detail(find(cu, publicId));

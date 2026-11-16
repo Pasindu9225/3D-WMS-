@@ -228,4 +228,49 @@ class DispatchTest extends ApiTest {
         Cookie other = login(newUser(newTenant(1), "TENANT_ADMIN"));
         send(other, get("/api/v1/dashboard?warehouse=" + warehouse)).andExpect(status().isNotFound());
     }
+    @Test
+    void exportsStockMovementsAndOrdersAsExcelAndPdfWithFormulasKeptAsText() throws Exception {
+        String productId = read(send(admin, get("/api/v1/products?q=OIL-1L")), "$.items[0].id");
+        int v = read(send(admin, get("/api/v1/products?q=OIL-1L")), "$.items[0].version");
+        send(admin, put("/api/v1/products/" + productId).content("{\"name\":\"=HYPERLINK(\\\"http://x\\\")\",\"baseUom\":\"EA\",\"barcode\":\"4791\","
+                + "\"costMinor\":45000,\"trackBatch\":false,\"trackExpiry\":false,\"units\":[{\"uom\":\"CASE\",\"factor\":12,\"barcode\":\"14791\"}],"
+                + "\"version\":" + v + "}")).andExpect(status().isOk());
+        ship(admin, packedOrder("C1", 1)).andExpect(status().isCreated());
+
+        byte[] xlsx = send(admin, get("/api/v1/exports/stock.xlsx?warehouse=" + warehouse)).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition",
+                        org.hamcrest.Matchers.startsWith("attachment; filename=\"stock-WH1-")))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (var book = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(xlsx))) {
+            var sheet = book.getSheetAt(0);
+            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("Place");
+            var row = sheet.getRow(2);
+            assertThat(row.getCell(1).getStringCellValue()).isEqualTo("OIL-1L");
+            assertThat(row.getCell(2).getCellType()).isEqualTo(org.apache.poi.ss.usermodel.CellType.STRING); // not a formula
+            assertThat(row.getCell(2).getStringCellValue()).isEqualTo("=HYPERLINK(\"http://x\")");
+            assertThat(row.getCell(5).getNumericCellValue()).isEqualTo(36.0); // 48 received, 12 shipped
+        }
+        byte[] moves = send(admin, get("/api/v1/exports/movements.xlsx?warehouse=" + warehouse + "&type=SHIP")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        try (var book = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(moves))) {
+            var sheet = book.getSheetAt(0);
+            assertThat(sheet.getLastRowNum()).isEqualTo(2); // title, header, the one SHIP line
+            assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("SHIP");
+            assertThat(sheet.getRow(2).getCell(6).getStringCellValue()).isEqualTo("Dispatch area");
+        }
+        byte[] pdf = send(admin, get("/api/v1/exports/orders.pdf?status=SHIPPED")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        var reader = new com.lowagie.text.pdf.PdfReader(pdf);
+        String text = new com.lowagie.text.pdf.parser.PdfTextExtractor(reader).getTextFromPage(1);
+        assertThat(text).contains("Sales orders", "SO-000001", "SHIPPED", "Kandy Super");
+        send(admin, get("/api/v1/exports/movements.pdf?warehouse=" + warehouse)).andExpect(status().isOk());
+
+        send(admin, get("/api/v1/exports/stock.csv?warehouse=" + warehouse)).andExpect(status().is4xxClientError());
+        send(admin, get("/api/v1/exports/orders.xlsx?status=LOST")).andExpect(status().isBadRequest());
+        Cookie receiver = login(newUser(tenant, "RECEIVER"));
+        send(receiver, get("/api/v1/exports/stock.xlsx?warehouse=" + warehouse)).andExpect(status().isForbidden());
+        Cookie other = login(newUser(newTenant(1), "TENANT_ADMIN"));
+        send(other, get("/api/v1/exports/stock.xlsx?warehouse=" + warehouse)).andExpect(status().isNotFound());
+        assertThat(jdbc.queryForList("SELECT action FROM audit_log WHERE tenant_id = ? AND action = 'EXPORTED'", String.class, tenant)).hasSize(4);
+    }
 }

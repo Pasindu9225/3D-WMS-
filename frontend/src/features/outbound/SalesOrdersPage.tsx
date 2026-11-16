@@ -7,6 +7,7 @@ import { FormMessage, Input } from '@/components/ui/input'
 import { Pager, Table, Th, Tr } from '@/components/ui/table'
 import { can, useMe } from '@/features/auth/session'
 import { ImportDialog } from '@/features/catalog/ImportDialog'
+import { ExportLinks } from '@/features/report/ExportLinks'
 import { errorMessage } from '@/lib/errors'
 import { t, type MessageKey } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
@@ -60,6 +61,7 @@ export function SalesOrdersPage() {
           <option value="">{t('po.allStatuses')}</option>
           {SO_STATUSES.map((s) => <option key={s} value={s}>{t(`so.status.${s}` as MessageKey)}</option>)}
         </select>
+        <span className="ml-auto"><ExportLinks what="orders" params={{ status: status || undefined, q: q || undefined }} /></span>
       </div>
       {list.isError && <FormMessage tone="error">{errorMessage(list.error)}</FormMessage>}
       <Table>

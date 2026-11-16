@@ -46,6 +46,7 @@ export function useSuggestions(warehouseId: string, item: Waiting, qty: number |
     }),
     enabled: qty !== null && qty > 0,
     staleTime: 0,
+    placeholderData: keepPreviousData, // while a new quantity loads, the list stays (no flicker, no vanishing note)
   })
 }
 
