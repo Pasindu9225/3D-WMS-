@@ -27,12 +27,20 @@ public class UserRateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         Optional<CurrentUser> user = CurrentUser.get();
         if (user.isPresent()) {
-            long wait = limiter.tryConsume(RateLimiter.Scope.USER, Long.toString(user.get().userId()));
+            RateLimiter.Scope scope = isScan(request) ? RateLimiter.Scope.SCAN : RateLimiter.Scope.USER;
+            long wait = limiter.tryConsume(scope, Long.toString(user.get().userId()));
             if (wait > 0) {
                 IpRateLimitFilter.tooMany(response, wait);
                 return;
             }
         }
         chain.doFilter(request, response);
+    }
+
+    /** Phone scan endpoints get their own, larger bucket (300/min) so a fast worker is not cut off. */
+    static boolean isScan(HttpServletRequest request) {
+        String p = request.getRequestURI();
+        return ("POST".equals(request.getMethod()) && (p.matches("/api/v1/receipts/[^/]+/lines") || p.equals("/api/v1/putaway")
+                || p.equals("/api/v1/transfers"))) || p.startsWith("/api/v1/products/by-barcode/");
     }
 }

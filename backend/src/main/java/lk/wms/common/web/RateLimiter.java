@@ -19,7 +19,8 @@ import org.springframework.stereotype.Component;
 public class RateLimiter {
 
     /** UPLOAD: SEC-45, file uploads per user. */
-    public enum Scope { GLOBAL, LOGIN, USER, UPLOAD }
+    /** SCAN: phone scans (receiving, putaway, transfers, barcode lookups), which come faster than office clicks. */
+    public enum Scope { GLOBAL, LOGIN, USER, UPLOAD, SCAN }
 
     private final Map<Scope, Integer> perMinute = new EnumMap<>(Scope.class);
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
@@ -30,7 +31,9 @@ public class RateLimiter {
     public RateLimiter(@Value("${wms.rate-limit.global-per-minute}") int global,
             @Value("${wms.rate-limit.login-per-minute}") int login,
             @Value("${wms.rate-limit.user-per-minute}") int user,
-            @Value("${wms.rate-limit.upload-per-minute:20}") int upload) {
+            @Value("${wms.rate-limit.upload-per-minute:20}") int upload,
+            @Value("${wms.rate-limit.scan-per-minute:300}") int scan) {
+        perMinute.put(Scope.SCAN, scan);
         perMinute.put(Scope.GLOBAL, global);
         perMinute.put(Scope.LOGIN, login);
         perMinute.put(Scope.USER, user);

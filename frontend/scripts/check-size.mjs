@@ -1,6 +1,6 @@
 // Bundle budget (docs/SPEC.md): admin initial JS under 400 KB gzipped. Run after `npm run build`.
 // Initial JS = the entry script plus everything index.html preloads. Lazy page chunks are not counted.
-import { readFileSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 
@@ -37,6 +37,8 @@ if (total > BUDGET_KB) {
 // chunks and everything they import statically. Lazy imports (the zxing fallback, 3D) are not counted.
 const WORKER_BUDGET_KB = 250
 const manifest = JSON.parse(readFileSync(join(dist, '.vite', 'manifest.json'), 'utf8'))
+// Security review v0.4 F2: the file list is for this check only; it must not be served with the app.
+rmSync(join(dist, '.vite'), { recursive: true, force: true })
 const seen = new Set()
 const visit = (key) => {
   const entry = manifest[key]

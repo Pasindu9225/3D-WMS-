@@ -13,10 +13,10 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-/** SEC-60 with small limits: global 5/min, login 2/min, user 3/min. */
+/** SEC-60 with small limits: global 5/min, login 2/min, user 3/min, scans 6/min. */
 class RateLimitTest {
 
-    private final RateLimiter limiter = new RateLimiter(5, 2, 3, 20);
+    private final RateLimiter limiter = new RateLimiter(5, 2, 3, 20, 6);
 
     @AfterEach
     void clear() {
@@ -57,6 +57,28 @@ class RateLimitTest {
             assertThat(send(filter, "GET", "/api/v1/x", "10.3.3." + i).getStatus()).isEqualTo(200);
         }
         assertThat(send(filter, "GET", "/api/v1/x", "10.3.3.99").getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    void phoneScansHaveTheirOwnLargerBucket() throws Exception {
+        UserRateLimitFilter filter = new UserRateLimitFilter(limiter);
+        SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                new CurrentUser(78, "U", 1, "S", List.of(), Set.of()), null, List.of()));
+        for (int i = 0; i < 3; i++) {
+            assertThat(send(filter, "GET", "/api/v1/x", "10.5.5.5").getStatus()).isEqualTo(200);
+        }
+        assertThat(send(filter, "GET", "/api/v1/x", "10.5.5.5").getStatus()).isEqualTo(429); // office bucket used up
+        for (int i = 0; i < 3; i++) { // scans still go through, from their own bucket
+            assertThat(send(filter, "POST", "/api/v1/receipts/R1/lines", "10.5.5.5").getStatus()).isEqualTo(200);
+            assertThat(send(filter, "GET", "/api/v1/products/by-barcode/4791", "10.5.5.5").getStatus()).isEqualTo(200);
+        }
+        assertThat(send(filter, "POST", "/api/v1/putaway", "10.5.5.5").getStatus()).isEqualTo(429); // 7th scan
+        assertThat(UserRateLimitFilter.isScan(request("GET", "/api/v1/receipts/R1/lines"))).isFalse(); // reads are office
+        assertThat(UserRateLimitFilter.isScan(request("POST", "/api/v1/transfers"))).isTrue();
+    }
+
+    private static MockHttpServletRequest request(String method, String path) {
+        return new MockHttpServletRequest(method, path);
     }
 
     @Test
