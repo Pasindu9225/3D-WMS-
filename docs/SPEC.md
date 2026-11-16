@@ -291,6 +291,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Exit criteria:** end-to-end test receive → putaway → transfer passes; concurrent putaway test (two workers, same bin) never over-fills; stock always equals sum of movements.
 
+**Status (2026-11-16):** done. Exit criteria pass in the automated suites; acceptance run in docs/test-report-v0.4.md; security review in docs/security-review-v0.4.md.
+
 ### v1.0 — Outbound, reports and pilot release (MVP)
 
 **Goal:** the full warehouse cycle works, the system is deployed securely, and the pilot customer uses it daily.

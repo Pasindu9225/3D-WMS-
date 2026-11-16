@@ -21,7 +21,7 @@ interface AuditRow {
 }
 
 const SIZE = 25
-const ENTITIES = ['app_user', 'user_session', 'warehouse', 'rack_template', 'bin']
+const ENTITIES = ['app_user', 'user_session', 'warehouse', 'rack_template', 'bin', 'product', 'partner', 'purchase_order', 'receipt', 'stock_adjustment']
 
 export function AuditPage() {
   const [entity, setEntity] = useState('')

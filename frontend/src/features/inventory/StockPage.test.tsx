@@ -39,10 +39,10 @@ it('shows totals per product, where a product is, and the movement history', asy
   )
   await user.click(await screen.findByRole('button', { name: /OIL-1L/ }))
   expect(await screen.findByText('A-R01-01-01')).toBeInTheDocument()
-  expect(screen.getByText('receiving')).toBeInTheDocument()
+  expect(screen.getByText('Receiving area')).toBeInTheDocument()
   expect(urls).toContain('/api/v1/stock?warehouse=w1&page=0&size=50&product=p1')
 
   await user.click(screen.getByRole('tab', { name: 'Movements' }))
   expect(await screen.findByRole('cell', { name: 'Put away' })).toBeInTheDocument()
-  expect(screen.getByText('receiving → A-R01-01-01')).toBeInTheDocument()
+  expect(screen.getByText('Receiving area → A-R01-01-01')).toBeInTheDocument()
 })

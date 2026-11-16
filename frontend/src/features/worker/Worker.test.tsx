@@ -34,8 +34,8 @@ function renderAt(element: React.ReactNode) {
 
 it('shows what is waiting and only the jobs this person may do', async () => {
   renderAt(<WorkerHome />)
-  expect(await screen.findByText('2 orders to receive')).toBeInTheDocument()
-  expect(await screen.findByText('3 items to put away')).toBeInTheDocument()
+  expect(await screen.findByText('Orders to receive: 2')).toBeInTheDocument()
+  expect(await screen.findByText('Items to put away: 3')).toBeInTheDocument()
   expect(screen.queryByText(/adjustments to approve/)).not.toBeInTheDocument() // a receiver does not approve
   expect(screen.getByRole('link', { name: 'Receive' })).toHaveAttribute('href', '/worker/receive')
   expect(screen.getByRole('link', { name: 'Put away' })).toBeInTheDocument()
