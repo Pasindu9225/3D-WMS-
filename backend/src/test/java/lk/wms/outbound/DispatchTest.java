@@ -196,4 +196,36 @@ class DispatchTest extends ApiTest {
         ship(packer, packed).andExpect(status().isCreated());
         send(admin, post("/api/v1/shipments").content("{\"warehouseId\":\"" + warehouse + "\",\"orderIds\":[]}")).andExpect(status().isBadRequest());
     }
+    @Test
+    void dashboardShowsValueLowStockTodayBinsAndKpis() throws Exception {
+        String productId = read(send(admin, get("/api/v1/products?q=OIL-1L")), "$.items[0].id");
+        int v = read(send(admin, get("/api/v1/products?q=OIL-1L")), "$.items[0].version");
+        send(admin, put("/api/v1/products/" + productId).content("{\"name\":\"Coconut oil 1L\",\"baseUom\":\"EA\",\"barcode\":\"4791\","
+                + "\"costMinor\":45000,\"reorderPoint\":30,\"trackBatch\":false,\"trackExpiry\":false,"
+                + "\"units\":[{\"uom\":\"CASE\",\"factor\":12,\"barcode\":\"14791\"}],\"version\":" + v + "}")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.reorderPoint").value(30));
+        send(admin, post("/api/v1/products").content("{\"sku\":\"RICE\",\"name\":\"Rice\",\"baseUom\":\"BAG\",\"reorderPoint\":5,"
+                + "\"trackBatch\":false,\"trackExpiry\":false,\"units\":[]}")).andExpect(status().isCreated());
+        send(admin, post("/api/v1/products").content("{\"sku\":\"BAD\",\"name\":\"B\",\"baseUom\":\"EA\",\"reorderPoint\":-1,"
+                + "\"trackBatch\":false,\"trackExpiry\":false,\"units\":[]}")).andExpect(status().isBadRequest());
+        ship(admin, packedOrder("C1", 2)).andExpect(status().isCreated()); // 24 of the 48 leave
+
+        send(admin, get("/api/v1/dashboard?warehouse=" + warehouse)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.stockValueMinor").value(24 * 45000))
+                .andExpect(jsonPath("$.productsWithoutCost").value(0))
+                .andExpect(jsonPath("$.lowStock.length()").value(2))
+                .andExpect(jsonPath("$.lowStock[0].sku").value("OIL-1L")).andExpect(jsonPath("$.lowStock[0].onHand").value(24))
+                .andExpect(jsonPath("$.lowStock[1].sku").value("RICE")).andExpect(jsonPath("$.lowStock[1].onHand").value(0))
+                .andExpect(jsonPath("$.today.receipts").value(1)).andExpect(jsonPath("$.today.unitsReceived").value(48))
+                .andExpect(jsonPath("$.today.shipments").value(1)).andExpect(jsonPath("$.today.unitsShipped").value(24))
+                .andExpect(jsonPath("$.today.ordersReleased").value(1)).andExpect(jsonPath("$.today.ordersShipped").value(1))
+                .andExpect(jsonPath("$.bins").value(6)).andExpect(jsonPath("$.binsInUse").value(1)).andExpect(jsonPath("$.binUsePercent").value(17))
+                .andExpect(jsonPath("$.dockToStockMinutes").value(0))
+                .andExpect(jsonPath("$.linesPerHour").value(4.0)); // one pick line in the minimum 15-minute window
+
+        Cookie receiver = login(newUser(tenant, "RECEIVER"));
+        send(receiver, get("/api/v1/dashboard?warehouse=" + warehouse)).andExpect(status().isForbidden());
+        Cookie other = login(newUser(newTenant(1), "TENANT_ADMIN"));
+        send(other, get("/api/v1/dashboard?warehouse=" + warehouse)).andExpect(status().isNotFound());
+    }
 }

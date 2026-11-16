@@ -21,6 +21,8 @@ export interface Product {
   trackExpiry: boolean
   /** Cost per base unit in cents. */
   costMinor: number | null
+  /** Low stock at or below this many base units (dashboard); null = not watched. */
+  reorderPoint: number | null
   hasImage: boolean
   units: ProductUnit[]
   version: number

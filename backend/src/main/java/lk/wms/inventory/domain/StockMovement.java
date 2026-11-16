@@ -167,6 +167,10 @@ public class StockMovement extends TenantScoped {
         return refType;
     }
 
+    public Long getRefId() {
+        return refId;
+    }
+
     public Long getUserId() {
         return userId;
     }

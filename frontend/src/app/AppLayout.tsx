@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowLeftRight, Barcode, Scale, Boxes, FileText, ShoppingCart, Store, ListChecks, PackageOpen, Truck as TruckOut, LayoutDashboard, PackageCheck, Truck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
+import { ArrowDownToLine, ArrowLeftRight, Barcode, Scale, Boxes, FileText, ShoppingCart, Store, ListChecks, PackageOpen, Truck as TruckOut, LayoutDashboard, Gauge, PackageCheck, Truck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
 import { useState, type ComponentType } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -24,6 +24,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
+  { to: '/app/dashboard', label: 'nav.dashboard', icon: Gauge, permission: 'reports:read' },
   { to: '/app/warehouses', label: 'nav.warehouses', icon: Warehouse, permission: 'warehouses:read' },
   { to: '/app/rack-types', label: 'nav.rackTypes', icon: Boxes, permission: 'warehouses:read' },
   { to: '/app/3d', label: 'nav.view3d', icon: Cuboid, permission: 'warehouses:read' },

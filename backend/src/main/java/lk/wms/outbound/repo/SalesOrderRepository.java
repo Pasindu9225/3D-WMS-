@@ -1,5 +1,6 @@
 package lk.wms.outbound.repo;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +25,10 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
     List<SalesOrder> findByShipmentIdOrderById(Long shipmentId);
 
     long countByWarehouseIdAndStatus(Long warehouseId, SalesOrder.Status status);
+
+    long countByWarehouseIdAndReleasedAtGreaterThanEqual(Long warehouseId, Instant from);
+
+    long countByWarehouseIdAndShippedAtGreaterThanEqual(Long warehouseId, Instant from);
 
     /** Orders by internal id (pick lists point at them). */
     @Query("select o from SalesOrder o where o.id in :ids")

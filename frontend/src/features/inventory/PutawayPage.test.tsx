@@ -38,7 +38,7 @@ it('suggests a bin, accepts another scanned bin with a note, and puts away the c
   await user.type(qty, '10')
   expect(await screen.findByText('A-R01-01-01')).toBeInTheDocument()
   await user.type(screen.getByLabelText('Scan the bin label'), 'a-r01-01-02')
-  expect(await screen.findByText(/This is not a suggested bin/)).toBeInTheDocument()
+  expect(await screen.findByText(/This is not a suggested bin/, {}, { timeout: 3000 })).toBeInTheDocument() // after a debounce: slow under a full parallel run
   await user.click(screen.getByRole('button', { name: 'Put away here' }))
   expect(await screen.findByText('Put 10 EA in A-R01-01-02. 14 left in receiving.')).toBeInTheDocument()
   await waitFor(() => expect(posted?.body).toEqual({

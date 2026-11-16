@@ -104,6 +104,27 @@ public class StockService {
 
     /** Totals per product in a warehouse, optionally only products matching a search. */
     @Transactional(readOnly = true)
+    /** One ledger line as reports read it. */
+    public record Moved(String type, long productId, String batchNo, LocalDate expiry, BigDecimal qty, Instant at, Long refId) {
+    }
+
+    /** Ledger lines of these types (RECEIVE, PUTAWAY, PICK, SHIP, ADJUST ...) in a warehouse since a moment, oldest first. */
+    @Transactional(readOnly = true)
+    public List<Moved> movedSince(long warehouseId, Collection<String> types, Instant from) {
+        return ledger.since(warehouseId, types.stream().map(StockMovement.Type::valueOf).toList(), from).stream()
+                .map(m -> new Moved(m.getType().name(), m.getProductId(), m.getBatchNo(), m.getExpiryDate(), m.getQty(),
+                        m.getCreatedAt(), m.getRefId())).toList();
+    }
+
+    /** On hand per product in a warehouse, every place counted (bins, receiving, dispatch). */
+    @Transactional(readOnly = true)
+    public Map<Long, BigDecimal> onHandByProduct(long warehouseId) {
+        Map<Long, BigDecimal> out = new java.util.HashMap<>();
+        stock.totalsByProduct(warehouseId, true, List.of(-1L), Pageable.unpaged())
+                .forEach(r -> out.put(((Number) r[0]).longValue(), (BigDecimal) r[1]));
+        return out;
+    }
+
     /** How many lots wait in the receiving area of a warehouse (the task board). */
     public long awaitingPutaway(long warehouseId) {
         return stock.awaitingPutaway(warehouseId, org.springframework.data.domain.PageRequest.of(0, 1)).getTotalElements();

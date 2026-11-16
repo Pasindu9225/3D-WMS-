@@ -65,11 +65,13 @@ public class ProductController {
             boolean trackBatch,
             boolean trackExpiry,
             @Min(0) @Max(1_000_000_000_000L) Long costMinor,
+            @jakarta.validation.constraints.DecimalMin("0") @jakarta.validation.constraints.DecimalMax("10000000")
+            @jakarta.validation.constraints.Digits(integer = 8, fraction = 3) java.math.BigDecimal reorderPoint,
             @NotNull @Size(max = 10) List<@NotNull @Valid UnitRequest> units,
             @Min(0) Integer version) { // required on update
 
         ProductSpec spec() {
-            return new ProductSpec(name, barcode, baseUom, weightG, volumeCm3, trackBatch, trackExpiry, costMinor,
+            return new ProductSpec(name, barcode, baseUom, weightG, volumeCm3, trackBatch, trackExpiry, costMinor, reorderPoint,
                     units.stream().map(u -> new UnitSpec(u.uom(), u.factor(), u.barcode())).toList());
         }
     }
@@ -79,7 +81,7 @@ public class ProductController {
             java.util.regex.Pattern.compile("^\\s*([A-Za-z]+)\\s*=\\s*(\\d{1,7})\\s*(?::\\s*(\\S+))?\\s*$");
 
     static final List<String> COLUMNS = List.of("sku", "name", "barcode", "base_uom", "weight_kg", "volume_l", "cost",
-            "track_batch", "track_expiry", "units");
+            "track_batch", "track_expiry", "units", "reorder_point");
 
     private final ProductService products;
     private final jakarta.validation.Validator validator;
@@ -105,16 +107,17 @@ public class ProductController {
                 List.of("sku", "name", "base_uom"));
         List<ProductService.ImportRow> rows = new java.util.ArrayList<>();
         Map<String, String> columnOf = Map.of("sku", "sku", "name", "name", "barcode", "barcode", "baseUom", "base_uom",
-                "weightG", "weight_kg", "volumeCm3", "volume_l", "costMinor", "cost", "units", "units");
+                "weightG", "weight_kg", "volumeCm3", "volume_l", "costMinor", "cost", "units", "units", "reorderPoint", "reorder_point");
         for (int i = 0; i < csv.size(); i++) {
             int errorsBefore = csv.errors.size();
             Long weight = csv.scaled(i, "weight_kg", 1000);
             Long volume = csv.scaled(i, "volume_l", 1000);
             Long cost = csv.scaled(i, "cost", 100);
+            Long reorder = csv.scaled(i, "reorder_point", 1000);
             List<UnitRequest> units = units(csv, i);
             ProductRequest r = new ProductRequest(csv.upper(i, "sku"), csv.text(i, "name"), csv.text(i, "barcode"),
                     csv.upper(i, "base_uom"), toInt(weight), toInt(volume), csv.yesNo(i, "track_batch"),
-                    csv.yesNo(i, "track_expiry"), cost, units, null);
+                    csv.yesNo(i, "track_expiry"), cost, reorder == null ? null : java.math.BigDecimal.valueOf(reorder, 3), units, null);
             if (r.sku() == null) {
                 csv.error(i, "sku", "SKU is required");
             } else if (csv.valid(validator, i, r, columnOf) && csv.errors.size() == errorsBefore) {

@@ -12,6 +12,10 @@ import org.springframework.data.repository.query.Param;
 /** Tenant filter by @TenantId; archived products hidden by @SQLRestriction. */
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
+    /** [id, reorder_point] of live products that have one. */
+    @org.springframework.data.jpa.repository.Query("select p.id, p.reorderPoint from Product p where p.reorderPoint is not null")
+    java.util.List<Object[]> reorderPoints();
+
     Optional<Product> findByPublicId(String publicId);
 
     /**

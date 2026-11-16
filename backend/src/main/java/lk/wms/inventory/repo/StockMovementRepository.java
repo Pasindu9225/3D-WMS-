@@ -24,4 +24,11 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             @org.springframework.data.repository.query.Param("from") java.time.Instant from,
             @org.springframework.data.repository.query.Param("to") java.time.Instant to,
             org.springframework.data.domain.Pageable pageable);
+
+    /** Ledger lines of some types in a warehouse since a moment, oldest first (dashboard figures). */
+    @org.springframework.data.jpa.repository.Query("select m from StockMovement m where m.warehouseId = :warehouseId"
+            + " and m.type in :types and m.createdAt >= :from order by m.createdAt, m.id")
+    java.util.List<StockMovement> since(@org.springframework.data.repository.query.Param("warehouseId") long warehouseId,
+            @org.springframework.data.repository.query.Param("types") java.util.Collection<StockMovement.Type> types,
+            @org.springframework.data.repository.query.Param("from") java.time.Instant from);
 }

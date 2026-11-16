@@ -133,6 +133,7 @@ const schema = z.object({
   weight: optional((v) => { const g = parseWeight(v); return g !== null && g <= 100_000_000 }, t('products.weightRule')),
   volume: optional((v) => { const c = parseVolume(v); return c !== null && c <= 100_000_000 }, t('products.volumeRule')),
   cost: optional((v) => parseMoney(v) !== null, t('products.costRule')),
+  reorder: optional((v) => /^\d{1,8}(\.\d{1,3})?$/.test(v), t('products.reorderRule')),
   trackBatch: z.boolean(),
   trackExpiry: z.boolean(),
   units: z.array(z.object({
@@ -155,10 +156,11 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           weight: product.weightG === null ? '' : String(product.weightG / 1000),
           volume: product.volumeCm3 === null ? '' : String(product.volumeCm3 / 1000),
           cost: product.costMinor === null ? '' : (product.costMinor / 100).toFixed(2),
+          reorder: product.reorderPoint == null ? '' : String(product.reorderPoint),
           trackBatch: product.trackBatch, trackExpiry: product.trackExpiry,
           units: product.units.map((u) => ({ uom: u.uom, factor: String(u.factor), barcode: u.barcode ?? '' })),
         }
-      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', trackBatch: false, trackExpiry: false, units: [] },
+      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', reorder: '', trackBatch: false, trackExpiry: false, units: [] },
   })
   const units = useFieldArray({ control: form.control, name: 'units' })
   const { errors } = form.formState
@@ -173,6 +175,7 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
     weightG: v.weight ? parseWeight(v.weight) : null,
     volumeCm3: v.volume ? parseVolume(v.volume) : null,
     costMinor: v.cost ? parseMoney(v.cost) : null,
+    reorderPoint: v.reorder ? Number(v.reorder) : null,
     trackBatch: v.trackBatch,
     trackExpiry: v.trackExpiry,
     units: v.units.map((u) => ({ uom: u.uom, factor: u.factor, barcode: u.barcode || null })),
@@ -209,6 +212,9 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           </Field>
           <Field label={t('products.costField')} error={errors.cost?.message}>
             {(p) => <Input {...p} inputMode="decimal" placeholder="450.00" {...form.register('cost')} />}
+          </Field>
+          <Field label={t('products.reorderField')} error={errors.reorder?.message}>
+            {(p) => <Input {...p} inputMode="decimal" placeholder="20" {...form.register('reorder')} />}
           </Field>
         </div>
         <div className="flex flex-wrap gap-4 text-sm">

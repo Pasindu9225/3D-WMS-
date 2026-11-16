@@ -332,6 +332,16 @@ public class SalesOrderService {
         return new Shipped(s.getPublicId(), s.getNumber(), s.getVehicleNo(), s.getDriverName(), o.getShippedAt());
     }
 
+    /** Orders of a warehouse released and shipped since a moment (the dashboard's "today"). */
+    public record DayCounts(long released, long shipped) {
+    }
+
+    @Transactional(readOnly = true)
+    public DayCounts countsSince(long warehouseId, Instant from) {
+        return new DayCounts(orders.countByWarehouseIdAndReleasedAtGreaterThanEqual(warehouseId, from),
+                orders.countByWarehouseIdAndShippedAtGreaterThanEqual(warehouseId, from));
+    }
+
     static Summary summary(SalesOrder o) {
         return new Summary(o.getPublicId(), o.getNumber(), o.getStatus().name(), o.getCustomerCode(), o.getCustomerName(),
                 o.getCustomerRef(), o.getWarehouseCode(), o.getRequestedDate(), o.getLineCount(), o.getCreatedAt());

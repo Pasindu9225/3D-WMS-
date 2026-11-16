@@ -60,6 +60,10 @@ public class Product extends TenantScoped {
     @Column(name = "cost_minor")
     private Long costMinor;
 
+    /** Low stock at or below this many base units (dashboard); null = not watched. */
+    @Column(name = "reorder_point", precision = 14, scale = 3)
+    private java.math.BigDecimal reorderPoint;
+
     @Column(name = "image_file_id")
     private Long imageFileId;
 
@@ -89,7 +93,8 @@ public class Product extends TenantScoped {
     }
 
     public void set(String name, String barcode, String baseUom, Integer weightG, Integer volumeCm3, boolean trackBatch,
-            boolean trackExpiry, Long costMinor) {
+            boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint) {
+        this.reorderPoint = reorderPoint;
         this.name = name;
         this.barcode = barcode;
         this.baseUom = baseUom;
@@ -169,6 +174,10 @@ public class Product extends TenantScoped {
 
     public Long getCostMinor() {
         return costMinor;
+    }
+
+    public java.math.BigDecimal getReorderPoint() {
+        return reorderPoint;
     }
 
     public Long getImageFileId() {

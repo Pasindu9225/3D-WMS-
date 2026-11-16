@@ -33,6 +33,7 @@ export const router = createBrowserRouter([
           { path: 'pack/:id', lazy: () => import('@/features/outbound/PackPage').then((m) => ({ Component: m.PackPage })) },
           { path: 'dispatch', lazy: () => import('@/features/outbound/DispatchPage').then((m) => ({ Component: m.DispatchPage })) },
           { path: 'tasks', lazy: () => import('@/features/outbound/TaskBoardPage').then((m) => ({ Component: m.TaskBoardPage })) },
+          { path: 'dashboard', lazy: () => import('@/features/report/DashboardPage').then((m) => ({ Component: m.DashboardPage })) },
           { path: 'sales-orders/:id', lazy: () => import('@/features/outbound/SalesOrderPage').then((m) => ({ Component: m.SalesOrderPage })) },
           { path: 'purchase-orders', lazy: () => import('@/features/inbound/PurchaseOrdersPage').then((m) => ({ Component: m.PurchaseOrdersPage })) },
           {
