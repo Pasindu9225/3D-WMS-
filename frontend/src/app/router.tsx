@@ -29,6 +29,8 @@ export const router = createBrowserRouter([
           { path: 'sales-orders', lazy: () => import('@/features/outbound/SalesOrdersPage').then((m) => ({ Component: m.SalesOrdersPage })) },
           { path: 'pick', lazy: () => import('@/features/outbound/PickPage').then((m) => ({ Component: m.PickPage })) },
           { path: 'pick/:id', lazy: () => import('@/features/outbound/PickPage').then((m) => ({ Component: m.PickPage })) },
+          { path: 'pack', lazy: () => import('@/features/outbound/PackPage').then((m) => ({ Component: m.PackPage })) },
+          { path: 'pack/:id', lazy: () => import('@/features/outbound/PackPage').then((m) => ({ Component: m.PackPage })) },
           { path: 'sales-orders/:id', lazy: () => import('@/features/outbound/SalesOrderPage').then((m) => ({ Component: m.SalesOrderPage })) },
           { path: 'purchase-orders', lazy: () => import('@/features/inbound/PurchaseOrdersPage').then((m) => ({ Component: m.PurchaseOrdersPage })) },
           {
@@ -66,6 +68,8 @@ export const router = createBrowserRouter([
           { path: 'find', lazy: () => import('@/features/worker/FindPage').then((m) => ({ Component: m.FindPage })) },
           { path: 'pick', lazy: () => import('@/features/outbound/PickPage').then((m) => ({ Component: m.PickPage })) },
           { path: 'pick/:id', lazy: () => import('@/features/outbound/PickPage').then((m) => ({ Component: m.PickPage })) },
+          { path: 'pack', lazy: () => import('@/features/outbound/PackPage').then((m) => ({ Component: m.PackPage })) },
+          { path: 'pack/:id', lazy: () => import('@/features/outbound/PackPage').then((m) => ({ Component: m.PackPage })) },
         ],
       },
       { path: '*', lazy: () => import('./NotFoundPage').then((m) => ({ Component: m.NotFoundPage })) },

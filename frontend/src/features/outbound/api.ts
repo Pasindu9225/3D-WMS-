@@ -49,6 +49,9 @@ export interface SalesOrder {
   reserved: { lineNo: number; sku: string; binCode: string | null; batchNo: string | null; expiryDate: string | null; qty: number }[]
   /** The pick list once released (null for drafts). */
   pick: PickList | null
+  deliveryNoteNo: string | null
+  cartons: number | null
+  packedAt: string | null
   version: number
 }
 
@@ -176,3 +179,51 @@ export function usePickAction() {
     },
   })
 }
+
+export interface PackItem {
+  sku: string
+  name: string
+  baseUom: string
+  /** Base units. */
+  ordered: number
+  picked: number
+  /** Every code that may be scanned for this product and how many base units one scan counts. */
+  codes: { code: string; uom: string; factor: number }[]
+}
+
+export interface PackView {
+  id: string
+  number: string
+  status: SoStatus
+  customerName: string
+  customerRef: string | null
+  warehouseCode: string
+  items: PackItem[]
+  version: number
+}
+
+export function useToPack(enabled = true) {
+  return useQuery({ queryKey: ['to-pack'], queryFn: () => api<Page<SoSummary>>('/sales-orders/to-pack?size=50'), enabled })
+}
+
+export function usePackView(id: string | undefined) {
+  return useQuery({ queryKey: ['pack', id], queryFn: () => api<PackView>(`/sales-orders/${id}/pack`), enabled: !!id })
+}
+
+export function useFinishPack() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; version: number; cartons: number; weightG: number | null; counts: { sku: string; qty: number }[] }) =>
+      api<PackView>(`/sales-orders/${id}/pack`, { method: 'POST', body }),
+    onSuccess: (p) => {
+      qc.setQueryData(['pack', p.id], p)
+      void qc.invalidateQueries({ queryKey: ['to-pack'] })
+      void qc.invalidateQueries({ queryKey: ['sales-order', p.id] })
+      void qc.invalidateQueries({ queryKey: ['sales-orders'] })
+    },
+  })
+}
+
+/** The two papers that travel with a packed order. */
+export const packingSlipUrl = (id: string) => `/api/v1/sales-orders/${id}/packing-slip.pdf`
+export const deliveryNoteUrl = (id: string) => `/api/v1/sales-orders/${id}/delivery-note.pdf`

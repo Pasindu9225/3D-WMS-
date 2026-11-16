@@ -25,6 +25,8 @@ import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
 import lk.wms.common.web.PageResponse;
 import lk.wms.common.web.RateLimiter;
+import lk.wms.outbound.service.DocumentPdf;
+import lk.wms.outbound.service.PackService;
 import lk.wms.outbound.service.SalesOrderService;
 import lk.wms.outbound.service.SalesOrderService.Detail;
 import lk.wms.outbound.service.SalesOrderService.ImportLine;
@@ -96,15 +98,26 @@ public class SalesOrderController {
     public record VersionRequest(@NotNull @Min(0) Integer version) {
     }
 
+    public record PackCount(@NotBlank @Size(max = 40) String sku,
+            @NotNull @DecimalMin("0") @DecimalMax("10000000") @Digits(integer = 8, fraction = 3) BigDecimal qty) {
+    }
+
+    public record PackRequest(@NotNull @Min(0) Integer version, @NotNull @Min(1) @jakarta.validation.constraints.Max(999) Integer cartons,
+            @Min(0) @jakarta.validation.constraints.Max(100_000_000) Integer weightG,
+            @NotNull @Size(min = 1, max = 500) List<@Valid @NotNull PackCount> counts) {
+    }
+
     public record CancelRequest(@NotNull @Min(0) Integer version, @NotBlank @Size(max = 200) String reason) {
     }
 
     private final SalesOrderService orders;
+    private final PackService packs;
     private final Validator validator;
     private final RateLimiter limiter;
 
-    public SalesOrderController(SalesOrderService orders, Validator validator, RateLimiter limiter) {
+    public SalesOrderController(SalesOrderService orders, PackService packs, Validator validator, RateLimiter limiter) {
         this.orders = orders;
+        this.packs = packs;
         this.validator = validator;
         this.limiter = limiter;
     }
@@ -119,6 +132,54 @@ public class SalesOrderController {
         return PageResponse.of(orders.list(CurrentUser.require(), statuses, q, PageResponse.request(page, size, sort,
                 Map.of("number", "number", "requestedDate", "requestedDate", "customer", "customerName"),
                 Sort.by(Sort.Direction.DESC, "id"))), s -> s);
+    }
+
+    /** Picked orders waiting at the packing table, oldest first. */
+    @GetMapping("/to-pack")
+    @PreAuthorize("hasAnyAuthority('packing:execute', 'outbound:read')")
+    public PageResponse<Summary> toPack(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return PageResponse.of(packs.toPack(CurrentUser.require(), PageResponse.request(page, size, null, Map.of(),
+                Sort.by(Sort.Direction.ASC, "id"))), s -> s);
+    }
+
+    @GetMapping("/{id}/pack")
+    @PreAuthorize("hasAnyAuthority('packing:execute', 'outbound:read')")
+    public PackService.PackView packView(@PathVariable @Size(max = 26) String id) {
+        return packs.view(CurrentUser.require(), id);
+    }
+
+    @PostMapping("/{id}/pack")
+    @PreAuthorize("hasAuthority('packing:execute')")
+    public PackService.PackView pack(@PathVariable @Size(max = 26) String id, @Valid @RequestBody PackRequest body) {
+        return packs.finish(CurrentUser.require(), id, body.version(), body.cartons(), body.weightG(),
+                body.counts().stream().map(c -> new PackService.Count(c.sku(), c.qty())).toList());
+    }
+
+    @GetMapping("/{id}/packing-slip.pdf")
+    @PreAuthorize("hasAnyAuthority('packing:execute', 'outbound:read')")
+    public ResponseEntity<byte[]> packingSlip(@PathVariable @Size(max = 26) String id) {
+        PackService.Papers p = packs.papers(CurrentUser.require(), id);
+        return pdf("packing-slip-" + p.number() + ".pdf", DocumentPdf.packingSlip(p));
+    }
+
+    @GetMapping("/{id}/delivery-note.pdf")
+    @PreAuthorize("hasAnyAuthority('packing:execute', 'outbound:read')")
+    public ResponseEntity<byte[]> deliveryNote(@PathVariable @Size(max = 26) String id) {
+        PackService.Papers p = packs.papers(CurrentUser.require(), id);
+        return pdf(p.deliveryNoteNo() + ".pdf", DocumentPdf.deliveryNote(p));
+    }
+
+    /**
+     * Opens in the browser's PDF viewer (to print); nosniff comes from the security headers. The site-wide CSP has
+     * object-src 'none', which stops the browser's built-in viewer, so a PDF gets its own policy: nothing may load
+     * except the PDF itself, and no page may frame it (Spring Security keeps a CSP the response already set).
+     */
+    private static ResponseEntity<byte[]> pdf(String name, byte[] bytes) {
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF)
+                .header("Content-Security-Policy", "default-src 'none'; object-src 'self'; frame-ancestors 'none'")
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.inline().filename(name).build().toString())
+                .body(bytes);
     }
 
     @GetMapping("/{id}")

@@ -1,11 +1,11 @@
-import { ArrowDownToLine, ArrowLeftRight, Download, ListChecks, PackageCheck, ScanLine, Scale } from 'lucide-react'
+import { ArrowDownToLine, ArrowLeftRight, Download, ListChecks, PackageCheck, PackageOpen, ScanLine, Scale } from 'lucide-react'
 import { useEffect, useState, type ComponentType } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { can, useMe } from '@/features/auth/session'
 import { useReceivableOrders } from '@/features/inbound/api'
 import { useAdjustments, useWaiting } from '@/features/inventory/api'
-import { usePickLists } from '@/features/outbound/api'
+import { usePickLists, useToPack } from '@/features/outbound/api'
 import { useWarehouses } from '@/features/warehouses/api'
 import { canInstall, install, onInstallChange } from '@/lib/install'
 import { t, type MessageKey } from '@/lib/i18n'
@@ -21,6 +21,7 @@ const ACTIONS: Action[] = [
   { to: '/worker/receive', label: 'worker.receive', icon: PackageCheck, permission: 'inbound:receive' },
   { to: '/worker/putaway', label: 'worker.putaway', icon: ArrowDownToLine, permission: 'putaway:execute' },
   { to: '/worker/pick', label: 'worker.pick', icon: ListChecks, permission: 'picking:execute' },
+  { to: '/worker/pack', label: 'worker.pack', icon: PackageOpen, permission: 'packing:execute' },
   { to: '/worker/move', label: 'worker.move', icon: ArrowLeftRight, permission: 'inventory:transfer' },
   { to: '/worker/find', label: 'worker.find', icon: ScanLine, permission: 'catalog:read' },
 ]
@@ -63,6 +64,7 @@ function Todo() {
   const waiting = useWaiting(can(me.data, 'putaway:execute') ? first : undefined)
   const approvals = useAdjustments('PENDING', 0)
   const picks = usePickLists(can(me.data, 'picking:execute'))
+  const packs = useToPack(can(me.data, 'packing:execute'))
   const rows: { to: string; text: string }[] = []
   if (can(me.data, 'inbound:receive') && receive.data && receive.data.total > 0) {
     rows.push({ to: '/worker/receive', text: t('worker.todo.receive', { n: receive.data.total }) })
@@ -72,6 +74,9 @@ function Todo() {
   }
   if (picks.data && picks.data.total > 0) {
     rows.push({ to: '/worker/pick', text: t('worker.todo.pick', { n: picks.data.total }) })
+  }
+  if (packs.data && packs.data.total > 0) {
+    rows.push({ to: '/worker/pack', text: t('worker.todo.pack', { n: packs.data.total }) })
   }
   if (can(me.data, 'inventory:approve') && approvals.data && approvals.data.total > 0) {
     rows.push({ to: '/app/adjustments', text: t('worker.todo.approve', { n: approvals.data.total }) })

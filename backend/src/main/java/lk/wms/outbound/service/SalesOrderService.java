@@ -72,7 +72,8 @@ public class SalesOrderService {
     public record Detail(String id, String number, String status, String customerCode, String customerName,
             String customerRef, String warehouseId, String warehouseCode, String shipTo, LocalDate requestedDate,
             String note, Instant createdAt, Instant releasedAt, Instant cancelledAt, String cancelReason, List<LineView> lines,
-            List<ReservedView> reserved, PickService.Detail pick, int version) {
+            List<ReservedView> reserved, PickService.Detail pick, String deliveryNoteNo, Integer cartons, Instant packedAt,
+            int version) {
     }
 
     static final String KIND = "SO";
@@ -333,6 +334,7 @@ public class SalesOrderService {
         return new Detail(o.getPublicId(), o.getNumber(), o.getStatus().name(), o.getCustomerCode(), o.getCustomerName(),
                 o.getCustomerRef(), warehouses.publicIdOf(o.getWarehouseId()), o.getWarehouseCode(), o.getShipTo(),
                 o.getRequestedDate(), o.getNote(), o.getCreatedAt(), o.getReleasedAt(), o.getCancelledAt(), o.getCancelReason(),
-                lines, reserved, o.getStatus() == Status.DRAFT ? null : picks.forOrder(o), o.getVersion());
+                lines, reserved, o.getStatus() == Status.DRAFT ? null : picks.forOrder(o), o.getDeliveryNoteNo(), o.getCartons(),
+                o.getPackedAt(), o.getVersion());
     }
 }

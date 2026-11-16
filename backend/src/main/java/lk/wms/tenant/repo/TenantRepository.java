@@ -13,6 +13,9 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
     @Query("select t.adjustApprovalMinor from Tenant t where t.id = :id")
     Optional<Long> findAdjustApprovalMinor(@Param("id") long id);
 
+    @Query("select t.name from Tenant t where t.id = :id")
+    Optional<String> findName(@Param("id") long id);
+
     @Query("select t.status from Tenant t where t.id = :id")
     Optional<Tenant.Status> findStatus(@Param("id") long id);
 

@@ -34,6 +34,12 @@ public class TenantService {
         return tenants.findAdjustApprovalMinor(tenantId).orElse(1_000_000L);
     }
 
+    /** The company name, for documents such as delivery notes. */
+    @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
+    public String name(long tenantId) {
+        return tenants.findName(tenantId).orElse("");
+    }
+
     /** F8: a suspended (or unknown) company cannot sign in, refresh or use a live session. */
     @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
     public boolean isActive(long tenantId) {

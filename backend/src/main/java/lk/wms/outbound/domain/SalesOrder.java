@@ -93,6 +93,20 @@ public class SalesOrder extends TenantScoped {
     @Column(name = "released_at")
     private Instant releasedAt;
 
+    @Column(name = "delivery_note_no", length = 20)
+    private String deliveryNoteNo;
+
+    private Integer cartons;
+
+    @Column(name = "weight_g")
+    private Integer weightG;
+
+    @Column(name = "packed_by")
+    private Long packedBy;
+
+    @Column(name = "packed_at")
+    private Instant packedAt;
+
     @Column(name = "cancelled_by")
     private Long cancelledBy;
 
@@ -158,6 +172,15 @@ public class SalesOrder extends TenantScoped {
     public void picking(boolean done) {
         this.status = done ? Status.PICKED : Status.PICKING;
         this.updatedAt = Instant.now();
+    }
+
+    public void pack(String deliveryNoteNo, int cartons, Integer weightG, long userId) {
+        this.status = Status.PACKED;
+        this.deliveryNoteNo = deliveryNoteNo;
+        this.cartons = cartons;
+        this.weightG = weightG;
+        this.packedBy = userId;
+        this.packedAt = Instant.now();
     }
 
     public void cancel(long userId, String reason) {
@@ -229,6 +252,26 @@ public class SalesOrder extends TenantScoped {
 
     public Instant getReleasedAt() {
         return releasedAt;
+    }
+
+    public String getDeliveryNoteNo() {
+        return deliveryNoteNo;
+    }
+
+    public Integer getCartons() {
+        return cartons;
+    }
+
+    public Integer getWeightG() {
+        return weightG;
+    }
+
+    public Long getPackedBy() {
+        return packedBy;
+    }
+
+    public Instant getPackedAt() {
+        return packedAt;
     }
 
     public Instant getCancelledAt() {

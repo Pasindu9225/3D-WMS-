@@ -303,7 +303,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Customers (partners); sales orders: create, CSV import, cancel
 - [x] Stock reservation on order release (FIFO by receive date)
 - [x] Pick list per order; picker scans bin and product; short-pick handling
-- [ ] Packing screen: verify by scan, print packing slip and delivery note PDF
+- [x] Packing screen: verify by scan, print packing slip and delivery note PDF
 - [ ] Dispatch: mark shipped, stock leaves, movement recorded
 - [ ] Supervisor task board: assign, re-assign, priorities, live status
 - [ ] Dashboard: stock value, low stock, today's receipts and shipments, bin utilisation %, KPIs (dock-to-stock time, lines picked per hour)

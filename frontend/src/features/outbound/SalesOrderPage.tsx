@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, PackageCheck, Trash2, X } from 'lucide-react'
+import { ArrowLeft, FileText, PackageCheck, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -17,7 +17,7 @@ import { useWarehouses } from '@/features/warehouses/api'
 import { api, ApiError } from '@/lib/api'
 import { errorMessage, fieldErrors } from '@/lib/errors'
 import { t, type MessageKey } from '@/lib/i18n'
-import { useSalesOrder, useSoAction, type SalesOrder } from './api'
+import { deliveryNoteUrl, packingSlipUrl, useSalesOrder, useSoAction, type SalesOrder } from './api'
 import { SoStatusBadge } from './SalesOrdersPage'
 
 const SELECT = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm'
@@ -103,6 +103,15 @@ function SoView({ so }: { so: SalesOrder }) {
         <Fact label={t('po.col.warehouse')} value={so.warehouseCode} />
         <Fact label={t('so.col.requested')} value={so.requestedDate ?? '—'} />
       </dl>
+      {so.deliveryNoteNo && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm">
+          <span>{t('so.packedInfo', { dn: so.deliveryNoteNo, cartons: so.cartons ?? 0 })}</span>
+          <span className="ml-auto flex gap-2">
+            <Button asChild size="sm" variant="outline"><a href={packingSlipUrl(so.id)} target="_blank" rel="noopener"><FileText /> {t('pack.slip')}</a></Button>
+            <Button asChild size="sm" variant="outline"><a href={deliveryNoteUrl(so.id)} target="_blank" rel="noopener"><FileText /> {t('pack.note')}</a></Button>
+          </span>
+        </div>
+      )}
       {so.shipTo && <p className="text-sm"><span className="font-medium">{t('so.shipTo')}:</span> {so.shipTo}</p>}
       {so.note && <p className="text-sm"><span className="font-medium">{t('po.note')}:</span> {so.note}</p>}
       <Table>
