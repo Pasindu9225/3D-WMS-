@@ -59,6 +59,11 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             order by s.receivedAt, s.id""")
     List<Stock> lots(@Param("warehouseId") long warehouseId, @Param("binId") Long binId, @Param("productId") long productId);
 
+    /** Free stock of a product in the bins of a warehouse (v1.2 refill: where to bring a pick face's stock from). */
+    @Query("select s from Stock s where s.warehouseId = :warehouseId and s.productId = :productId and s.binId is not null"
+            + " and s.qtyOnHand > s.qtyReserved")
+    List<Stock> freeInBins(@Param("warehouseId") long warehouseId, @Param("productId") long productId);
+
     /** Stock rows of a warehouse, optionally one product, a set of bins, or only the receiving area. */
     @Query("""
             select s from Stock s

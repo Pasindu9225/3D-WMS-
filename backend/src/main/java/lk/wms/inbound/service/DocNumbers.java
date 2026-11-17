@@ -18,7 +18,12 @@ public class DocNumbers {
     }
 
     public String next(CurrentUser cu, String kind) {
-        counters.bump(cu.tenantId(), kind);
+        return next(cu.tenantId(), kind);
+    }
+
+    /** For work no signed-in user starts directly (e.g. a refill task made by a pick). */
+    public String next(long tenantId, String kind) {
+        counters.bump(tenantId, kind);
         return String.format("%s-%06d", kind, counters.taken(kind));
     }
 }

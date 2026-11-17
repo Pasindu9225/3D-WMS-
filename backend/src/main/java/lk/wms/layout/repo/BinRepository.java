@@ -20,9 +20,9 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
 
     Optional<Bin> findByWarehouseIdAndCode(long warehouseId, String code);
 
-    /** [id, public_id, code, blocked, in a quarantine zone] of these bins (stock screens label rows with them). */
+    /** [id, public_id, code, blocked, in a quarantine zone, pick face] of these bins (stock screens label rows with them). */
     @Query("""
-            select b.id, b.publicId, b.code, b.blocked, case when z.type = lk.wms.layout.domain.Zone.Type.QUARANTINE then true else false end
+            select b.id, b.publicId, b.code, b.blocked, case when z.type = lk.wms.layout.domain.Zone.Type.QUARANTINE then true else false end, b.pickFace
             from Bin b, lk.wms.layout.domain.RackLevel l, lk.wms.layout.domain.Rack r, lk.wms.layout.domain.Zone z
             where b.levelId = l.id and l.rackId = r.id and r.zoneId = z.id and b.id in :ids""")
     List<Object[]> labels(@Param("ids") Collection<Long> ids);

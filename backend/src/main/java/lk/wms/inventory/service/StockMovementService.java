@@ -86,6 +86,10 @@ public class StockMovementService {
     }
 
     /** Published after each move (live 3D views refresh fill levels once the transaction commits). */
+    /** Stock left a bin (v1.2): heard in the same transaction by the refill check of pick-face bins. */
+    public record StockTaken(long warehouseId, long binId, long productId, long userId) {
+    }
+
     public record StockChanged(long warehouseId) {
     }
 
@@ -202,6 +206,9 @@ public class StockMovementService {
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             // the same key arrived twice at once: the other request made the move
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_DONE", "This was just done; reload to see it");
+        }
+        if (m.from() != null && m.from().binId() != null) {
+            events.publishEvent(new StockTaken(m.warehouseId(), m.from().binId(), m.productId(), m.userId()));
         }
         events.publishEvent(new StockChanged(m.warehouseId()));
         return Outcome.MOVED;

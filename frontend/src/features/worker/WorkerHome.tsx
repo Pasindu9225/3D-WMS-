@@ -1,4 +1,4 @@
-import { PackageX, ArrowDownToLine, ArrowLeftRight, ClipboardCheck, Download, ListChecks, PackageCheck, PackageOpen, Truck, ScanLine, Scale } from 'lucide-react'
+import { ArrowUpFromLine, PackageX, ArrowDownToLine, ArrowLeftRight, ClipboardCheck, Download, ListChecks, PackageCheck, PackageOpen, Truck, ScanLine, Scale } from 'lucide-react'
 import { useEffect, useState, type ComponentType } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -6,6 +6,7 @@ import { can, useMe } from '@/features/auth/session'
 import { useReceivableOrders } from '@/features/inbound/api'
 import { useAdjustments, useWaiting } from '@/features/inventory/api'
 import { useCounts } from '@/features/inventory/counts'
+import { useRefillTasks } from '@/features/inventory/refill'
 import { useReturns } from '@/features/outbound/returns'
 import { usePickLists, useToDispatch, useToPack } from '@/features/outbound/api'
 import { useWarehouses } from '@/features/warehouses/api'
@@ -26,6 +27,7 @@ const ACTIONS: Action[] = [
   { to: '/worker/pack', label: 'worker.pack', icon: PackageOpen, permission: 'packing:execute' },
   { to: '/worker/dispatch', label: 'worker.dispatch', icon: Truck, permission: 'dispatch:execute' },
   { to: '/worker/returns', label: 'worker.returns', icon: PackageX, permission: 'inbound:receive' },
+  { to: '/worker/refill', label: 'worker.refill', icon: ArrowUpFromLine, permission: 'inventory:transfer' },
   { to: '/worker/count', label: 'worker.count', icon: ClipboardCheck, permission: 'counts:execute' },
   { to: '/worker/move', label: 'worker.move', icon: ArrowLeftRight, permission: 'inventory:transfer' },
   { to: '/worker/find', label: 'worker.find', icon: ScanLine, permission: 'catalog:read' },
@@ -73,6 +75,7 @@ function Todo() {
   const ships = useToDispatch(can(me.data, 'dispatch:execute'))
   const counts = useCounts(false, can(me.data, 'counts:execute'))
   const toReturn = useReturns(false, can(me.data, 'inbound:receive'))
+  const toRefill = useRefillTasks(can(me.data, 'inventory:transfer'))
   const rows: { to: string; text: string }[] = []
   if (can(me.data, 'inbound:receive') && receive.data && receive.data.total > 0) {
     rows.push({ to: '/worker/receive', text: t('worker.todo.receive', { n: receive.data.total }) })
@@ -88,6 +91,9 @@ function Todo() {
   }
   if (ships.data && ships.data.total > 0) {
     rows.push({ to: '/worker/dispatch', text: t('worker.todo.dispatch', { n: ships.data.total }) })
+  }
+  if (toRefill.data && toRefill.data.total > 0) {
+    rows.push({ to: '/worker/refill', text: t('worker.todo.refill', { n: toRefill.data.total }) })
   }
   if (toReturn.data && toReturn.data.total > 0) {
     rows.push({ to: '/worker/returns', text: t('worker.todo.returns', { n: toReturn.data.total }) })

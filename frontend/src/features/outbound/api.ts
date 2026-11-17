@@ -286,6 +286,8 @@ export interface Board {
   toPack: number
   toDispatch: number
   inReceiving: number
+  /** Refill tasks waiting (v1.2). */
+  toRefill: number
   lists: PickSummary[]
 }
 

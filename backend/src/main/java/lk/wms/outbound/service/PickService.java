@@ -63,7 +63,7 @@ public class PickService {
 
     /** The supervisor's view of one warehouse: what waits where, and the open pick lists. */
     public record Board(long toRelease, long toPick, long picking, long pickedToday, long toPack, long toDispatch,
-            long inReceiving, List<Summary> lists) {
+            long inReceiving, long toRefill, List<Summary> lists) {
     }
 
     public enum ShortReason { NOT_THERE, DAMAGED }
@@ -84,11 +84,13 @@ public class PickService {
     private final lk.wms.inventory.service.StockService stockViews;
     private final lk.wms.outbound.repo.PickWaveRepository waves;
     private final lk.wms.layout.service.BinService bins;
+    private final lk.wms.inventory.service.RefillService refills;
 
     public PickService(PickListRepository lists, SalesOrderRepository orders, DocNumbers numbers, ProductService products,
             WarehouseService warehouses, StockMovementService stock, AuditService audit, lk.wms.auth.service.UserService users,
             lk.wms.inventory.service.StockService stockViews, lk.wms.outbound.repo.PickWaveRepository waves,
-            lk.wms.layout.service.BinService bins) {
+            lk.wms.layout.service.BinService bins, lk.wms.inventory.service.RefillService refills) {
+        this.refills = refills;
         this.waves = waves;
         this.bins = bins;
         this.users = users;
@@ -150,7 +152,8 @@ public class PickService {
                 lists.countIn(wh.id(), PickList.Status.OPEN, null), lists.countIn(wh.id(), PickList.Status.IN_PROGRESS, null),
                 lists.countIn(wh.id(), PickList.Status.DONE, today),
                 orders.countByWarehouseIdAndStatus(wh.id(), SalesOrder.Status.PICKED),
-                orders.countByWarehouseIdAndStatus(wh.id(), SalesOrder.Status.PACKED), stockViews.awaitingPutaway(wh.id()), open);
+                orders.countByWarehouseIdAndStatus(wh.id(), SalesOrder.Status.PACKED), stockViews.awaitingPutaway(wh.id()),
+                refills.countOpen(wh.id()), open);
     }
 
     /** People who can be given a pick list in this warehouse: pickers assigned to it, and company admins. */

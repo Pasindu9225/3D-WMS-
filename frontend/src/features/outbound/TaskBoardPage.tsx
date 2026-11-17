@@ -46,7 +46,7 @@ export function TaskBoardPage() {
   const b = board.data
   const tiles: [MessageKey, number | undefined][] = [
     ['board.toRelease', b?.toRelease], ['board.toPick', b?.toPick], ['board.picking', b?.picking], ['board.pickedToday', b?.pickedToday],
-    ['board.toPack', b?.toPack], ['board.toDispatch', b?.toDispatch], ['board.inReceiving', b?.inReceiving],
+    ['board.toPack', b?.toPack], ['board.toDispatch', b?.toDispatch], ['board.inReceiving', b?.inReceiving], ['board.toRefill', b?.toRefill],
   ]
 
   return (
@@ -68,7 +68,7 @@ export function TaskBoardPage() {
       {board.isError && <FormMessage tone="error">{errorMessage(board.error)}</FormMessage>}
       {action.isError && <FormMessage tone="error">{errorMessage(action.error)}</FormMessage>}
       {waveAction.isError && <FormMessage tone="error">{errorMessage(waveAction.error)}</FormMessage>}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
         {tiles.map(([label, n]) => (
           <div key={label} className="rounded-lg border bg-card p-3">
             <div className="text-2xl font-semibold tabular-nums">{n ?? '–'}</div>
