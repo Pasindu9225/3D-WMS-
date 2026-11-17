@@ -31,3 +31,4 @@ Thumbs.db
 deploy/local/certs/
 deploy/local/backups/
 deploy/local/zap/
+.fe.log
