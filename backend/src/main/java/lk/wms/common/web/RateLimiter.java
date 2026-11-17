@@ -20,7 +20,8 @@ public class RateLimiter {
 
     /** UPLOAD: SEC-45, file uploads per user. */
     /** SCAN: phone scans (receiving, putaway, transfers, barcode lookups), which come faster than office clicks. */
-    public enum Scope { GLOBAL, LOGIN, USER, UPLOAD, SCAN }
+    /** EXPORT: Excel/PDF exports per user; one can be 200,000 rows (security review v1.0 F1). */
+    public enum Scope { GLOBAL, LOGIN, USER, UPLOAD, SCAN, EXPORT }
 
     private final Map<Scope, Integer> perMinute = new EnumMap<>(Scope.class);
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
@@ -32,7 +33,9 @@ public class RateLimiter {
             @Value("${wms.rate-limit.login-per-minute}") int login,
             @Value("${wms.rate-limit.user-per-minute}") int user,
             @Value("${wms.rate-limit.upload-per-minute:20}") int upload,
-            @Value("${wms.rate-limit.scan-per-minute:300}") int scan) {
+            @Value("${wms.rate-limit.scan-per-minute:300}") int scan,
+            @Value("${wms.rate-limit.export-per-minute:10}") int export) {
+        perMinute.put(Scope.EXPORT, export);
         perMinute.put(Scope.SCAN, scan);
         perMinute.put(Scope.GLOBAL, global);
         perMinute.put(Scope.LOGIN, login);

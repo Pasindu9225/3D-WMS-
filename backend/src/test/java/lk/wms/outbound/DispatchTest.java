@@ -273,4 +273,16 @@ class DispatchTest extends ApiTest {
         send(other, get("/api/v1/exports/stock.xlsx?warehouse=" + warehouse)).andExpect(status().isNotFound());
         assertThat(jdbc.queryForList("SELECT action FROM audit_log WHERE tenant_id = ? AND action = 'EXPORTED'", String.class, tenant)).hasSize(4);
     }
+
+    /** Security review v1.0 F1: a big export is heavy, so each person may start at most 10 a minute. */
+    @Test
+    void exportsAreLimitedTo10PerMinutePerUser() throws Exception {
+        Cookie busy = login(newUser(tenant, "TENANT_ADMIN"));
+        for (int i = 0; i < 10; i++) {
+            send(busy, get("/api/v1/exports/orders.xlsx")).andExpect(status().isOk());
+        }
+        send(busy, get("/api/v1/exports/orders.xlsx")).andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("TOO_MANY_EXPORTS"));
+        send(admin, get("/api/v1/exports/orders.xlsx")).andExpect(status().isOk()); // someone else is not affected
+    }
 }

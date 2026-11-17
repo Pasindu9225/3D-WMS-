@@ -6,7 +6,10 @@ import jakarta.validation.constraints.Size;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.Locale;
+import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
+import lk.wms.common.web.RateLimiter;
+import org.springframework.http.HttpStatus;
 import lk.wms.report.service.ExportService;
 import lk.wms.report.service.ExportService.Filter;
 import lk.wms.report.service.ExportService.Format;
@@ -25,9 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExportController {
 
     private final ExportService exports;
+    private final RateLimiter limiter;
 
-    public ExportController(ExportService exports) {
+    public ExportController(ExportService exports, RateLimiter limiter) {
         this.exports = exports;
+        this.limiter = limiter;
     }
 
     @GetMapping("/api/v1/exports/{what}.{format}")
@@ -41,8 +46,12 @@ public class ExportController {
             @RequestParam(required = false) @Pattern(regexp = "DRAFT|RELEASED|PICKING|PICKED|PACKED|SHIPPED|CANCELLED") String status,
             @RequestParam(required = false) @Size(max = 200) String q,
             HttpServletResponse response) throws IOException {
+        CurrentUser cu = CurrentUser.require();
+        if (limiter.tryConsume(RateLimiter.Scope.EXPORT, Long.toString(cu.userId())) > 0) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_EXPORTS", "Too many exports; wait a minute");
+        }
         Format f = Format.valueOf(format.toUpperCase(Locale.ROOT));
-        ExportService.Plan plan = exports.plan(CurrentUser.require(), What.valueOf(what.toUpperCase(Locale.ROOT)), f,
+        ExportService.Plan plan = exports.plan(cu, What.valueOf(what.toUpperCase(Locale.ROOT)), f,
                 new Filter(warehouse, type, from, to, status, q));
         response.setContentType(f == Format.XLSX ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "application/pdf");
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION,

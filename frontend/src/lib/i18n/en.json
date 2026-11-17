@@ -498,6 +498,7 @@
   "error.IMAGE_UNREADABLE": "This picture cannot be read. Try another file.",
   "error.IMAGE_NOT_FOUND": "This product has no picture.",
   "error.TOO_MANY_UPLOADS": "Too many uploads. Wait a minute and try again.",
+  "error.TOO_MANY_EXPORTS": "Too many downloads. Wait a minute and try again.",
   "nav.suppliers": "Suppliers",
   "suppliers.title": "Suppliers",
   "suppliers.hint": "Who you buy from. Purchase orders and receiving use this list.",

@@ -317,6 +317,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Exit criteria:** pilot runs receive → putaway → pick → pack → ship for 2 weeks with no stock mismatch; all v0.1 to v1.0 SEC rules verified; ZAP scan clean of high issues.
 
+**Status 2026-11-17:** every task that needs no server is done; security review (docs/security-review-v1.0.md) and acceptance run (docs/test-report-v1.0.md) passed locally. Waiting for a server: install, HTTPS (SEC-66), backups timer (SEC-83), ZAP on the real domain, then the 2-week pilot.
+
 ### v1.1 — Counts, returns, batch and expiry
 
 **Goal:** stock stays accurate over time and the system suits food and pharmacy warehouses.
