@@ -383,6 +383,9 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 - [x] Drone view: the camera flies a smooth path over the whole warehouse, then along each aisle; play / pause / speed; can fly along a pick route; any colour mode (zone, status, expiry, pick heat) stays on
   — done: plane button in the 3D view; once round the floor, low past every rack nearest-first, ends looking down; with a route on screen it flies the pick walk; pause, 0.5× / 1× / 2×, progress, stop (button, Esc, drag or click); about 137 fps on the dev PC
+- [x] Realistic 3D (owner's reference picture, 2026-11-18): blue upright frames with bracing and base plates, orange front and back beams, label plates, a wooden pallet with cartons wherever there is stock (stack height from how full), zones in strong colours with painted border lines and names on the floor, kerb round the building; new default "Real" colour mode; all drawn in code (no model or image downloads), 12 draw calls, 145 fps at 10,000 bins on the dev PC
+- [ ] Custom rack looks: rack type style (pallet racking / shelving) and upright and beam colours, shown in 3D without republishing
+- [ ] Light on the internet: the layout kept in the browser; the server only says "unchanged" (ETag 304) until a new publish
 - [ ] Walk-through: first-person view at eye height (1.7 m); keys (W A S D / arrows) and mouse to look on a PC, on-screen joystick on phones and tablets; cannot walk through racks or walls; click a bin to see what is in it; "you are here" dot on the Lite map
 
 **Deliverables:** two new camera modes in the 3D view, no new library (three.js, React Three Fiber and drei are already in the app).

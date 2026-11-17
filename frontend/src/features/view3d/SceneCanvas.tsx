@@ -8,7 +8,8 @@ import type { Scene } from './api'
 import type { CameraApi } from './camera'
 import { slowFromFrameTimes } from './perf'
 import { ZONE_COLOR } from './colors'
-import { buildInstances, floorBox, type BoxSpec } from './sceneLayout'
+import { buildInstances, centreOf, edgeStripes, floorBox, type BoxSpec } from './sceneLayout'
+import { cartonTexture, labelTexture, palletTexture } from './textures'
 import { routePoints, type PickRoute } from './route'
 
 const M = 1 / 1000
@@ -27,25 +28,30 @@ function shapeOf(flat: number[]): THREE.Shape {
 const unitBox = new THREE.BoxGeometry(1, 1, 1)
 
 /**
- * Many boxes, one draw call: a single InstancedMesh whose instances are scaled unit cubes. colors (optional)
- * gives one colour per instance; otherwise the material colour is used.
+ * Many boxes, one draw call: a single InstancedMesh whose instances are scaled unit cubes. colors (optional) gives
+ * one colour per instance (it tints the texture, if any); otherwise the material colour is used. pickOnly draws
+ * nothing but still catches clicks; ghost draws faint see-through boxes.
  */
-function Boxes({ specs, color, colors, onPick }: {
+function Boxes({ specs, color, colors, onPick, map, ghost, pickOnly }: {
   specs: BoxSpec[]
   color: string
   colors?: THREE.Color[]
   /** Click on one instance (not a drag): its index. */
   onPick?: (index: number) => void
+  map?: THREE.Texture | null
+  ghost?: boolean
+  pickOnly?: boolean
 }) {
   const mesh = useRef<THREE.InstancedMesh>(null)
   useLayoutEffect(() => {
     const m = mesh.current
     if (!m) return
     const o = new THREE.Object3D()
-    specs.forEach((s, i) => {
-      o.position.set(s.x, s.y, s.z)
-      o.rotation.set(0, s.rotY, 0)
-      o.scale.set(s.w, s.h, s.d)
+    o.rotation.order = 'YXZ' // turn with the rack first, then tilt about its length (diagonal braces)
+    specs.forEach((sp, i) => {
+      o.position.set(sp.x, sp.y, sp.z)
+      o.rotation.set(sp.tilt ?? 0, sp.rotY, 0)
+      o.scale.set(sp.w, sp.h, sp.d)
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
       if (colors) m.setColorAt(i, colors[i]!)
@@ -62,8 +68,30 @@ function Boxes({ specs, color, colors, onPick }: {
         e.stopPropagation()
         onPick(e.instanceId)
       })}>
-      <meshStandardMaterial color={colors ? '#ffffff' : color} />
+      {pickOnly ? <meshBasicMaterial visible={false} />
+        : ghost ? <meshBasicMaterial color={colors ? '#ffffff' : color} transparent opacity={0.28} depthWrite={false} />
+          : <meshStandardMaterial color={colors ? '#ffffff' : color} map={map ?? null} roughness={0.85} />}
     </instancedMesh>
+  )
+}
+
+/** A zone's code and name painted flat on the floor at its middle, sized to the zone. */
+function ZoneLabel({ zone }: { zone: Scene['zones'][number] }) {
+  const texture = useMemo(() => labelTexture(zone.code, zone.name), [zone.code, zone.name])
+  useEffect(() => () => texture?.dispose(), [texture])
+  const c = centreOf(zone.polygon)
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (let i = 0; i < zone.polygon.length; i += 2) {
+    minX = Math.min(minX, zone.polygon[i]!); maxX = Math.max(maxX, zone.polygon[i]!)
+    minY = Math.min(minY, zone.polygon[i + 1]!); maxY = Math.max(maxY, zone.polygon[i + 1]!)
+  }
+  const size = Math.max(1.5, Math.min(8, Math.min(maxX - minX, maxY - minY) * M * 0.9)) // readable on narrow zones too
+  if (!texture) return null
+  return (
+    <mesh position={[c.x * M, 0.02, c.y * M]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[size, size]} />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} />
+    </mesh>
   )
 }
 
@@ -72,10 +100,12 @@ function Boxes({ specs, color, colors, onPick }: {
  * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
  * draw call each, whatever the number of racks.
  */
-export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow, onFrame, route, drone }: {
+export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow, onFrame, route, drone, ghosts = true }: {
   scene: Scene
   /** A pick walk drawn on the floor (v1.2), if any. */
   /** The drone flight (v2.1) while it is on. */
+  /** Show empty bins as faint coloured boxes (colour modes); off in the Real look. */
+  ghosts?: boolean
   drone?: DroneProps | null
   route?: PickRoute | null
   /** Boxes from buildInstances(scene), worked out by the page so search and fly-to use the same positions. */
@@ -103,6 +133,18 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       return color
     })
   }, [colors])
+  const cartonColors = useMemo(() => parts.cartons.map((c) => binColors[c.bin]!), [parts.cartons, binColors])
+  const emptyColors = useMemo(() => parts.empties.map((c) => binColors[c.bin]!), [parts.empties, binColors])
+  const zoneLines = useMemo(() => {
+    const specs: BoxSpec[] = []
+    const cols: THREE.Color[] = []
+    for (const z of scene.zones) {
+      const c = new THREE.Color(ZONE_COLOR[z.type])
+      for (const st of edgeStripes(z.polygon, 0.12)) { specs.push(st); cols.push(c) }
+    }
+    return { specs, cols }
+  }, [scene.zones])
+  const kerb = useMemo(() => edgeStripes(scene.floor, 0.2, 0.3), [scene.floor])
   const doors = useMemo<BoxSpec[]>(() => {
     const outline: { x: number; y: number }[] = []
     for (let i = 0; i < scene.floor.length; i += 2) outline.push({ x: scene.floor[i]!, y: scene.floor[i + 1]! })
@@ -125,17 +167,25 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       {/* Plan y runs down the screen; turning the floor +90° about x maps plan (x, y) to scene (x, 0, y). */}
       <group rotation={[Math.PI / 2, 0, 0]}>
         <mesh geometry={floor} onClick={(e) => e.delta <= 4 && onSelect(null)}>
-          <meshStandardMaterial color="#cbd5e1" side={THREE.DoubleSide} />
+          <meshStandardMaterial color="#9ca3af" roughness={0.95} side={THREE.DoubleSide} />
         </mesh>
         {zones.map((z) => (
-          <mesh key={z.code} geometry={z.geometry} position={[0, 0, -0.01]}>
-            <meshStandardMaterial color={ZONE_COLOR[z.type]} transparent opacity={0.3} side={THREE.DoubleSide} />
+          <mesh key={z.code} geometry={z.geometry} position={[0, 0, -0.005]}>
+            <meshStandardMaterial color={ZONE_COLOR[z.type]} transparent opacity={0.45} side={THREE.DoubleSide} depthWrite={false} />
           </mesh>
         ))}
       </group>
-      <Boxes specs={parts.posts} color="#1e3a8a" />
-      <Boxes specs={parts.shelves} color="#f97316" />
-      <Boxes specs={parts.bins} color="#94a3b8" colors={binColors} onPick={onSelect} />
+      <Boxes specs={zoneLines.specs} color="#ffffff" colors={zoneLines.cols} />
+      {scene.zones.map((z) => <ZoneLabel key={z.code} zone={z} />)}
+      <Boxes specs={kerb} color="#475569" />
+      <Boxes specs={parts.posts} color="#1d4ed8" />
+      <Boxes specs={parts.braces} color="#3b82f6" />
+      <Boxes specs={parts.beams} color="#f97316" />
+      <Boxes specs={parts.labels} color="#f8fafc" />
+      <Boxes specs={parts.pallets} color="#b98a52" map={palletTexture()} />
+      <Boxes specs={parts.cartons} color="#d8a86c" colors={cartonColors} map={cartonTexture()} />
+      {ghosts && <Boxes specs={parts.empties} color="#cbd5e1" colors={emptyColors} ghost />}
+      <Boxes specs={parts.bins} color="#ffffff" pickOnly onPick={onSelect} />
       {selected !== null && parts.bins[selected] && <Highlight spec={parts.bins[selected]!} />}
       <Boxes specs={doors} color="#facc15" />
       {route && route.stops.length > 0 && <RouteLine route={route} />}

@@ -37,9 +37,9 @@ function savedView(): ViewMode {
 function savedMode(): ColorMode {
   try {
     const m = localStorage.getItem(MODE_KEY)
-    return m === 'status' || m === 'expiry' || m === 'heat' ? m : 'zone'
+    return m === 'zone' || m === 'status' || m === 'expiry' || m === 'heat' ? m : 'real'
   } catch {
-    return 'zone'
+    return 'real'
   }
 }
 
@@ -216,7 +216,7 @@ export function View3DPage() {
         )}
         {scene.data && view === '3d' && (
           <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">{t('view3d.loading3d')}</p>}>
-            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} route={route}
+            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} route={route} ghosts={mode !== 'real'}
               drone={drone && tour ? { tour, playing: drone.playing, speed: drone.speed, onProgress: onDroneProgress, onStop: stopDrone } : null} />}
           </Suspense>
         )}
@@ -225,7 +225,7 @@ export function View3DPage() {
           <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div className="pointer-events-auto space-y-2 rounded-lg border bg-card/90 p-2 text-xs shadow-sm sm:max-w-[60%]">
               <div role="radiogroup" aria-label={t('view3d.colorBy')} className="flex gap-1">
-                {(['zone', 'status', 'expiry', 'heat'] as ColorMode[]).map((m) => (
+                {(['real', 'zone', 'status', 'expiry', 'heat'] as ColorMode[]).map((m) => (
                   <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
                     className={`rounded px-2 py-1 font-medium ${mode === m ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
                     {t(`view3d.colorBy.${m}` as MessageKey)}
@@ -237,6 +237,7 @@ export function View3DPage() {
                   <li key={l.key} className="flex items-center gap-1.5">
                     <span className="size-3 rounded-sm" style={{ background: l.color }} />
                     {mode === 'heat' ? (l.key === 'NONE' ? t('view3d.heat.none') : l.from === l.to ? (l.from === 1 ? t('view3d.heat.single') : t('view3d.heat.one', { n: l.from ?? 0 })) : t('view3d.heat.range', { from: l.from ?? 0, to: l.to ?? 0 }))
+                      : mode === 'real' ? t(`view3d.real.${l.key}` as MessageKey)
                       : mode === 'zone' ? t(`layout.zoneType.${l.key}` as MessageKey)
                       : mode === 'expiry' ? t(`view3d.expiry.${l.key}` as MessageKey) : t(`view3d.status.${l.key}` as MessageKey)}
                   </li>
@@ -245,6 +246,7 @@ export function View3DPage() {
               {mode === 'status' && <p className="text-muted-foreground">{t('view3d.status.note')}</p>}
               {mode === 'expiry' && <p className="text-muted-foreground">{t('view3d.expiry.note')}</p>}
               {mode === 'heat' && <p className="text-muted-foreground">{t('view3d.heat.note')}</p>}
+              {mode === 'real' && <p className="text-muted-foreground">{t('view3d.real.note')}</p>}
               {route && <p className="font-medium text-cyan-700 dark:text-cyan-300">{t(route.stops.length === 1 ? 'route.labelOne' : 'route.label', { n: route.stops.length, m: Math.round(route.metres) })}</p>}
             </div>
             {view === '3d' && (

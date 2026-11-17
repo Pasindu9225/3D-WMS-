@@ -24,6 +24,7 @@ export function fakeScene(bins: number): Scene {
     racks: [], bins: { ids: [], codes: [], rack: [], level: [], pos: [] }, flags: '',
   }
   let flags = ''
+  const fill: number[] = [] // about two in three places hold a pallet (v2.1 real look: pallets and cartons are drawn)
   for (let r = 0; r < racks; r++) {
     const code = `R${String(r + 1).padStart(3, '0')}`
     scene.racks.push({ code, zone: 'Z1', x: 2000 + (r % perRow) * 2700 + 1350, y: 2000 + Math.floor(r / perRow) * 4100 + 550,
@@ -35,9 +36,11 @@ export function fakeScene(bins: number): Scene {
       scene.bins.level.push(Math.floor(i / 10))
       scene.bins.pos.push(i % 10)
       flags += i % 37 === 0 ? '1' : i % 11 === 0 ? '2' : '0'
+      fill.push(i % 3 === 2 ? 0 : 20 + ((i * 37) % 80))
     }
   }
   scene.flags = flags
+  scene.fill = fill
   return scene
 }
 
@@ -46,7 +49,7 @@ export function PerfPage() {
   const [count, setCount] = useState(10_000)
   const scene = useMemo(() => fakeScene(count), [count])
   const parts = useMemo(() => buildInstances(scene), [scene])
-  const colors = useMemo(() => binColors(scene, 'status', scene.flags), [scene])
+  const colors = useMemo(() => binColors(scene, 'real', scene.flags), [scene])
   const frames = useRef<number[]>([])
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<{ median: number; p10: number } | null>(null)
@@ -76,7 +79,7 @@ export function PerfPage() {
       </div>
       <div className="min-h-0 flex-1">
         <Suspense fallback={<p className="p-6">{t('view3d.loading3d')}</p>}>
-          <SceneCanvas scene={scene} parts={parts} colors={colors} selected={null} onSelect={() => undefined}
+          <SceneCanvas scene={scene} parts={parts} colors={colors} selected={null} onSelect={() => undefined} ghosts={false}
             onFrame={running ? (d) => frames.current.push(d) : undefined} />
         </Suspense>
       </div>

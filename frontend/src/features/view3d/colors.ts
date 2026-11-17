@@ -1,7 +1,11 @@
 import type { ZoneType } from '@/features/warehouses/api'
 import { BLOCKED, PICK_FACE, type Scene } from './api'
 
-export type ColorMode = 'zone' | 'status' | 'expiry' | 'heat'
+export type ColorMode = 'real' | 'zone' | 'status' | 'expiry' | 'heat'
+
+/** Real look (v2.1): natural cardboard tints, a little different per bin so stacks do not look copy-pasted. */
+export const CARTON_COLORS = ['#d8a86c', '#c99456', '#e2b883', '#cf9d62'] as const
+export const EMPTY_COLOR = '#cbd5e1'
 export type ExpiryBand = 'EXPIRED' | 'D30' | 'D60' | 'D90' | 'LATER' | 'NONE'
 export type BinStatus = 'EMPTY' | 'PARTLY' | 'FULL' | 'BLOCKED' | 'PICK_FACE'
 
@@ -74,6 +78,9 @@ export function statusOf(flag: number, fill?: number): BinStatus {
 
 /** Colour of every bin, in scene order. flags is the live status string (scene.flags or /bin-status). */
 export function binColors(scene: Scene, mode: ColorMode, flags: string): string[] {
+  if (mode === 'real') {
+    return scene.bins.rack.map((_, i) => ((scene.fill?.[i] ?? 0) > 0 ? CARTON_COLORS[(i * 7) % CARTON_COLORS.length]! : EMPTY_COLOR))
+  }
   if (mode === 'expiry') {
     return scene.bins.rack.map((_, i) => EXPIRY_COLOR[expiryBand(scene.expiryDays?.[i])])
   }
@@ -93,6 +100,7 @@ export function binColors(scene: Scene, mode: ColorMode, flags: string): string[
 
 /** Legend rows for the current mode: only what is on screen (zone types present, every status). */
 export function legend(scene: Scene, mode: ColorMode): { key: string; color: string; from?: number; to?: number }[] {
+  if (mode === 'real') return [{ key: 'LOADED', color: CARTON_COLORS[0] }, { key: 'EMPTY', color: EMPTY_COLOR }]
   if (mode === 'heat') {
     const max = Math.max(0, ...(scene.picks ?? []))
     return [{ key: 'NONE', color: HEAT_COLOR[0] }, ...heatRanges(max).map((r) => ({ key: `H${r.step}`, color: HEAT_COLOR[r.step]!, from: r.from, to: r.to }))]

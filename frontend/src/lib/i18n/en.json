@@ -1396,5 +1396,9 @@
   "drone.play": "Play",
   "drone.pause": "Pause",
   "drone.stop": "Stop the drone",
-  "drone.progress": "Flight done"
+  "drone.progress": "Flight done",
+  "view3d.colorBy.real": "Real",
+  "view3d.real.LOADED": "Pallet with goods",
+  "view3d.real.EMPTY": "Empty place",
+  "view3d.real.note": "A pallet with cartons where there is stock; a taller stack means a fuller place."
 }
