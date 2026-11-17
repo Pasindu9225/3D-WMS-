@@ -38,13 +38,23 @@ function place(r: Scene['racks'][number], lx: number, lz: number) {
   return { x: r.x * M + lx * cos - lz * sin, z: r.y * M + lx * sin + lz * cos, rotY: -a }
 }
 
+export const UPRIGHT = '#1d4ed8'
+export const BEAM = '#f97316'
+
 export interface SceneParts {
   /** Upright posts (2 per end frame) and their base plates. */
   posts: BoxSpec[]
+  /** One colour per post, per brace, per beam / shelf: the rack type's own colours (v2.1). */
+  postColors: string[]
+  braceColors: string[]
+  beamColors: string[]
   /** Horizontal and diagonal bracing of the end frames. */
   braces: BoxSpec[]
   /** Step beams, front and back, at every level above the floor. */
   beams: BoxSpec[]
+  /** Shelving (SHELF style): one solid shelf per raised level. */
+  shelves: BoxSpec[]
+  shelfColors: string[]
   /** One white label plate per bin, on the beam under it. */
   labels: BoxSpec[]
   /** A wooden pallet under every bin that holds stock. */
@@ -65,7 +75,17 @@ export function buildInstances(scene: Scene): SceneParts {
   const posts: BoxSpec[] = []
   const braces: BoxSpec[] = []
   const beams: BoxSpec[] = []
+  const shelves: BoxSpec[] = []
+  const postColors: string[] = []
+  const braceColors: string[] = []
+  const beamColors: string[] = []
+  const shelfColors: string[] = []
   for (const r of scene.racks) {
+    const up = r.uprightColor ?? UPRIGHT
+    const beam = r.beamColor ?? BEAM
+    const shelving = r.style === 'SHELF'
+    const postsBefore = posts.length
+    const bracesBefore = braces.length
     const w = r.widthMm * M
     const d = r.depthMm * M
     const h = r.heightMm * M
@@ -90,11 +110,18 @@ export function buildInstances(scene: Scene): SceneParts {
         braces.push({ ...c, y: (k + 0.5) * step, w: BRACE, h: BRACE, d: len, tilt })
       }
     }
+    for (let k = postsBefore; k < posts.length; k++) postColors.push(up)
+    for (let k = bracesBefore; k < braces.length; k++) braceColors.push(up)
     for (const level of r.levels) {
       if (level <= 0) continue // floor level: goods stand on the floor
       for (const sz of [-1, 1]) {
         const p = place(r, 0, sz * (d / 2 - BEAM_D / 2))
-        beams.push({ ...p, y: level * M - BEAM_H / 2, w: Math.max(0.1, w - POST * 2), h: BEAM_H, d: BEAM_D })
+        beams.push({ ...p, y: level * M - BEAM_H / 2, w: Math.max(0.1, w - POST * 2), h: shelving ? BEAM_H / 2 : BEAM_H, d: BEAM_D })
+        beamColors.push(beam)
+      }
+      if (shelving) { // a solid shelf between the beams
+        shelves.push({ ...place(r, 0, 0), y: level * M - 0.015, w: Math.max(0.1, w - POST * 2), h: 0.03, d: Math.max(0.1, d - BEAM_D) })
+        shelfColors.push(beam)
       }
     }
   }
@@ -122,18 +149,20 @@ export function buildInstances(scene: Scene): SceneParts {
     }
     const fill = scene.fill?.[i] ?? 0
     if (fill > 0) {
-      const pw = Math.min(box.w - 0.04, 1.2)
-      const pd = Math.min(box.d, 1.0)
-      pallets.push({ ...p, y: floorOf + PALLET_H / 2, w: pw, h: PALLET_H, d: pd, bin: i })
-      const room = Math.max(0.1, binH - PALLET_H - 0.02)
+      const onPallet = r.style !== 'SHELF' // shelving: cartons straight on the shelf
+      const pw = Math.min(box.w - 0.04, onPallet ? 1.2 : box.w)
+      const pd = Math.min(box.d, onPallet ? 1.0 : box.d)
+      const base = onPallet ? PALLET_H : 0
+      if (onPallet) pallets.push({ ...p, y: floorOf + PALLET_H / 2, w: pw, h: PALLET_H, d: pd, bin: i })
+      const room = Math.max(0.1, binH - base - 0.02)
       const share = fill <= 1 ? 0.4 : Math.min(1, Math.max(0.2, fill / 100)) // 1 % = goods of unknown size: show a modest stack
       const ch = room * share
-      cartons.push({ ...p, y: floorOf + PALLET_H + ch / 2, w: pw * 0.96, h: ch, d: pd * 0.96, bin: i })
+      cartons.push({ ...p, y: floorOf + base + ch / 2, w: pw * 0.96, h: ch, d: pd * 0.96, bin: i })
     } else {
       empties.push({ ...box, bin: i })
     }
   }
-  return { posts, braces, beams, labels, pallets, cartons, empties, bins }
+  return { posts, postColors, braces, braceColors, beams, beamColors, shelves, shelfColors, labels, pallets, cartons, empties, bins }
 }
 
 /** Centre and size of the floor, for framing the camera. */

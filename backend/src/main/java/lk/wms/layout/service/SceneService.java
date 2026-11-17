@@ -42,7 +42,7 @@ public class SceneService {
 
     /** levels: height from the floor of each level, bottom first; bins sit on these shelves. */
     public record RackView(String code, String zone, int x, int y, int rotation, int widthMm, int depthMm, int heightMm,
-            int binsPerLevel, int[] levels) {
+            int binsPerLevel, int[] levels, String style, String uprightColor, String beamColor) {
     }
 
     /** Parallel arrays: bin i is in racks[rack[i]], on levels[level[i]], slot pos[i] counted from the left end. */
@@ -66,11 +66,13 @@ public class SceneService {
     private final BinRepository bins;
     private final JsonMapper json;
     private final lk.wms.inventory.service.StockService stock;
+    private final RackTemplateService templates;
 
     public SceneService(WarehouseService warehouses, LayoutVersionRepository versions, ZoneRepository zones,
             RackRepository racks, RackLevelRepository levels, BinRepository bins, JsonMapper json,
-            lk.wms.inventory.service.StockService stock) {
+            lk.wms.inventory.service.StockService stock, RackTemplateService templates) {
         this.stock = stock;
+        this.templates = templates;
         this.warehouses = warehouses;
         this.versions = versions;
         this.zones = zones;
@@ -119,12 +121,14 @@ public class SceneService {
             binsPerLevel[r] = Math.max(binsPerLevel[r], b.getPositionNo());
         }
         List<RackView> rackViews = new ArrayList<>(rackRows.size());
+        Map<Long, lk.wms.layout.domain.RackTemplate> looks = templates.looks(rackRows.stream().map(Rack::getTemplateId).collect(Collectors.toSet()));
         for (int i = 0; i < rackRows.size(); i++) {
             Rack r = rackRows.get(i);
             int[] heights = levelsByRack.getOrDefault(r.getId(), List.of()).stream()
                     .mapToInt(RackLevel::getHeightFromFloorMm).toArray();
             rackViews.add(new RackView(r.getCode(), zoneCodes.get(r.getZoneId()), r.getPosXMm(), r.getPosYMm(),
-                    r.getRotationDeg(), r.getWidthMm(), r.getDepthMm(), r.getHeightMm(), binsPerLevel[i], heights));
+                    r.getRotationDeg(), r.getWidthMm(), r.getDepthMm(), r.getHeightMm(), binsPerLevel[i], heights,
+                    look(looks, r).getStyle().name(), look(looks, r).getUprightColor(), look(looks, r).getBeamColor()));
         }
         return new SceneView(published.getPublishedAt().toString(), flat(doc.floor()), doc.openings(), zoneViews,
                 rackViews, arrays, flags(binRows), fill(w.id(), binRows), expiryDays(w.id(), binRows),
@@ -157,6 +161,14 @@ public class SceneService {
         }
         return out;
     }
+
+    /** A rack's 3D look from its rack type; the classic look when the type was archived. */
+    private static lk.wms.layout.domain.RackTemplate look(Map<Long, lk.wms.layout.domain.RackTemplate> looks, Rack r) {
+        lk.wms.layout.domain.RackTemplate t = looks.get(r.getTemplateId());
+        return t != null ? t : CLASSIC;
+    }
+
+    private static final lk.wms.layout.domain.RackTemplate CLASSIC = new lk.wms.layout.domain.RackTemplate("-", "-", 1000, 1000, 1000, 1, 1, 1);
 
     /** Lines picked from each bin in the last 30 days (v1.2 heat map), 0 when never. */
     // ponytail: re-counted on every /bin-status call; cache per warehouse for a minute if picking gets heavy

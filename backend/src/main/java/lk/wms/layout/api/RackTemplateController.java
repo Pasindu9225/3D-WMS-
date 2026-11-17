@@ -41,10 +41,13 @@ public class RackTemplateController {
             @Min(500) @Max(40_000) int heightMm,
             @Min(1) @Max(20) int levels,
             @Min(1) @Max(50) int binsPerLevel,
-            @Min(1) @Max(100_000_000) long maxWeightPerLevelG) {
+            @Min(1) @Max(100_000_000) long maxWeightPerLevelG,
+            @Pattern(regexp = "PALLET|SHELF") String style, // optional: classic pallet racking
+            @Pattern(regexp = "#[0-9A-Fa-f]{6}") String uprightColor,
+            @Pattern(regexp = "#[0-9A-Fa-f]{6}") String beamColor) {
 
         TemplateSpec spec() {
-            return new TemplateSpec(name, widthMm, depthMm, heightMm, levels, binsPerLevel, maxWeightPerLevelG);
+            return new TemplateSpec(name, widthMm, depthMm, heightMm, levels, binsPerLevel, maxWeightPerLevelG, style, uprightColor, beamColor);
         }
     }
 

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Archive, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
@@ -110,6 +110,9 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
     height: length(500, 40_000),
     levels: whole(1, 20),
     binsPerLevel: whole(1, 50),
+    style: z.enum(['PALLET', 'SHELF']),
+    uprightColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    beamColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     weight: z.string().refine((v) => {
       const g = parseWeight(v)
       return g !== null && g >= 1 && g <= 100_000_000
@@ -121,8 +124,10 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
     defaultValues: type
       ? { code: type.code, name: type.name, width: format(type.widthMm, unit), depth: format(type.depthMm, unit),
           height: format(type.heightMm, unit), levels: String(type.levels), binsPerLevel: String(type.binsPerLevel),
-          weight: String(type.maxWeightPerLevelG / 1000) }
-      : { code: '', name: '', width: '', depth: '', height: '', levels: '4', binsPerLevel: '3', weight: '1000' },
+          weight: String(type.maxWeightPerLevelG / 1000), style: type.style ?? 'PALLET', uprightColor: type.uprightColor ?? '#1d4ed8',
+          beamColor: type.beamColor ?? '#f97316' }
+      : { code: '', name: '', width: '', depth: '', height: '', levels: '4', binsPerLevel: '3', weight: '1000', style: 'PALLET',
+          uprightColor: '#1d4ed8', beamColor: '#f97316' },
   })
   const { errors } = form.formState
   const server = fieldErrors(save.error)
@@ -136,7 +141,11 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
     levels: v.levels,
     binsPerLevel: v.binsPerLevel,
     maxWeightPerLevelG: parseWeight(v.weight)!,
+    style: v.style,
+    uprightColor: v.uprightColor,
+    beamColor: v.beamColor,
   }, { onSuccess: onClose }))
+  const look = useWatch({ control: form.control, name: ['style', 'uprightColor', 'beamColor', 'levels', 'binsPerLevel'] })
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()} title={type ? t('rackTypes.editTitle') : t('rackTypes.new')}
       description={t('rackTypes.formHint', { unit })}>
@@ -173,6 +182,28 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
             {(p) => <Input {...p} inputMode="decimal" {...form.register('weight')} />}
           </Field>
         </div>
+        <fieldset className="grid grid-cols-[1fr_auto] items-end gap-3 rounded-md border p-3">
+          <legend className="px-1 text-sm font-medium">{t('rackTypes.look')}</legend>
+          <div className="grid gap-3">
+            <Field label={t('rackTypes.style')}>
+              {(p) => (
+                <select {...p} className="h-10 rounded-md border border-input bg-background px-3" {...form.register('style')}>
+                  <option value="PALLET">{t('rackTypes.style.PALLET')}</option>
+                  <option value="SHELF">{t('rackTypes.style.SHELF')}</option>
+                </select>
+              )}
+            </Field>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="color" className="h-9 w-12 cursor-pointer rounded border" {...form.register('uprightColor')} /> {t('rackTypes.uprightColor')}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="color" className="h-9 w-12 cursor-pointer rounded border" {...form.register('beamColor')} /> {t('rackTypes.beamColor')}
+              </label>
+            </div>
+          </div>
+          <RackPreview style={look[0]} upright={look[1]} beam={look[2]} levels={Number(look[3]) || 1} slots={Number(look[4]) || 1} />
+        </fieldset>
         {type && <p className="text-xs text-muted-foreground">{t('rackTypes.editNote')}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
@@ -180,5 +211,37 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
         </div>
       </form>
     </Dialog>
+  )
+}
+
+/** A small front view of the rack in its chosen look: uprights, beams (or shelves) and loads. */
+function RackPreview({ style, upright, beam, levels, slots }: { style: 'PALLET' | 'SHELF'; upright: string; beam: string; levels: number; slots: number }) {
+  const n = Math.min(Math.max(levels, 1), 8)
+  const s = Math.min(Math.max(slots, 1), 6)
+  const w = 120
+  const h = 130
+  const rows = Array.from({ length: n }, (_, i) => i)
+  const cols = Array.from({ length: s }, (_, i) => i)
+  const levelH = (h - 10) / n
+  const slotW = (w - 16) / s
+  return (
+    <svg role="img" aria-label={t('rackTypes.preview')} width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="rounded bg-muted">
+      {rows.map((r) => {
+        const y = h - 4 - r * levelH
+        return (
+          <g key={r}>
+            {cols.map((c) => (
+              <g key={c}>
+                {style === 'PALLET' && <rect x={8 + c * slotW + 2} y={y - 5} width={slotW - 4} height={4} fill="#a16207" />}
+                <rect x={8 + c * slotW + 3} y={y - (style === 'PALLET' ? 5 : 1) - levelH * 0.5} width={slotW - 6} height={levelH * 0.5} fill="#d8a86c" stroke="#92400e" strokeWidth={0.5} />
+              </g>
+            ))}
+            {r > 0 && <rect x={6} y={y} width={w - 12} height={style === 'SHELF' ? 3 : 4} fill={beam} />}
+          </g>
+        )
+      })}
+      <rect x={4} y={4} width={5} height={h - 4} fill={upright} />
+      <rect x={w - 9} y={4} width={5} height={h - 4} fill={upright} />
+    </svg>
   )
 }

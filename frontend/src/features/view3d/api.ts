@@ -21,6 +21,10 @@ export interface Scene {
     binsPerLevel: number
     /** Height from the floor of each level, bottom first. */
     levels: number[]
+    /** 3D look from the rack type (v2.1): pallet racking or shelving, and its colours. Missing in older data. */
+    style?: 'PALLET' | 'SHELF'
+    uprightColor?: string
+    beamColor?: string
   }[]
   /** Parallel arrays: bin i is in racks[rack[i]], level level[i], slot pos[i] from the left end. */
   bins: { ids: string[]; codes: string[]; rack: number[]; level: number[]; pos: number[] }
@@ -41,7 +45,10 @@ export function useScene(warehouseId: string) {
   return useQuery({
     queryKey: ['scene', warehouseId],
     queryFn: () => api<Scene>(`/warehouses/${warehouseId}/scene`),
-    staleTime: 60_000,
+    // v2.1: live changes arrive over the socket and a new publish reloads it, so no need to ask often; when it is asked,
+    // the browser sends its saved copy's ETag and an unchanged layout costs a 304 with no body.
+    staleTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
     retry: false,
   })
 }

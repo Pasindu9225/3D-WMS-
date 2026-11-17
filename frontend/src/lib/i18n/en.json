@@ -1400,5 +1400,12 @@
   "view3d.colorBy.real": "Real",
   "view3d.real.LOADED": "Pallet with goods",
   "view3d.real.EMPTY": "Empty place",
-  "view3d.real.note": "A pallet with cartons where there is stock; a taller stack means a fuller place."
+  "view3d.real.note": "A pallet with cartons where there is stock; a taller stack means a fuller place.",
+  "rackTypes.look": "How it looks in 3D",
+  "rackTypes.style": "Type",
+  "rackTypes.style.PALLET": "Pallet racking (open beams, pallets)",
+  "rackTypes.style.SHELF": "Shelving (solid shelves, cartons)",
+  "rackTypes.uprightColor": "Uprights",
+  "rackTypes.beamColor": "Beams / shelves",
+  "rackTypes.preview": "Preview of the rack"
 }

@@ -23,6 +23,7 @@ class SceneApiTest extends ApiTest {
     long tenant;
     Cookie admin;
     String warehouse;
+    String type;
 
     @BeforeEach
     void warehouseWithLayout() throws Exception {
@@ -31,7 +32,7 @@ class SceneApiTest extends ApiTest {
         warehouse = read(send(admin, post("/api/v1/warehouses").content(
                 "{\"code\":\"WH1\",\"name\":\"Main\",\"widthM\":40,\"lengthM\":20,\"wallHeightM\":8}"))
                 .andExpect(status().isCreated()), "$.id");
-        String type = read(send(admin, post("/api/v1/rack-templates").content("{\"code\":\"PAL\",\"name\":\"Pallet\","
+        type = read(send(admin, post("/api/v1/rack-templates").content("{\"code\":\"PAL\",\"name\":\"Pallet\","
                 + "\"widthMm\":2700,\"depthMm\":1100,\"heightMm\":6000,\"levels\":4,\"binsPerLevel\":3,"
                 + "\"maxWeightPerLevelG\":1000000}")).andExpect(status().isCreated()), "$.id");
         String floor = "[{\"x\":0,\"y\":0},{\"x\":40000,\"y\":0},{\"x\":40000,\"y\":20000},{\"x\":0,\"y\":20000}]";
@@ -62,6 +63,24 @@ class SceneApiTest extends ApiTest {
                 .andExpect(jsonPath("$.bins.ids.length()").value(12))
                 .andExpect(jsonPath("$.flags").value("000000000000"))
                 .andReturn().getResponse().getContentAsString();
+        // v2.1: each rack carries its type's 3D look (classic pallet racking by default) and follows changes without a new publish
+        send(admin, get("/api/v1/warehouses/" + warehouse + "/scene")).andExpect(jsonPath("$.racks[0].style").value("PALLET"))
+                .andExpect(jsonPath("$.racks[0].uprightColor").value("#1d4ed8")).andExpect(jsonPath("$.racks[0].beamColor").value("#f97316"));
+        String look = "{\"name\":\"Shelving\",\"widthMm\":2700,\"depthMm\":1100,\"heightMm\":6000,\"levels\":4,\"binsPerLevel\":3,\"maxWeightPerLevelG\":1000000,";
+        send(admin, put("/api/v1/rack-templates/" + type).content(look + "\"style\":\"SHELF\",\"uprightColor\":\"red\"}")).andExpect(status().isBadRequest());
+        send(admin, put("/api/v1/rack-templates/" + type).content(look + "\"style\":\"CANTILEVER\"}")).andExpect(status().isBadRequest());
+        send(admin, put("/api/v1/rack-templates/" + type).content(look + "\"style\":\"SHELF\",\"uprightColor\":\"#22C55E\",\"beamColor\":\"#64748b\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.style").value("SHELF")).andExpect(jsonPath("$.uprightColor").value("#22c55e"));
+        send(admin, get("/api/v1/warehouses/" + warehouse + "/scene")).andExpect(jsonPath("$.racks[0].style").value("SHELF"))
+                .andExpect(jsonPath("$.racks[0].uprightColor").value("#22c55e")).andExpect(jsonPath("$.racks[0].beamColor").value("#64748b"));
+        // v2.1, light on the internet: the browser keeps the layout; asking again with its ETag gets 304 and no body
+        var first = send(admin, get("/api/v1/warehouses/" + warehouse + "/scene")).andExpect(status().isOk()).andReturn().getResponse();
+        String etag = first.getHeader("ETag");
+        assertThat(etag).isNotBlank();
+        assertThat(first.getHeader("Cache-Control")).contains("private").contains("no-cache").doesNotContain("no-store");
+        var again = send(admin, get("/api/v1/warehouses/" + warehouse + "/scene").header("If-None-Match", etag)).andReturn().getResponse();
+        assertThat(again.getStatus()).isEqualTo(304);
+        assertThat(again.getContentAsByteArray()).isEmpty();
         List<String> codes = jsonList(body, "$.bins.codes");
         List<Integer> level = jsonList(body, "$.bins.level");
         List<Integer> pos = jsonList(body, "$.bins.pos");

@@ -66,3 +66,19 @@ it('paints a line along each edge of a zone', async () => {
   expect(lines[1]!.w).toBeCloseTo(2) // right edge, 2 m
   expect(Math.abs(lines[1]!.rotY)).toBeCloseTo(Math.PI / 2)
 })
+
+it('draws each rack in its own colours; shelving gets solid shelves and no pallets', () => {
+  const s = scene(0, [60, 60])
+  s.racks[0] = { ...s.racks[0]!, style: 'SHELF', uprightColor: '#22c55e', beamColor: '#64748b' }
+  const parts = buildInstances(s)
+  expect(new Set(parts.postColors)).toEqual(new Set(['#22c55e']))
+  expect(new Set(parts.beamColors)).toEqual(new Set(['#64748b']))
+  expect(parts.shelves).toHaveLength(1) // the raised level
+  expect(parts.pallets).toHaveLength(0)
+  expect(parts.cartons).toHaveLength(2)
+  expect(parts.cartons[0]!.y - parts.cartons[0]!.h / 2).toBeCloseTo(0) // straight on the floor, no pallet under it
+  const classic = buildInstances(scene(0, [60, 60]))
+  expect(classic.shelves).toHaveLength(0)
+  expect(classic.pallets).toHaveLength(2)
+  expect(classic.postColors[0]).toBe('#1d4ed8')
+})

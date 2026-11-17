@@ -16,4 +16,7 @@ public interface RackTemplateRepository extends JpaRepository<RackTemplate, Long
     List<RackTemplate> findByPublicIdIn(Collection<String> publicIds);
 
     Page<RackTemplate> findAllBy(Pageable pageable);
+
+    /** Templates of published racks (3D look); archived ones are absent and get the default look. */
+    List<RackTemplate> findByIdIn(Collection<Long> ids);
 }

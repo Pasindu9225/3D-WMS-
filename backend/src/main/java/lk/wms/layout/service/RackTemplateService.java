@@ -22,12 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class RackTemplateService {
 
     public record TemplateView(String id, String code, String name, int widthMm, int depthMm, int heightMm, int levels,
-            int binsPerLevel, long maxWeightPerLevelG) {
+            int binsPerLevel, long maxWeightPerLevelG, String style, String uprightColor, String beamColor) {
     }
 
     /** Fields the planner sets; code is fixed once created (racks refer to the template by ID, labels by code). */
     public record TemplateSpec(String name, int widthMm, int depthMm, int heightMm, int levels, int binsPerLevel,
-            long maxWeightPerLevelG) {
+            long maxWeightPerLevelG, String style, String uprightColor, String beamColor) {
     }
 
     private final RackTemplateRepository templates;
@@ -50,6 +50,7 @@ public class RackTemplateService {
         try {
             t = templates.saveAndFlush(new RackTemplate(code, s.name().trim(), s.widthMm(), s.depthMm(), s.heightMm(),
                     s.levels(), s.binsPerLevel(), s.maxWeightPerLevelG()));
+            look(t, s);
         } catch (DataIntegrityViolationException e) {
             throw new ApiException(HttpStatus.CONFLICT, "CODE_IN_USE", "Another rack type already uses this code");
         }
@@ -63,6 +64,7 @@ public class RackTemplateService {
         RackTemplate t = find(publicId);
         TemplateView before = view(t);
         t.set(s.name().trim(), s.widthMm(), s.depthMm(), s.heightMm(), s.levels(), s.binsPerLevel(), s.maxWeightPerLevelG());
+        look(t, s);
         audit.record(cu.tenantId(), cu.userId(), "RACK_TEMPLATE_UPDATED", "rack_template", t.getPublicId(), before, view(t));
         return view(t);
     }
@@ -108,8 +110,21 @@ public class RackTemplateService {
         }
     }
 
+/** Style and colours, with the classic look for anything left out. */
+    private static void look(RackTemplate t, TemplateSpec s) {
+        t.setLook(s.style() == null ? RackTemplate.Style.PALLET : RackTemplate.Style.valueOf(s.style()),
+                s.uprightColor() == null ? "#1d4ed8" : s.uprightColor().toLowerCase(java.util.Locale.ROOT),
+                s.beamColor() == null ? "#f97316" : s.beamColor().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** Looks of these templates by internal id (3D scene, same module). */
+    @Transactional(readOnly = true)
+    public Map<Long, RackTemplate> looks(Collection<Long> ids) {
+        return ids.isEmpty() ? Map.of() : templates.findByIdIn(ids).stream().collect(Collectors.toMap(RackTemplate::getId, Function.identity()));
+    }
+
     private static TemplateView view(RackTemplate t) {
         return new TemplateView(t.getPublicId(), t.getCode(), t.getName(), t.getWidthMm(), t.getDepthMm(), t.getHeightMm(),
-                t.getLevels(), t.getBinsPerLevel(), t.getMaxWeightPerLevelG());
+                t.getLevels(), t.getBinsPerLevel(), t.getMaxWeightPerLevelG(), t.getStyle().name(), t.getUprightColor(), t.getBeamColor());
     }
 }

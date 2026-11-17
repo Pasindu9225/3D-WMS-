@@ -134,6 +134,11 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
     })
   }, [colors])
   const cartonColors = useMemo(() => parts.cartons.map((c) => binColors[c.bin]!), [parts.cartons, binColors])
+  const rackColors = useMemo(() => {
+    const cache = new Map<string, THREE.Color>() // a few rack colours, shared by every part
+    const of = (list: string[]) => list.map((c) => { let x = cache.get(c); if (!x) cache.set(c, (x = new THREE.Color(c))); return x })
+    return { posts: of(parts.postColors), braces: of(parts.braceColors), beams: of(parts.beamColors), shelves: of(parts.shelfColors) }
+  }, [parts])
   const emptyColors = useMemo(() => parts.empties.map((c) => binColors[c.bin]!), [parts.empties, binColors])
   const zoneLines = useMemo(() => {
     const specs: BoxSpec[] = []
@@ -178,9 +183,10 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       <Boxes specs={zoneLines.specs} color="#ffffff" colors={zoneLines.cols} />
       {scene.zones.map((z) => <ZoneLabel key={z.code} zone={z} />)}
       <Boxes specs={kerb} color="#475569" />
-      <Boxes specs={parts.posts} color="#1d4ed8" />
-      <Boxes specs={parts.braces} color="#3b82f6" />
-      <Boxes specs={parts.beams} color="#f97316" />
+      <Boxes specs={parts.posts} color="#1d4ed8" colors={rackColors.posts} />
+      <Boxes specs={parts.braces} color="#3b82f6" colors={rackColors.braces} />
+      <Boxes specs={parts.beams} color="#f97316" colors={rackColors.beams} />
+      <Boxes specs={parts.shelves} color="#94a3b8" colors={rackColors.shelves} />
       <Boxes specs={parts.labels} color="#f8fafc" />
       <Boxes specs={parts.pallets} color="#b98a52" map={palletTexture()} />
       <Boxes specs={parts.cartons} color="#d8a86c" colors={cartonColors} map={cartonTexture()} />

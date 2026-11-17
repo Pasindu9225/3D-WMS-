@@ -26,6 +26,10 @@ public class Rack extends TenantScoped {
     @Column(name = "template_id", nullable = false)
     private Long templateId;
 
+    public Long getTemplateId() {
+        return templateId;
+    }
+
     @Column(nullable = false, length = 10, updatable = false)
     private String code;
 

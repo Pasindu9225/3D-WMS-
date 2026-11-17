@@ -67,6 +67,19 @@ public class RackTemplate extends TenantScoped {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    /** How it looks in 3D (v2.1): PALLET racking or SHELF shelving, and its colours (#RRGGBB). */
+    public enum Style { PALLET, SHELF }
+
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(nullable = false)
+    private Style style = Style.PALLET;
+
+    @Column(name = "upright_color", nullable = false, length = 7)
+    private String uprightColor = "#1d4ed8";
+
+    @Column(name = "beam_color", nullable = false, length = 7)
+    private String beamColor = "#f97316";
+
     protected RackTemplate() {
     }
 
@@ -88,6 +101,24 @@ public class RackTemplate extends TenantScoped {
         this.binsPerLevel = (short) binsPerLevel;
         this.maxWeightPerLevelG = maxWeightPerLevelG;
         this.updatedAt = Instant.now();
+    }
+
+    public void setLook(Style style, String uprightColor, String beamColor) {
+        this.style = style;
+        this.uprightColor = uprightColor;
+        this.beamColor = beamColor;
+    }
+
+    public Style getStyle() {
+        return style;
+    }
+
+    public String getUprightColor() {
+        return uprightColor;
+    }
+
+    public String getBeamColor() {
+        return beamColor;
     }
 
     public void archive() {
