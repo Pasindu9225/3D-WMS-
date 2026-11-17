@@ -1275,5 +1275,7 @@
   "view3d.heat.range": "{from}–{to} picks",
   "view3d.heat.note": "Lines picked from each bin in the last 30 days; red = the busiest bins.",
   "view3d.bin.picks": "Picked (30 days)",
-  "view3d.heat.single": "1 pick"
+  "view3d.heat.single": "1 pick",
+  "route.labelOne": "Route: 1 stop · about {m} m",
+  "route.showOne": "Show route (1 stop, about {m} m)"
 }

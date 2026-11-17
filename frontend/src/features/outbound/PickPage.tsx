@@ -246,7 +246,7 @@ function ShowRoute({ param }: { param: string }) {
   return (
     <Link to={'/app/warehouses/' + route.data.warehouseId + '/3d?route=' + param}
       className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-      <Route className="size-4" /> {t('route.show', { n: route.data.stops.length, m: Math.round(route.data.metres) })}
+      <Route className="size-4" /> {t(route.data.stops.length === 1 ? 'route.showOne' : 'route.show', { n: route.data.stops.length, m: Math.round(route.data.metres) })}
     </Link>
   )
 }

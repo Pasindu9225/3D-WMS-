@@ -1,6 +1,6 @@
 # 3D Warehouse System
 
-Read docs/SPEC.md before any task. It is the single source of truth; if this file and SPEC.md disagree, SPEC.md wins. Current version: v1.1 (v0.4 done 2026-11-16; v1.0 and v1.1 built, reviewed and accepted locally 2026-11-17; v1.0 deploy and pilot wait for a server; next: v1.2; update as you go).
+Read docs/SPEC.md before any task. It is the single source of truth; if this file and SPEC.md disagree, SPEC.md wins. Current version: v1.2 (v0.4 done 2026-11-16; v1.0 and v1.1 built, reviewed and accepted locally 2026-11-17; v1.2 built, reviewed and accepted locally 2026-11-18; v1.0 deploy and pilot wait for a server; next: v2.0; update as you go).
 
 ## Stack
 Java 17, Spring Boot 4.1, Hibernate, MySQL 8.4 LTS, Flyway, Caffeine, Bucket4j.

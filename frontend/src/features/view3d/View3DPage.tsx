@@ -236,7 +236,7 @@ export function View3DPage() {
               {mode === 'status' && <p className="text-muted-foreground">{t('view3d.status.note')}</p>}
               {mode === 'expiry' && <p className="text-muted-foreground">{t('view3d.expiry.note')}</p>}
               {mode === 'heat' && <p className="text-muted-foreground">{t('view3d.heat.note')}</p>}
-              {route && <p className="font-medium text-cyan-700 dark:text-cyan-300">{t('route.label', { n: route.stops.length, m: Math.round(route.metres) })}</p>}
+              {route && <p className="font-medium text-cyan-700 dark:text-cyan-300">{t(route.stops.length === 1 ? 'route.labelOne' : 'route.label', { n: route.stops.length, m: Math.round(route.metres) })}</p>}
             </div>
             {view === '3d' && (
               <div className="pointer-events-auto flex flex-col items-end gap-2 self-end">

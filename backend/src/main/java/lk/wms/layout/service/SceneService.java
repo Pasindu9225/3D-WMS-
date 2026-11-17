@@ -159,6 +159,7 @@ public class SceneService {
     }
 
     /** Lines picked from each bin in the last 30 days (v1.2 heat map), 0 when never. */
+    // ponytail: re-counted on every /bin-status call; cache per warehouse for a minute if picking gets heavy
     private int[] picks(long warehouseId, List<SceneBin> rows) {
         Map<Long, Integer> picks = stock.binPicks(warehouseId);
         int[] out = new int[rows.size()];

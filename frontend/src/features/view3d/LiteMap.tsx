@@ -116,7 +116,7 @@ export function RackBins({ scene, rack, colors, selectedBin, onBin, onClose }: {
 function RouteOverlay({ route }: { route: PickRoute }) {
   const pts = routePoints(route)
   return (
-    <g aria-label={t('route.label', { n: route.stops.length, m: Math.round(route.metres) })} role="img">
+    <g aria-label={t(route.stops.length === 1 ? 'route.labelOne' : 'route.label', { n: route.stops.length, m: Math.round(route.metres) })} role="img">
       <polyline points={pts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#22d3ee" strokeWidth={180}
         strokeLinejoin="round" strokeDasharray="600 300" />
       <circle cx={route.startX} cy={route.startY} r={700} fill="#22d3ee" />

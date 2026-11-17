@@ -355,6 +355,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Exit criteria:** batch picking of 10 orders shortens the route versus single-order picking in a test layout.
 
+**Status 2026-11-18:** all tasks done; security review (docs/security-review-v1.2.md) and acceptance run (docs/test-report-v1.2.md) passed locally; exit criterion met (WaveTest: ten orders walk less than a ninth of one by one). Ships with the v1.0 deployment once a server exists.
+
 ### v2.0 — SaaS and commercial release
 
 **Goal:** new customers can sign up and pay per warehouse without your help.
