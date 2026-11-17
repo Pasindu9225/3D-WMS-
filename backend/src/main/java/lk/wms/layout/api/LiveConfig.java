@@ -56,6 +56,8 @@ import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
 public class LiveConfig implements WebSocketMessageBrokerConfigurer {
 
     static final Pattern BIN_TOPIC = Pattern.compile("^/topic/wh/([0-9A-HJKMNP-TV-Z]{26})/bins$");
+    /** A person's own notifications (v1.2): only ever their own id. */
+    static final Pattern MY_TOPIC = Pattern.compile("^/topic/user/([0-9A-HJKMNP-TV-Z]{26})/notifications$");
     static final Duration MAX_SOCKET_AGE = Duration.ofMinutes(15);
     /** A few tabs per sign-in is plenty; more would let one account use up server memory. */
     static final int MAX_SOCKETS_PER_SESSION = 5;
@@ -125,6 +127,13 @@ public class LiveConfig implements WebSocketMessageBrokerConfigurer {
         switch (command) {
             case CONNECT, STOMP -> { }
             case SUBSCRIBE -> {
+                Matcher mine = MY_TOPIC.matcher(String.valueOf(frame.getDestination()));
+                if (mine.matches()) {
+                    if (!mine.group(1).equals(user.userPublicId())) {
+                        throw new MessageDeliveryException("subscription not allowed");
+                    }
+                    return;
+                }
                 Matcher m = BIN_TOPIC.matcher(String.valueOf(frame.getDestination()));
                 if (!m.matches() || !user.permissions().contains("warehouses:read")) {
                     throw new MessageDeliveryException("subscription not allowed");

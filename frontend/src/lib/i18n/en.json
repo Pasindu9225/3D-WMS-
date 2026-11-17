@@ -1252,5 +1252,21 @@
   "error.RULE_DESTINATION": "Choose a bin or a zone.",
   "error.RULE_LIMIT": "This warehouse already has the most putaway rules allowed (200).",
   "error.ZONE_NOT_FOUND": "There is no zone with that code in the published layout.",
-  "error.OUTSIDE_ZONE": "This product may only go in its zone. Scan a bin there."
+  "error.OUTSIDE_ZONE": "This product may only go in its zone. Scan a bin there.",
+  "notify.bell": "Notifications",
+  "notify.bellUnread": "Notifications, {n} new",
+  "notify.title": "Notifications",
+  "notify.readAll": "Mark all as read",
+  "notify.none": "Nothing new.",
+  "notify.new": "new",
+  "notify.pickList": "Pick list {number} was given to you.",
+  "notify.wave": "Pick wave {number} was given to you.",
+  "notify.lowStock": "Low stock in {warehouse}: {sku} {name} has {onHand} {uom} left (reorder at {reorderPoint}).",
+  "notify.expiry": "{warehouse}: {soon} lots expire within {days} days.",
+  "notify.expiryWithExpired": "{warehouse}: {expired} lots have expired and {soon} more expire within {days} days.",
+  "notify.justNow": "just now",
+  "notify.minutesAgo": "{n} min ago",
+  "notify.hoursAgo": "{n} h ago",
+  "notify.daysAgo": "{n} days ago",
+  "error.NOTIFICATION_NOT_FOUND": "This notification does not exist."
 }

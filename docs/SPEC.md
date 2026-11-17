@@ -348,7 +348,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Pick path ordering by bin sequence; route drawn on the 3D floor — nearest rack first from the dispatch zone (lists and waves); "Show route" on the Lite map and the 3D floor
 - [x] Min/max replenishment for pick-face bins; auto tasks from bulk storage — refill rules per pick bin; a drop below min makes one task (max − on hand); FEFO source from storage bins
 - [x] Putaway rules editor (fixed bin, same product, closest empty, by zone and category) — rules per warehouse for one product, a category or every product → a fixed bin or a zone ("only this zone" also refuses other bins at the scan); then the built-in same product → nearest empty order
-- [ ] In-app notifications (low stock, task assigned, expiry) via WebSocket
+- [x] In-app notifications (low stock, task assigned, expiry) via WebSocket — bell in the office and phone headers; pick list or wave given to you; low stock at the reorder point (once a day per product); daily 06:00 expiry summary; live push on /topic/user/{id}/notifications (own id only)
 - [ ] Heat map in 3D: most-picked bins
 
 **Deliverables:** advanced picking, replenishment, rules editor, heat map.

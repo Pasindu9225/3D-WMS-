@@ -1,3 +1,4 @@
+import { NotificationBell } from '@/features/notify/NotificationBell'
 import { Signpost, ArrowUpFromLine, PackageX, ArrowDownToLine, ArrowLeftRight, Barcode, Scale, Boxes, FileText, ShoppingCart, Store, ListChecks, PackageOpen, Truck as TruckOut, LayoutDashboard, Gauge, PackageCheck, Truck, ClipboardCheck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
 import { useState, type ComponentType } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -79,6 +80,7 @@ export function AppLayout() {
           <span className="font-semibold md:hidden">{t('app.name')}</span>
           <div className="ml-auto flex items-center gap-1">
             <Button asChild variant="ghost" size="sm"><Link to="/worker">{t('worker.open')}</Link></Button>
+            {me.data && <NotificationBell userId={me.data.id} />}
             <ThemeToggle />
             <UserMenu me={me.data} />
           </div>

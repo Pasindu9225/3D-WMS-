@@ -85,11 +85,14 @@ public class PickService {
     private final lk.wms.outbound.repo.PickWaveRepository waves;
     private final lk.wms.layout.service.BinService bins;
     private final lk.wms.inventory.service.RefillService refills;
+    private final lk.wms.notify.service.NotificationService notifications;
 
     public PickService(PickListRepository lists, SalesOrderRepository orders, DocNumbers numbers, ProductService products,
             WarehouseService warehouses, StockMovementService stock, AuditService audit, lk.wms.auth.service.UserService users,
             lk.wms.inventory.service.StockService stockViews, lk.wms.outbound.repo.PickWaveRepository waves,
-            lk.wms.layout.service.BinService bins, lk.wms.inventory.service.RefillService refills) {
+            lk.wms.layout.service.BinService bins, lk.wms.inventory.service.RefillService refills,
+            lk.wms.notify.service.NotificationService notifications) {
+        this.notifications = notifications;
         this.refills = refills;
         this.waves = waves;
         this.bins = bins;
@@ -168,6 +171,12 @@ public class PickService {
     /** Gives a list to one picker of its warehouse, or back to anyone (null). Done lists stay as they are. */
     @Transactional
     public Detail assign(CurrentUser cu, String publicId, String userPublicId) {
+        return assign(cu, publicId, userPublicId, true);
+    }
+
+    /** notify = false when a wave gives several lists at once (the wave tells the picker once). */
+    @Transactional
+    public Detail assign(CurrentUser cu, String publicId, String userPublicId, boolean notify) {
         PickList p = lists.lockByPublicId(publicId).orElse(null);
         access(cu, p);
         if (p.getStatus() == PickList.Status.DONE) {
@@ -188,6 +197,9 @@ public class PickService {
         change.put("from", before == null ? "anyone" : before);
         change.put("to", to == null ? "anyone" : to);
         audit.record(cu.tenantId(), cu.userId(), "PICK_ASSIGNED", "pick_list", p.getPublicId(), null, change);
+        if (notify && to != null && !to.equals(before)) {
+            notifications.taskAssigned(to, "PICK_LIST", p.getNumber(), "/worker/pick/" + p.getPublicId());
+        }
         return detail(p, order(p));
     }
 

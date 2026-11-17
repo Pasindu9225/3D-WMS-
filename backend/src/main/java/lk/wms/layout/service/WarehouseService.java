@@ -100,6 +100,12 @@ public class WarehouseService {
         return warehouses.codeOf(warehouseId).orElse(null);
     }
 
+    /** Internal ids of the company's warehouses (archived ones excluded), for jobs. */
+    @Transactional(readOnly = true)
+    public List<Long> liveIds() {
+        return warehouses.findAll().stream().map(Warehouse::getId).toList();
+    }
+
     /** Users assigned to a warehouse (internal ids); company admins work everywhere and are not listed. */
     @Transactional(readOnly = true)
     public List<Long> userIdsIn(long warehouseId) {

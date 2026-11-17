@@ -2,6 +2,7 @@ import { ArrowLeft, LogOut, Monitor } from 'lucide-react'
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useLogout, useMe } from '@/features/auth/session'
+import { NotificationBell } from '@/features/notify/NotificationBell'
 import { t } from '@/lib/i18n'
 
 /** The phone app: one column, big targets, no sidebar. Same sign-in and permissions as the office app. */
@@ -22,6 +23,7 @@ export function WorkerLayout() {
           </Button>
         )}
         <span className="ml-auto truncate text-sm text-muted-foreground">{me.data.fullName}</span>
+        <NotificationBell userId={me.data.id} className="size-11" />
         <Button asChild variant="ghost" size="icon" className="size-11" aria-label={t('worker.office')}>
           <Link to="/app"><Monitor /></Link>
         </Button>

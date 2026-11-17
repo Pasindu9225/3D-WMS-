@@ -199,6 +199,16 @@ public class ProductService {
         return out;
     }
 
+    /** What a low-stock alert says about a product (v1.2 notifications). */
+    public record Watch(String sku, String name, String baseUom, java.math.BigDecimal reorderPoint) {
+    }
+
+    @Transactional(readOnly = true)
+    public Watch watch(long productId) {
+        return products.withIds(java.util.List.of(productId)).stream().findFirst()
+                .map(p -> new Watch(p.getSku(), p.getName(), p.getBaseUom(), p.getReorderPoint())).orElse(null);
+    }
+
     /** A product's category (putaway rules), or null. */
     @Transactional(readOnly = true)
     public String category(long productId) {

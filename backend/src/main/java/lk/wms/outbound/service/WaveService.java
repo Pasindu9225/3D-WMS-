@@ -63,9 +63,11 @@ public class WaveService {
     private final BinService bins;
     private final AuditService audit;
     private final lk.wms.auth.service.UserService users;
+    private final lk.wms.notify.service.NotificationService notifications;
 
     public WaveService(PickWaveRepository waves, PickListRepository lists, SalesOrderRepository orders, PickService picks,
-            DocNumbers numbers, WarehouseService warehouses, BinService bins, AuditService audit, lk.wms.auth.service.UserService users) {
+            DocNumbers numbers, WarehouseService warehouses, BinService bins, AuditService audit, lk.wms.auth.service.UserService users, lk.wms.notify.service.NotificationService notifications) {
+        this.notifications = notifications;
         this.waves = waves;
         this.lists = lists;
         this.orders = orders;
@@ -116,7 +118,8 @@ public class WaveService {
         }
         lists.flush();
         if (pickerId != null && !pickerId.isBlank()) {
-            locked.forEach(p -> picks.assign(cu, p.getPublicId(), pickerId)); // checks the person may pick here
+            locked.forEach(p -> picks.assign(cu, p.getPublicId(), pickerId, false)); // checks the person may pick here
+            notifications.taskAssigned(locked.get(0).getAssignedTo(), "WAVE", wave.getNumber(), "/worker/pick/wave/" + wave.getPublicId());
         }
         audit.record(cu.tenantId(), cu.userId(), "WAVE_CREATED", "pick_wave", wave.getPublicId(), null,
                 Map.of("number", wave.getNumber(), "lists", locked.stream().map(PickList::getNumber).toList(),

@@ -48,6 +48,10 @@ class LiveUpdatesTest extends ApiTest {
 
     long tenant;
     Cookie admin;
+    lk.wms.auth.domain.AppUser adminUser;
+
+    @Autowired
+    lk.wms.notify.service.NotificationService notifications;
     String warehouse;
     String binId;
     final WebSocketStompClient client = new WebSocketStompClient(new StandardWebSocketClient());
@@ -58,7 +62,8 @@ class LiveUpdatesTest extends ApiTest {
     void publishedWarehouse() throws Exception {
         client.setMessageConverter(new SimpleMessageConverter()); // raw bytes: we read the JSON ourselves
         tenant = newTenant(2);
-        admin = login(newUser(tenant, "TENANT_ADMIN"));
+        adminUser = newUser(tenant, "TENANT_ADMIN");
+        admin = login(adminUser);
         warehouse = read(send(admin, post("/api/v1/warehouses").content(
                 "{\"code\":\"WH1\",\"name\":\"Main\",\"widthM\":40,\"lengthM\":20,\"wallHeightM\":8}"))
                 .andExpect(status().isCreated()), "$.id");
@@ -106,6 +111,28 @@ class LiveUpdatesTest extends ApiTest {
         assertThat(errors.poll(5, TimeUnit.SECONDS)).isNotNull(); // ERROR frame, socket closed
         send(admin, patch("/api/v1/bins/" + binId).content("{\"blocked\":true}")).andExpect(status().isOk());
         assertThat(received.poll(1, TimeUnit.SECONDS)).isNull();
+    }
+
+    @Test
+    void myNotificationsArePushedToMeOnlyAfterCommit() throws Exception {
+        StompSession session = connect(admin, "http://localhost:" + port);
+        subscribe(session, "/topic/user/" + adminUser.getPublicId() + "/notifications");
+        Thread.sleep(300);
+        lk.wms.common.tenant.TenantContext.callAs(tenant, () -> {
+            notifications.taskAssigned(adminUser.getId(), "PICK_LIST", "PL-000001", "/worker/pick/x");
+            return null;
+        });
+        assertThat(received.poll(5, TimeUnit.SECONDS)).as("errors: %s", errors).isEqualTo("{\"type\":\"NOTIFICATION\"}");
+        session.disconnect();
+        Thread.sleep(300); // the socket-limit test counts open sockets
+    }
+
+    @Test
+    void nobodyCanListenToSomeoneElsesNotifications() throws Exception {
+        lk.wms.auth.domain.AppUser colleague = newUser(tenant, "PICKER");
+        StompSession session = connect(admin, "http://localhost:" + port); // even a company admin
+        subscribe(session, "/topic/user/" + colleague.getPublicId() + "/notifications");
+        assertThat(errors.poll(5, TimeUnit.SECONDS)).isNotNull();
     }
 
     @Test
