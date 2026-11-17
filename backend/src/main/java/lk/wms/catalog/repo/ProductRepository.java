@@ -18,6 +18,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByPublicId(String publicId);
 
+    /** Ids of live products in one ABC class (count plans). */
+    @Query("select p.id from Product p where p.abcClass = :abc")
+    java.util.List<Long> idsWithAbc(@Param("abc") String abc);
+
     /** Ids of every live product of the company (the ABC job classifies them all). */
     @Query("select p.id from Product p")
     java.util.List<Long> liveIds();

@@ -86,6 +86,13 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     @Query("select s.binId, s.productId, s.qtyOnHand from Stock s where s.warehouseId = :warehouseId and s.binId is not null and s.qtyOnHand > 0")
     List<Object[]> binContents(@Param("warehouseId") long warehouseId);
 
+    /** Stock in the bins of a warehouse (optionally only some bins / products), for a count plan. */
+    @Query("select s from Stock s where s.warehouseId = :warehouseId and s.binId is not null and s.qtyOnHand > 0"
+            + " and (:allBins = true or s.binId in :binIds) and (:allProducts = true or s.productId in :productIds)")
+    List<Stock> inBins(@Param("warehouseId") long warehouseId, @Param("allBins") boolean allBins,
+            @Param("binIds") java.util.Collection<Long> binIds, @Param("allProducts") boolean allProducts,
+            @Param("productIds") java.util.Collection<Long> productIds);
+
     /** The earliest expiry date in each bin that holds dated stock, as [bin_id, min expiry] (3D expiry colours). */
     @Query("select s.binId, min(s.expiryDate) from Stock s where s.warehouseId = :warehouseId and s.binId is not null"
             + " and s.qtyOnHand > 0 and s.expiryDate is not null group by s.binId")

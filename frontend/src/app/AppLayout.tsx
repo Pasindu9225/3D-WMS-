@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowLeftRight, Barcode, Scale, Boxes, FileText, ShoppingCart, Store, ListChecks, PackageOpen, Truck as TruckOut, LayoutDashboard, Gauge, PackageCheck, Truck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
+import { ArrowDownToLine, ArrowLeftRight, Barcode, Scale, Boxes, FileText, ShoppingCart, Store, ListChecks, PackageOpen, Truck as TruckOut, LayoutDashboard, Gauge, PackageCheck, Truck, ClipboardCheck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
 import { useState, type ComponentType } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -35,6 +35,7 @@ const NAV: NavItem[] = [
   { to: '/app/putaway', label: 'nav.putaway', icon: ArrowDownToLine, permission: 'putaway:execute' },
   { to: '/app/move', label: 'nav.move', icon: ArrowLeftRight, permission: 'inventory:transfer' },
   { to: '/app/adjustments', label: 'nav.adjustments', icon: Scale, permission: 'inventory:read' },
+  { to: '/app/counts', label: 'nav.counts', icon: ClipboardCheck, permission: 'counts:execute' },
   { to: '/app/stock', label: 'nav.stock', icon: Package, permission: 'inventory:read' },
   { to: '/app/customers', label: 'nav.customers', icon: Store, permission: 'catalog:read' },
   { to: '/app/sales-orders', label: 'nav.salesOrders', icon: ShoppingCart, permission: 'outbound:read' },

@@ -171,6 +171,12 @@ public class ProductService {
     }
 
     /** A product as stock screens show it. Ids are internal, for other modules' services only. */
+    /** Live products in an ABC class (A, B or C), for count plans. */
+    @Transactional(readOnly = true)
+    public java.util.List<Long> idsWithAbc(String abc) {
+        return products.idsWithAbc(abc);
+    }
+
     /** Every live product's id, for the ABC job (current company). */
     @Transactional(readOnly = true)
     public java.util.List<Long> liveIds() {

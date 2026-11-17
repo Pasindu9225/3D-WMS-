@@ -328,6 +328,17 @@ public class StockMovementService {
         events.publishEvent(new StockChanged(held.get(0).getWarehouseId()));
     }
 
+    /**
+     * What one place holds right now, read under its row lock (a count line's expected quantity): a pick or move
+     * running at the same moment either finished before (and is included) or waits until the count is saved.
+     */
+    @Transactional
+    public BigDecimal onHandLocked(long warehouseId, long binId, long productId, String batchNo, LocalDate expiry) {
+        String batch = batchNo == null || batchNo.isBlank() ? null : batchNo.trim();
+        return stock.lockPlace(TenantContext.require(), warehouseId, binId, "BIN", productId, batch, expiry)
+                .map(Stock::getQtyOnHand).orElse(BigDecimal.ZERO);
+    }
+
     /** True when a move with this Idempotency-Key is already in the ledger (a phone retried). */
     @Transactional(readOnly = true)
     public boolean isDone(String clientRef) {
