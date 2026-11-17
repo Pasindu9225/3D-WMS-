@@ -89,14 +89,17 @@ function Todo() {
   if (rows.length === 0) return <p className="rounded-lg border p-4 text-sm text-muted-foreground">{t('worker.todo.none')}</p>
   return (
     <ul className="grid gap-2">
-      {rows.map((r) => (
+      {rows.map((r) => {
+        const Icon = ACTIONS.find((a) => a.to === r.to)?.icon ?? Scale
+        return (
         <li key={r.to}>
           <Link to={r.to} className="flex items-center gap-3 rounded-lg border bg-card p-4 hover:bg-secondary">
-            <Scale className="size-5 shrink-0 text-primary" />
+            <Icon className="size-5 shrink-0 text-primary" />
             <span>{r.text}</span>
           </Link>
         </li>
-      ))}
+        )
+      })}
     </ul>
   )
 }
