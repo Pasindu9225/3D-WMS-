@@ -40,6 +40,12 @@ public class TenantService {
         return tenants.findName(tenantId).orElse("");
     }
 
+    /** Ids of active companies; call in the system context (no company is current in a scheduled job). */
+    @Transactional(readOnly = true)
+    public java.util.List<Long> activeIds() {
+        return tenants.activeIds();
+    }
+
     /** F8: a suspended (or unknown) company cannot sign in, refresh or use a live session. */
     @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
     public boolean isActive(long tenantId) {

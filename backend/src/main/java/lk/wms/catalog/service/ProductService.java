@@ -33,7 +33,7 @@ public class ProductService {
 
     public record ProductView(String id, String sku, String barcode, String name, String baseUom, Integer weightG,
             Integer volumeCm3, boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, boolean hasImage,
-            List<UnitView> units, int version) {
+            List<UnitView> units, int version, String abcClass) {
     }
 
     /** Fields the user sets; the SKU is fixed once created (labels, orders and imports refer to it). */
@@ -171,6 +171,20 @@ public class ProductService {
     }
 
     /** A product as stock screens show it. Ids are internal, for other modules' services only. */
+    /** Every live product's id, for the ABC job (current company). */
+    @Transactional(readOnly = true)
+    public java.util.List<Long> liveIds() {
+        return products.liveIds();
+    }
+
+    /** Stores the ABC classes (A, B or C per product id) found by the job; versions stay as they are. */
+    @Transactional
+    public void setAbc(java.util.Map<Long, String> classOf, java.time.Instant at) {
+        java.util.Map<String, java.util.List<Long>> byClass = new java.util.HashMap<>();
+        classOf.forEach((id, c) -> byClass.computeIfAbsent(c, k -> new java.util.ArrayList<>()).add(id));
+        byClass.forEach((c, ids) -> products.setAbc(c, at, ids));
+    }
+
     /** Products with a reorder point: [id] -> point, for the low-stock list. */
     @Transactional(readOnly = true)
     public java.util.Map<Long, java.math.BigDecimal> reorderPoints() {
@@ -416,6 +430,6 @@ public class ProductService {
         return new ProductView(p.getPublicId(), p.getSku(), p.getBarcode(), p.getName(), p.getBaseUom(), p.getWeightG(),
                 p.getVolumeCm3(), p.isTrackBatch(), p.isTrackExpiry(), p.getCostMinor(), p.getReorderPoint(), p.getImageFileId() != null,
                 p.getUnits().stream().map(u -> new UnitView(u.getUom(), u.getFactor(), u.getBarcode())).toList(),
-                p.getVersion());
+                p.getVersion(), p.getAbcClass());
     }
 }

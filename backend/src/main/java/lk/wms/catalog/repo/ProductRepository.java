@@ -18,6 +18,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByPublicId(String publicId);
 
+    /** Ids of every live product of the company (the ABC job classifies them all). */
+    @Query("select p.id from Product p")
+    java.util.List<Long> liveIds();
+
+    /** Sets the ABC class of these products without touching their version (a running edit is not made stale). */
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
+    @Query("update Product p set p.abcClass = :abc, p.abcAt = :at where p.id in :ids")
+    int setAbc(@Param("abc") String abc, @Param("at") java.time.Instant at, @Param("ids") java.util.Collection<Long> ids);
+
     /**
      * Search: SKU or barcode starting with the text, or name containing it (case-insensitive collation).
      * The text is escaped by the service ('!' escapes % and _), so it is a literal, never a pattern.

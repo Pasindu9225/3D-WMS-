@@ -6,6 +6,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 /** Insert-only use: the ledger is never updated or deleted. */
 public interface StockMovementRepository extends JpaRepository<StockMovement, Long> {
 
+    /** Pick lines per product since a moment, as [product_id, count] (ABC classes). */
+    @org.springframework.data.jpa.repository.Query("select m.productId, count(m) from StockMovement m"
+            + " where m.type = lk.wms.inventory.domain.StockMovement.Type.PICK and m.createdAt >= :since group by m.productId")
+    java.util.List<Object[]> pickCounts(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
+
     /** A move already made with this Idempotency-Key (tenant-filtered). */
     boolean existsByClientRef(String clientRef);
 

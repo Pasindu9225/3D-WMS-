@@ -10,6 +10,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface TenantRepository extends JpaRepository<Tenant, Long> {
 
+    /** Every active company (system jobs such as the weekly ABC classes). */
+    @Query("select t.id from Tenant t where t.status = lk.wms.tenant.domain.Tenant.Status.ACTIVE order by t.id")
+    java.util.List<Long> activeIds();
+
     @Query("select t.adjustApprovalMinor from Tenant t where t.id = :id")
     Optional<Long> findAdjustApprovalMinor(@Param("id") long id);
 

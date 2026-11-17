@@ -64,6 +64,13 @@ public class Product extends TenantScoped {
     @Column(name = "reorder_point", precision = 14, scale = 3)
     private java.math.BigDecimal reorderPoint;
 
+    /** A, B or C by pick frequency (v1.1). Written only by the ABC job's bulk update, so a product edit never resets it. */
+    @Column(name = "abc_class", insertable = false, updatable = false)
+    private String abcClass;
+
+    @Column(name = "abc_at", insertable = false, updatable = false)
+    private java.time.Instant abcAt;
+
     @Column(name = "image_file_id")
     private Long imageFileId;
 
@@ -178,6 +185,10 @@ public class Product extends TenantScoped {
 
     public java.math.BigDecimal getReorderPoint() {
         return reorderPoint;
+    }
+
+    public String getAbcClass() {
+        return abcClass;
     }
 
     public Long getImageFileId() {

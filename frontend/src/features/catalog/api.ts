@@ -26,9 +26,11 @@ export interface Product {
   hasImage: boolean
   units: ProductUnit[]
   version: number
+  /** A, B or C by how often it is picked (weekly); null until first worked out. */
+  abcClass: 'A' | 'B' | 'C' | null
 }
 
-export type ProductInput = Omit<Product, 'id' | 'sku' | 'hasImage' | 'version'> & { sku?: string; version?: number }
+export type ProductInput = Omit<Product, 'id' | 'sku' | 'hasImage' | 'version' | 'abcClass'> & { sku?: string; version?: number }
 
 export const PRODUCT_PAGE_SIZE = 25
 
@@ -55,6 +57,15 @@ export function useArchiveProduct() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api<void>(`/products/${id}/archive`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+}
+
+/** Works out the ABC classes now (counts:approve) instead of waiting for Sunday. */
+export function useRecalculateAbc() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api<{ a: number; b: number; c: number }>('/abc/recalculate', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
   })
 }

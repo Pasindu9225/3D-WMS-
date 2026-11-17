@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Archive, FileUp, ImageOff, Pencil, Plus, Trash2, Upload } from 'lucide-react'
+import { Archive, FileUp, ImageOff, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -14,12 +14,14 @@ import { errorMessage, fieldErrors } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
 import { ImportDialog } from './ImportDialog'
-import { imageUrl, PRODUCT_PAGE_SIZE, useArchiveProduct, useProductImage, useProducts, useSaveProduct, type Product } from './api'
+import { imageUrl, PRODUCT_PAGE_SIZE, useArchiveProduct, useProductImage, useProducts, useRecalculateAbc, useSaveProduct, type Product } from './api'
 
 /** The company's products: SKU, barcode, units of measure, size and weight (v0.4 task 1). */
 export function ProductsPage() {
   const me = useMe()
   const manage = can(me.data, 'catalog:manage')
+  const approveCounts = can(me.data, 'counts:approve')
+  const abc = useRecalculateAbc()
   const [search, setSearch] = useState('')
   const q = useDebounced(search.trim())
   const [page, setPage] = useState(0)
@@ -37,10 +39,13 @@ export function ProductsPage() {
           <h1 className="text-2xl font-semibold">{t('products.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('products.hint')}</p>
         </div>
-        {manage && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setImporting(true)}><FileUp /> {t('import.button')}</Button>
-            <Button onClick={() => setEditing('new')}><Plus /> {t('products.new')}</Button>
+        {(manage || approveCounts) && (
+          <div className="flex flex-wrap gap-2">
+            {approveCounts && (
+              <Button variant="outline" disabled={abc.isPending} onClick={() => abc.mutate()}><RefreshCw /> {t('abc.recalculate')}</Button>
+            )}
+            {manage && <Button variant="outline" onClick={() => setImporting(true)}><FileUp /> {t('import.button')}</Button>}
+            {manage && <Button onClick={() => setEditing('new')}><Plus /> {t('products.new')}</Button>}
           </div>
         )}
       </div>
@@ -51,6 +56,8 @@ export function ProductsPage() {
         }} />
       {list.isError && <FormMessage tone="error">{errorMessage(list.error)}</FormMessage>}
       {archive.isError && <FormMessage tone="error">{errorMessage(archive.error)}</FormMessage>}
+      {abc.isError && <FormMessage tone="error">{errorMessage(abc.error)}</FormMessage>}
+      {abc.data && <FormMessage tone="success">{t('abc.done', abc.data)}</FormMessage>}
       <Table>
         <thead>
           <tr>
@@ -59,6 +66,7 @@ export function ProductsPage() {
             <Th className="hidden md:table-cell">{t('products.col.barcode')}</Th>
             <Th className="hidden sm:table-cell">{t('products.col.units')}</Th>
             <Th className="hidden lg:table-cell">{t('products.col.weight')}</Th>
+            <Th className="hidden sm:table-cell" title={t('abc.hint')}>{t('products.col.abc')}</Th>
             <Th className="w-1"><span className="sr-only">{t('users.col.actions')}</span></Th>
           </tr>
         </thead>
@@ -81,6 +89,7 @@ export function ProductsPage() {
                 {[p.baseUom, ...p.units.map((u) => `${u.uom} = ${u.factor} ${p.baseUom}`)].join(' · ')}
               </td>
               <td className="hidden tabular-nums lg:table-cell">{p.weightG === null ? '—' : formatKg(p.weightG)}</td>
+              <td className="hidden font-mono font-medium sm:table-cell">{p.abcClass ?? '—'}</td>
               <td className="whitespace-nowrap text-right">
                 {manage && (
                   <>
@@ -92,7 +101,7 @@ export function ProductsPage() {
             </Tr>
           ))}
           {data && data.items.length === 0 && (
-            <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">{q ? t('products.noMatch') : t('products.empty')}</td></tr>
+            <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">{q ? t('products.noMatch') : t('products.empty')}</td></tr>
           )}
         </tbody>
       </Table>
