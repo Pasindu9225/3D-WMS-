@@ -375,6 +375,19 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Exit criteria:** a new customer can sign up, build a warehouse and receive goods in under one hour without help.
 
+### v2.1 — 3D tours (requested by the owner 2026-11-18)
+
+**Goal:** see the warehouse as if flying over it or walking through it, to explain it to people and to plan changes.
+
+**Tasks**
+
+- [ ] Drone view: the camera flies a smooth path over the whole warehouse, then along each aisle; play / pause / speed; can fly along a pick route; any colour mode (zone, status, expiry, pick heat) stays on
+- [ ] Walk-through: first-person view at eye height (1.7 m); keys (W A S D / arrows) and mouse to look on a PC, on-screen joystick on phones and tablets; cannot walk through racks or walls; click a bin to see what is in it; "you are here" dot on the Lite map
+
+**Deliverables:** two new camera modes in the 3D view, no new library (three.js, React Three Fiber and drei are already in the app).
+
+**Exit criteria:** drone tour and walk-through run smoothly (30 fps or more) on the test layout on a mid-range PC; the 3D page stays within its size budget.
+
 ## MySQL database schema
 
 The schema has two cores: the location tree (warehouse → zone → rack → level → bin) and the append-only `stock_movement` ledger. The `stock` table is a fast running balance that must always equal the sum of movements.
