@@ -336,6 +336,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Exit criteria:** a full count of the pilot warehouse finishes without stopping work; FEFO test always picks the earliest expiry.
 
+**Status 2026-11-17:** all tasks done; security review (docs/security-review-v1.1.md) and acceptance run (docs/test-report-v1.1.md) passed locally. The full pilot count waits for the server, like the v1.0 pilot.
+
 ### v1.2 — Smarter picking and replenishment
 
 **Goal:** workers walk less and pick faces never run empty.

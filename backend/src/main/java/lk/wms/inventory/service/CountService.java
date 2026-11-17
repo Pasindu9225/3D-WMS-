@@ -71,7 +71,6 @@ public class CountService {
     static final String KIND = "CC";
     static final String REF = "COUNT";
     static final String APPROVE = "counts:approve";
-    static final int MAX_LINES = 2_000;
 
     private final CountPlanRepository plans;
     private final StockRepository stock;
@@ -82,10 +81,13 @@ public class CountService {
     private final ProductService products;
     private final AuditService audit;
     private final lk.wms.auth.service.UserService users;
+    private final int maxLines;
 
     public CountService(CountPlanRepository plans, StockRepository stock, StockMovementService moves, DocNumbers numbers,
             WarehouseService warehouses, BinService bins, ProductService products, AuditService audit,
-            lk.wms.auth.service.UserService users) {
+            lk.wms.auth.service.UserService users,
+            @org.springframework.beans.factory.annotation.Value("${wms.count.max-lines:2000}") int maxLines) {
+        this.maxLines = maxLines;
         this.plans = plans;
         this.stock = stock;
         this.moves = moves;
@@ -120,13 +122,14 @@ public class CountService {
         List<Stock> rows = scope == CountPlan.Scope.ZONE && binIds.isEmpty() || scope == CountPlan.Scope.ABC && productIds.isEmpty()
                 ? List.of()
                 : stock.inBins(wh.id(), scope != CountPlan.Scope.ZONE, binIds.isEmpty() ? List.of(-1L) : binIds,
-                        scope != CountPlan.Scope.ABC, productIds.isEmpty() ? List.of(-1L) : productIds);
+                        scope != CountPlan.Scope.ABC, productIds.isEmpty() ? List.of(-1L) : productIds,
+                        org.springframework.data.domain.PageRequest.of(0, maxLines + 1)); // never more rows than the limit needs
         if (rows.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "NOTHING_TO_COUNT", "There is no stock in bins to count there");
         }
-        if (rows.size() > MAX_LINES) {
+        if (rows.size() > maxLines) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "COUNT_TOO_LARGE",
-                    "That is " + rows.size() + " places; count at most " + MAX_LINES + " at a time (choose a zone)");
+                    "That is more than " + maxLines + " places; count at most " + maxLines + " at a time (choose a zone)");
         }
         Map<Long, BinService.BinLabel> labels = bins.labels(rows.stream().map(Stock::getBinId).distinct().toList());
         Map<Long, ProductService.Basic> basics = products.basics(new HashSet<>(rows.stream().map(Stock::getProductId).toList()));
@@ -208,8 +211,8 @@ public class CountService {
         if (listed) {
             throw new ApiException(HttpStatus.CONFLICT, "COUNT_LINE_LISTED", "This product is already on the count for that bin");
         }
-        if (plan.getLines().size() >= MAX_LINES) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "COUNT_TOO_LARGE", "This count already has " + MAX_LINES + " lines");
+        if (plan.getLines().size() >= maxLines) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "COUNT_TOO_LARGE", "This count already has " + maxLines + " lines");
         }
         ProductService.Basic basic = products.basic(scan.product().id());
         CountLine line = plan.add(spec(bin.id(), bin.code(), basic, batch, expiry), true);

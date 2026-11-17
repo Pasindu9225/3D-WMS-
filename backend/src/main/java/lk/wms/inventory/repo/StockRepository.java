@@ -91,7 +91,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             + " and (:allBins = true or s.binId in :binIds) and (:allProducts = true or s.productId in :productIds)")
     List<Stock> inBins(@Param("warehouseId") long warehouseId, @Param("allBins") boolean allBins,
             @Param("binIds") java.util.Collection<Long> binIds, @Param("allProducts") boolean allProducts,
-            @Param("productIds") java.util.Collection<Long> productIds);
+            @Param("productIds") java.util.Collection<Long> productIds, org.springframework.data.domain.Pageable limit);
 
     /** The earliest expiry date in each bin that holds dated stock, as [bin_id, min expiry] (3D expiry colours). */
     @Query("select s.binId, min(s.expiryDate) from Stock s where s.warehouseId = :warehouseId and s.binId is not null"
