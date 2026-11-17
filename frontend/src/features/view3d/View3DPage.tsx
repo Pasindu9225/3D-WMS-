@@ -227,7 +227,7 @@ export function View3DPage() {
                 {legend(scene.data, mode).map((l) => (
                   <li key={l.key} className="flex items-center gap-1.5">
                     <span className="size-3 rounded-sm" style={{ background: l.color }} />
-                    {mode === 'heat' ? (l.key === 'NONE' ? t('view3d.heat.none') : l.from === l.to ? t('view3d.heat.one', { n: l.from ?? 0 }) : t('view3d.heat.range', { from: l.from ?? 0, to: l.to ?? 0 }))
+                    {mode === 'heat' ? (l.key === 'NONE' ? t('view3d.heat.none') : l.from === l.to ? (l.from === 1 ? t('view3d.heat.single') : t('view3d.heat.one', { n: l.from ?? 0 })) : t('view3d.heat.range', { from: l.from ?? 0, to: l.to ?? 0 }))
                       : mode === 'zone' ? t(`layout.zoneType.${l.key}` as MessageKey)
                       : mode === 'expiry' ? t(`view3d.expiry.${l.key}` as MessageKey) : t(`view3d.status.${l.key}` as MessageKey)}
                   </li>
