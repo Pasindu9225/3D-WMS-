@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, CalendarClock } from 'lucide-react'
 import { useState } from 'react'
 import { FormMessage } from '@/components/ui/input'
 import { Table, Th, Tr } from '@/components/ui/table'
@@ -6,7 +6,7 @@ import { formatMoney } from '@/features/layout/units'
 import { useWarehouses } from '@/features/warehouses/api'
 import { errorMessage } from '@/lib/errors'
 import { t, type MessageKey } from '@/lib/i18n'
-import { useDashboard } from './api'
+import { useDashboard, type Expiry } from './api'
 
 const num = (n: number) => Number(Number(n).toFixed(3)).toLocaleString('en')
 
@@ -26,6 +26,47 @@ function Tile({ label, value, note }: { label: MessageKey; value: string; note?:
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
       {note && <div className="mt-1 text-xs text-muted-foreground">{note}</div>}
     </div>
+  )
+}
+
+const place = (code: string) => (code === 'RECEIVING' ? t('move.receiving') : code === 'DISPATCH' ? t('stock.dispatch') : code)
+
+/** v1.1: lots that have expired or expire within 90 days, with a count per band; hidden when there are none. */
+function ExpirySection({ expiry }: { expiry: Expiry }) {
+  const total = expiry.expired + expiry.within30 + expiry.within60 + expiry.within90
+  if (total === 0) return null
+  return (
+    <section className="grid gap-2">
+      <h2 className="flex items-center gap-2 text-sm font-medium">
+        <CalendarClock className="size-4 text-amber-600 dark:text-amber-400" aria-hidden />
+        {t('dash.expiring', { n: total })}
+      </h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Tile label="dash.expired" value={num(expiry.expired)} />
+        <Tile label="dash.within30" value={num(expiry.within30)} />
+        <Tile label="dash.within60" value={num(expiry.within60)} />
+        <Tile label="dash.within90" value={num(expiry.within90)} />
+      </div>
+      <Table>
+        <thead>
+          <tr><Th>{t('stock.col.product')}</Th><Th>{t('stock.col.place')}</Th><Th>{t('stock.col.lot')}</Th>
+            <Th className="text-right">{t('stock.col.qty')}</Th><Th className="text-right">{t('dash.daysLeft')}</Th></tr>
+        </thead>
+        <tbody>
+          {expiry.lots.map((l, i) => (
+            <Tr key={`${l.productId}-${l.place}-${l.expiry}-${l.batchNo ?? ''}-${i}`}>
+              <td><span className="font-mono text-sm font-semibold">{l.sku}</span> {l.name}</td>
+              <td className="font-mono text-sm">{place(l.place)}</td>
+              <td className="text-sm">{[l.batchNo, l.expiry].filter(Boolean).join(' · ')}</td>
+              <td className="text-right tabular-nums">{num(l.qty)} <span className="text-xs text-muted-foreground">{l.baseUom}</span></td>
+              <td className={`text-right tabular-nums ${l.daysLeft < 0 ? 'font-medium text-destructive' : ''}`}>
+                {l.daysLeft < 0 ? t('dash.expiredAgo', { n: -l.daysLeft }) : t('dash.daysN', { n: l.daysLeft })}
+              </td>
+            </Tr>
+          ))}
+        </tbody>
+      </Table>
+    </section>
   )
 }
 
@@ -94,6 +135,7 @@ export function DashboardPage() {
               </Table>
             )}
           </section>
+          <ExpirySection expiry={d.expiry} />
         </>
       )}
     </div>

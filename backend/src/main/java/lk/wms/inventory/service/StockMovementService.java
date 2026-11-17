@@ -31,6 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class StockMovementService {
 
+    // ponytail: Sri Lanka day for "expired"; a per-company time zone when a customer outside it signs up.
+    static final java.time.ZoneId ZONE = java.time.ZoneId.of("Asia/Colombo");
+
     /** Why stock moves; the public face of the ledger's movement type. */
     public enum Kind { RECEIVE, PUTAWAY, TRANSFER, ADJUST, PICK, SHIP, RETURN, COUNT }
 
@@ -250,7 +253,18 @@ public class StockMovementService {
         }
         Map<Long, BinService.BinLabel> labels = bins.labels(rows.stream().map(Stock::getBinId).distinct().toList());
         rows.removeIf(s -> labels.get(s.getBinId()) == null || labels.get(s.getBinId()).blocked());
-        rows.sort(Comparator.comparing(Stock::getReceivedAt).thenComparing(s -> labels.get(s.getBinId()).code()));
+        // v1.1 FEFO: expired lots never go out; the rest by earliest expiry (none last), then oldest receipt.
+        LocalDate today = LocalDate.now(ZONE);
+        Map<Long, BigDecimal> expired = new java.util.HashMap<>();
+        rows.removeIf(s -> {
+            boolean gone = s.getExpiryDate() != null && s.getExpiryDate().isBefore(today);
+            if (gone) {
+                expired.merge(s.getProductId(), s.available(), BigDecimal::add);
+            }
+            return gone;
+        });
+        rows.sort(Comparator.comparing(Stock::getExpiryDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Stock::getReceivedAt).thenComparing(s -> labels.get(s.getBinId()).code()));
 
         Map<Stock, BigDecimal> free = new java.util.LinkedHashMap<>();
         rows.forEach(r -> free.put(r, r.available()));
@@ -277,7 +291,9 @@ public class StockMovementService {
                 placeOf.put(a, s);
             }
             if (left.signum() > 0) {
-                shortages.add(n.label() + ": need " + plain(want) + ", " + plain(want.subtract(left)) + " free in bins");
+                BigDecimal old = expired.get(n.productId());
+                shortages.add(n.label() + ": need " + plain(want) + ", " + plain(want.subtract(left)) + " free in bins"
+                        + (old == null ? "" : " (" + plain(old) + " more expired)"));
             }
         }
         if (!shortages.isEmpty()) {

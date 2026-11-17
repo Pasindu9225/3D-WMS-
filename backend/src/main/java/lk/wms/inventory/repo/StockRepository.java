@@ -86,6 +86,17 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     @Query("select s.binId, s.productId, s.qtyOnHand from Stock s where s.warehouseId = :warehouseId and s.binId is not null and s.qtyOnHand > 0")
     List<Object[]> binContents(@Param("warehouseId") long warehouseId);
 
+    /** The earliest expiry date in each bin that holds dated stock, as [bin_id, min expiry] (3D expiry colours). */
+    @Query("select s.binId, min(s.expiryDate) from Stock s where s.warehouseId = :warehouseId and s.binId is not null"
+            + " and s.qtyOnHand > 0 and s.expiryDate is not null group by s.binId")
+    List<Object[]> binEarliestExpiry(@Param("warehouseId") long warehouseId);
+
+    /** Stock with an expiry date before :before (expired ones too), earliest first: the dashboard's expiry list. */
+    @Query("select s from Stock s where s.warehouseId = :warehouseId and s.qtyOnHand > 0 and s.expiryDate is not null"
+            + " and s.expiryDate < :before order by s.expiryDate, s.id")
+    List<Stock> expiringBefore(@Param("warehouseId") long warehouseId, @Param("before") java.time.LocalDate before,
+            org.springframework.data.domain.Pageable pageable);
+
     /** Goods received but not yet put away in one warehouse, oldest first. */
     @Query("select s from Stock s where s.warehouseId = :warehouseId and s.area = 'RECEIVING' and s.qtyOnHand > 0 order by s.receivedAt, s.id")
     org.springframework.data.domain.Page<Stock> awaitingPutaway(@Param("warehouseId") long warehouseId,

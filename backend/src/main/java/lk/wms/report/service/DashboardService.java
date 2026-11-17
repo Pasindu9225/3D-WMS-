@@ -43,8 +43,22 @@ public class DashboardService {
     }
 
     public record Dashboard(long stockValueMinor, int productsWithoutCost, List<LowStock> lowStock, Today today,
-            int bins, int binsInUse, int binUsePercent, int averageFillPercent, Integer dockToStockMinutes, BigDecimal linesPerHour) {
+            int bins, int binsInUse, int binUsePercent, int averageFillPercent, Integer dockToStockMinutes, BigDecimal linesPerHour,
+            Expiry expiry) {
     }
+
+    /** One lot that has expired or expires within 90 days; daysLeft is negative once expired. */
+    public record ExpiringLot(String productId, String sku, String name, String baseUom, String place, String batchNo,
+            LocalDate expiry, BigDecimal qty, long daysLeft) {
+    }
+
+    /** Lots per band (expired, within 30, 31–60, 61–90 days) and the earliest ones, at most 50. */
+    public record Expiry(int expired, int within30, int within60, int within90, List<ExpiringLot> lots) {
+    }
+
+    static final int EXPIRY_ROWS = 50;
+    // ponytail: bands counted over the first 1,000 lots; a count query when a warehouse holds more.
+    static final int EXPIRY_SCAN = 1_000;
 
     // ponytail: Sri Lanka day and week; a per-company time zone when a customer outside it signs up.
     static final ZoneId ZONE = ZoneId.of("Asia/Colombo");
@@ -125,7 +139,26 @@ public class DashboardService {
 
         List<Moved> week = stock.movedSince(wh.id(), List.of("RECEIVE", "PUTAWAY", "PICK"), weekAgo.minus(Duration.ofDays(7)));
         return new Dashboard(value, noCost, low, t, bins, inUse, bins == 0 ? 0 : Math.round(inUse * 100f / bins),
-                inUse == 0 ? 0 : Math.round((float) fillSum / inUse), dockToStock(week, weekAgo), linesPerHour(week, weekAgo));
+                inUse == 0 ? 0 : Math.round((float) fillSum / inUse), dockToStock(week, weekAgo), linesPerHour(week, weekAgo),
+                expiry(wh.id()));
+    }
+
+    /** v1.1 task 2: what has expired or expires within 90 days, earliest first. */
+    private Expiry expiry(long warehouseId) {
+        LocalDate today = LocalDate.now(ZONE);
+        List<StockService.ExpiringLot> found = stock.expiringBefore(warehouseId, today.plusDays(91), EXPIRY_SCAN);
+        Map<Long, ProductService.Basic> basics = products.basics(new HashSet<>(found.stream().map(StockService.ExpiringLot::productId).toList()));
+        int[] bands = new int[4];
+        List<ExpiringLot> lots = new ArrayList<>();
+        for (StockService.ExpiringLot l : found) {
+            long days = java.time.temporal.ChronoUnit.DAYS.between(today, l.expiry());
+            bands[days < 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 2 : 3]++;
+            ProductService.Basic b = basics.get(l.productId());
+            if (lots.size() < EXPIRY_ROWS && b != null) {
+                lots.add(new ExpiringLot(b.publicId(), b.sku(), b.name(), b.baseUom(), l.place(), l.batchNo(), l.expiry(), l.qty(), days));
+            }
+        }
+        return new Expiry(bands[0], bands[1], bands[2], bands[3], lots);
     }
 
     /**

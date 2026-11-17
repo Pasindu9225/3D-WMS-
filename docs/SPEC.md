@@ -325,8 +325,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Tasks**
 
-- [ ] Batch / lot and expiry per product (turn on or off per product)
-- [ ] FEFO picking for expiry products; expiry alerts (30 / 60 / 90 days); 3D colour by expiry
+- [x] Batch / lot and expiry per product (turn on or off per product) — built in v0.4 (product switches, receiving asks for them, stock keeps lots apart)
+- [x] FEFO picking for expiry products; expiry alerts (30 / 60 / 90 days); 3D colour by expiry — expired stock is never reserved; dashboard "Expiring soon"; Expiry colour mode
 - [ ] Cycle counting: count plans by ABC class or zone, blind count on phone, variance review and approval
 - [ ] ABC classification job (weekly, based on pick frequency)
 - [ ] Returns: return order, inspect, restock / quarantine / scrap

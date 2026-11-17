@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { Scene } from './api'
-import { binColors, legend, STATUS_COLOR, statusOf, ZONE_COLOR } from './colors'
+import { binColors, EXPIRY_COLOR, expiryBand, legend, STATUS_COLOR, statusOf, ZONE_COLOR } from './colors'
 
 const scene = {
   zones: [{ code: 'A', type: 'PICKING', name: 'Pick', polygon: [] }, { code: 'B', type: 'COLD', name: 'Cold', polygon: [] }],
@@ -30,4 +30,12 @@ it('lists only the zone types present, or every status', () => {
 it('colours bins by how full they are once stock is recorded; blocked still wins', () => {
   const stocked = { ...scene, fill: [0, 40, 100, 100] }
   expect(binColors(stocked, 'status', '0001')).toEqual([STATUS_COLOR.EMPTY, STATUS_COLOR.PARTLY, STATUS_COLOR.FULL, STATUS_COLOR.BLOCKED])
+})
+
+it('colours bins by their soonest expiry: expired, 30, 60, 90 days, later, nothing dated', () => {
+  expect([-1, 0, 30, 31, 60, 61, 90, 91, null, undefined].map(expiryBand))
+    .toEqual(['EXPIRED', 'D30', 'D30', 'D60', 'D60', 'D90', 'D90', 'LATER', 'NONE', 'NONE'])
+  const dated = { ...scene, expiryDays: [-2, 10, 120, null] }
+  expect(binColors(dated, 'expiry', '0000')).toEqual([EXPIRY_COLOR.EXPIRED, EXPIRY_COLOR.D30, EXPIRY_COLOR.LATER, EXPIRY_COLOR.NONE])
+  expect(legend(scene, 'expiry')).toHaveLength(6)
 })

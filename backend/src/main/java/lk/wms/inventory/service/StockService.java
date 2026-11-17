@@ -206,6 +206,28 @@ public class StockService {
         return out;
     }
 
+    /** The earliest expiry date in each bin holding dated stock (3D expiry colours). The caller has checked access. */
+    @Transactional(readOnly = true)
+    public Map<Long, java.time.LocalDate> binEarliestExpiry(long warehouseId) {
+        Map<Long, java.time.LocalDate> out = new HashMap<>();
+        stock.binEarliestExpiry(warehouseId).forEach(r -> out.put(((Number) r[0]).longValue(), (java.time.LocalDate) r[1]));
+        return out;
+    }
+
+    /** One lot that expires soon (or has expired): where it is and how much. */
+    public record ExpiringLot(long productId, String place, String batchNo, java.time.LocalDate expiry, BigDecimal qty) {
+    }
+
+    /** Lots with an expiry date before {@code before}, earliest first, at most {@code limit}. The caller has checked access. */
+    @Transactional(readOnly = true)
+    public List<ExpiringLot> expiringBefore(long warehouseId, java.time.LocalDate before, int limit) {
+        List<Stock> rows = stock.expiringBefore(warehouseId, before, org.springframework.data.domain.PageRequest.of(0, limit));
+        Map<Long, BinService.BinLabel> labels = bins.labels(rows.stream().map(Stock::getBinId).filter(java.util.Objects::nonNull).distinct().toList());
+        return rows.stream().map(s -> new ExpiringLot(s.getProductId(),
+                side(s.getBinId(), "RECEIVING".equals(s.getArea()), "DISPATCH".equals(s.getArea()), labels),
+                s.getBatchNo(), s.getExpiryDate(), s.getQtyOnHand())).toList();
+    }
+
     private static String side(Long binId, boolean receiving, boolean dispatch, Map<Long, BinService.BinLabel> labels) {
         if (binId != null) {
             BinService.BinLabel b = labels.get(binId);

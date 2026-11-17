@@ -33,8 +33,8 @@ export function useLiveBins(warehouseId: string, enabled: boolean): LiveState {
     const refreshStock = () => {
       clearTimeout(pending)
       pending = setTimeout(() => {
-        void api<{ publishedAt: string; flags: string; fill: number[] }>(`/warehouses/${warehouseId}/bin-status`).then((st) => {
-          queryClient.setQueryData<Scene>(key, (s) => (s && s.publishedAt === st.publishedAt ? { ...s, flags: st.flags, fill: st.fill } : s))
+        void api<{ publishedAt: string; flags: string; fill: number[]; expiryDays: (number | null)[] }>(`/warehouses/${warehouseId}/bin-status`).then((st) => {
+          queryClient.setQueryData<Scene>(key, (s) => (s && s.publishedAt === st.publishedAt ? { ...s, flags: st.flags, fill: st.fill, expiryDays: st.expiryDays } : s))
           void queryClient.invalidateQueries({ queryKey: ['bin-stock', warehouseId] })
         }).catch(() => undefined)
       }, 1000)

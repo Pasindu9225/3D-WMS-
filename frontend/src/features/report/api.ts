@@ -10,6 +10,29 @@ export interface LowStock {
   reorderPoint: number
 }
 
+/** A lot that has expired (daysLeft < 0) or expires within 90 days. */
+export interface ExpiringLot {
+  productId: string
+  sku: string
+  name: string
+  baseUom: string
+  /** Bin code, or RECEIVING / DISPATCH. */
+  place: string
+  batchNo: string | null
+  expiry: string
+  qty: number
+  daysLeft: number
+}
+
+export interface Expiry {
+  expired: number
+  within30: number
+  within60: number
+  within90: number
+  /** Earliest first, at most 50. */
+  lots: ExpiringLot[]
+}
+
 export interface Dashboard {
   /** Cents. */
   stockValueMinor: number
@@ -23,6 +46,7 @@ export interface Dashboard {
   /** Null when nothing was put away in the last 7 days. */
   dockToStockMinutes: number | null
   linesPerHour: number | null
+  expiry: Expiry
 }
 
 /** The manager's morning page for one warehouse; refreshed every minute while open. */

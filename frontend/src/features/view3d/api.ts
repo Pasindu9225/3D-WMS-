@@ -28,6 +28,8 @@ export interface Scene {
   flags: string
   /** How full each bin is, 0 to 100 (1 at least when it holds anything). Missing before stock existed. */
   fill?: number[]
+  /** Days until the earliest expiry in each bin (negative = expired), null when nothing dated is in it. */
+  expiryDays?: (number | null)[]
 }
 
 export const BLOCKED = 1
