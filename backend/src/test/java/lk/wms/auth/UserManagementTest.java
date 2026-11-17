@@ -96,7 +96,7 @@ class UserManagementTest extends IntegrationTest {
     @Test
     void expiredOrReissuedInviteLinksStopWorking() throws Exception {
         String token = inviteToken("old-" + Ulid.next() + "@test.lk");
-        jdbc.update("UPDATE user_invite SET expires_at = NOW(3) - INTERVAL 1 SECOND WHERE token_hash = ?",
+        jdbc.update("UPDATE user_invite SET expires_at = NOW(3) - INTERVAL 1 MINUTE WHERE token_hash = ?",
                 TokenService.sha256(token));
         accept(token, PASSWORD).andExpect(status().isBadRequest());
 

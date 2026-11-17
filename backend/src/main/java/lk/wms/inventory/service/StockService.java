@@ -33,7 +33,7 @@ public class StockService {
     }
 
     public record ProductTotal(String productId, String sku, String name, String baseUom, BigDecimal onHand,
-            BigDecimal inReceiving, long bins, BigDecimal reserved, BigDecimal inDispatch) {
+            BigDecimal inReceiving, long bins, BigDecimal reserved, BigDecimal inDispatch, BigDecimal inQuarantine) {
     }
 
     public record MovementRow(long id, String type, String sku, String name, String baseUom, String batchNo,
@@ -138,10 +138,12 @@ public class StockService {
         Page<Object[]> page = stock.totalsByProduct(w.id(), any, ids.isEmpty() ? List.of(-1L) : ids, pageable);
         Map<Long, ProductService.Basic> names = products.basics(page.getContent().stream()
                 .map(r -> ((Number) r[0]).longValue()).toList());
+        Map<Long, BigDecimal> held = inQuarantine(w.id());
         return page.map(r -> {
             ProductService.Basic p = names.get(((Number) r[0]).longValue());
             return new ProductTotal(p == null ? null : p.publicId(), p == null ? "?" : p.sku(), p == null ? "" : p.name(),
-                    p == null ? "" : p.baseUom(), (BigDecimal) r[1], (BigDecimal) r[2], ((Number) r[3]).longValue(), (BigDecimal) r[4], (BigDecimal) r[5]);
+                    p == null ? "" : p.baseUom(), (BigDecimal) r[1], (BigDecimal) r[2], ((Number) r[3]).longValue(), (BigDecimal) r[4], (BigDecimal) r[5],
+                    held.getOrDefault(((Number) r[0]).longValue(), BigDecimal.ZERO));
         });
     }
 
@@ -186,6 +188,20 @@ public class StockService {
                     side(m.getToBinId(), m.isToReceiving(), m.isToDispatch(), labels),
                     m.getQty(), m.getReason(), m.getRefType(), u == null ? null : u.fullName(), m.getCreatedAt());
         });
+    }
+
+    /** Units per product held in quarantine bins of a warehouse (v1.1). ponytail: reads every bin's stock; fine at pilot size. */
+    private Map<Long, BigDecimal> inQuarantine(long warehouseId) {
+        List<Object[]> rows = stock.binContents(warehouseId);
+        Map<Long, BinService.BinLabel> labels = bins.labels(rows.stream().map(r -> ((Number) r[0]).longValue()).distinct().toList());
+        Map<Long, BigDecimal> out = new HashMap<>();
+        for (Object[] r : rows) {
+            BinService.BinLabel l = labels.get(((Number) r[0]).longValue());
+            if (l != null && l.quarantine()) {
+                out.merge(((Number) r[1]).longValue(), (BigDecimal) r[2], BigDecimal::add);
+            }
+        }
+        return out;
     }
 
     /** Load per bin of a warehouse (for 3D fill levels). The caller has checked access to the warehouse. */

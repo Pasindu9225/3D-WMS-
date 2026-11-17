@@ -253,6 +253,15 @@ public class StockMovementService {
         }
         Map<Long, BinService.BinLabel> labels = bins.labels(rows.stream().map(Stock::getBinId).distinct().toList());
         rows.removeIf(s -> labels.get(s.getBinId()) == null || labels.get(s.getBinId()).blocked());
+        // v1.1: stock in a quarantine zone waits for a check and is never picked.
+        Map<Long, BigDecimal> held = new java.util.HashMap<>();
+        rows.removeIf(s -> {
+            boolean q = labels.get(s.getBinId()).quarantine();
+            if (q) {
+                held.merge(s.getProductId(), s.available(), BigDecimal::add);
+            }
+            return q;
+        });
         // v1.1 FEFO: expired lots never go out; the rest by earliest expiry (none last), then oldest receipt.
         LocalDate today = LocalDate.now(ZONE);
         Map<Long, BigDecimal> expired = new java.util.HashMap<>();
@@ -292,8 +301,10 @@ public class StockMovementService {
             }
             if (left.signum() > 0) {
                 BigDecimal old = expired.get(n.productId());
+                BigDecimal checking = held.get(n.productId());
                 shortages.add(n.label() + ": need " + plain(want) + ", " + plain(want.subtract(left)) + " free in bins"
-                        + (old == null ? "" : " (" + plain(old) + " more expired)"));
+                        + (old == null ? "" : " (" + plain(old) + " more expired)")
+                        + (checking == null ? "" : " (" + plain(checking) + " more in quarantine)"));
             }
         }
         if (!shortages.isEmpty()) {

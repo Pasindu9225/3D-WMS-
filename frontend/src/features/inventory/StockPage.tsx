@@ -93,6 +93,7 @@ function ByProduct({ warehouseId, onOpen }: { warehouseId: string | undefined; o
             <Th className="hidden text-right sm:table-cell">{t('stock.col.reserved')}</Th>
             <Th className="hidden text-right sm:table-cell">{t('stock.col.inReceiving')}</Th>
             <Th className="hidden text-right md:table-cell">{t('stock.col.inDispatch')}</Th>
+            <Th className="hidden text-right md:table-cell">{t('stock.col.inQuarantine')}</Th>
             <Th className="hidden text-right sm:table-cell">{t('stock.col.bins')}</Th>
           </tr>
         </thead>
@@ -108,6 +109,7 @@ function ByProduct({ warehouseId, onOpen }: { warehouseId: string | undefined; o
               <td className="hidden text-right tabular-nums sm:table-cell">{num(p.reserved)}</td>
               <td className="hidden text-right tabular-nums sm:table-cell">{num(p.inReceiving)}</td>
               <td className="hidden text-right tabular-nums md:table-cell">{num(p.inDispatch)}</td>
+              <td className="hidden text-right tabular-nums md:table-cell">{num(p.inQuarantine)}</td>
               <td className="hidden text-right tabular-nums sm:table-cell">{p.bins}</td>
             </Tr>
           ))}

@@ -102,7 +102,8 @@ public class PutawayService {
         List<Suggestion> out = new ArrayList<>();
         for (int rank = 2; rank >= 1 && out.size() < MAX_SUGGESTIONS; rank--) { // same batch, then same product
             for (Candidate c : all) {
-                if (out.size() < MAX_SUGGESTIONS && sameProduct.getOrDefault(c.id(), 0) == rank && fits(c, load.get(c.id()), needW, needV)) {
+                if (out.size() < MAX_SUGGESTIONS && sameProduct.getOrDefault(c.id(), 0) == rank && !"QUARANTINE".equals(c.zoneType())
+                        && fits(c, load.get(c.id()), needW, needV)) {
                     out.add(suggestion(c, Why.SAME_PRODUCT));
                 }
             }

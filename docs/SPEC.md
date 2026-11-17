@@ -329,8 +329,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] FEFO picking for expiry products; expiry alerts (30 / 60 / 90 days); 3D colour by expiry — expired stock is never reserved; dashboard "Expiring soon"; Expiry colour mode
 - [x] Cycle counting: count plans by ABC class or zone, blind count on phone, variance review and approval — expected read at count time (work does not stop), found goods, recount, approve as COUNT movements
 - [x] ABC classification job (weekly, based on pick frequency) — Sundays 02:00; A = 80% of picks (90 days), B = next 15%, C = rest; "Recalculate classes" on Products
-- [ ] Returns: return order, inspect, restock / quarantine / scrap
-- [ ] Quarantine zone rules (stock in quarantine cannot be picked)
+- [x] Returns: return order, inspect, restock / quarantine / scrap — from shipped orders, capped at shipped minus earlier returns; nothing enters stock before inspection
+- [x] Quarantine zone rules (stock in quarantine cannot be picked) — never reserved, never suggested for putaway, "In quarantine" on Stock; released with Move stock
 
 **Deliverables:** count module, returns module, batch/expiry tracking.
 

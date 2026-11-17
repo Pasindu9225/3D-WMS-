@@ -194,6 +194,8 @@ export interface ProductTotal {
   reserved: number
   /** Picked and waiting to be shipped. */
   inDispatch: number
+  /** In bins of a quarantine zone: counted in on hand, never picked (v1.1). */
+  inQuarantine: number
 }
 
 export interface MovementRow {

@@ -129,7 +129,7 @@ class AuthFlowTest extends IntegrationTest {
         Instant lockedUntil = lockedUntil();
         assertThat(lockedUntil).isBetween(Instant.now().plusSeconds(14 * 60), Instant.now().plusSeconds(16 * 60));
 
-        jdbc.update("UPDATE app_user SET locked_until = NOW(3) - INTERVAL 1 SECOND WHERE id = ?", user.getId());
+        jdbc.update("UPDATE app_user SET locked_until = NOW(3) - INTERVAL 1 MINUTE WHERE id = ?", user.getId());
         login(user.getEmail(), PASSWORD).andExpect(status().isOk());
         assertThat(jdbc.queryForObject("SELECT failed_logins FROM app_user WHERE id = ?", Integer.class, user.getId()))
                 .isZero();
@@ -190,7 +190,7 @@ class AuthFlowTest extends IntegrationTest {
     @Test
     void expiredRefreshTokenIsRejected() throws Exception {
         MvcResult first = login(user.getEmail(), PASSWORD).andReturn();
-        jdbc.update("UPDATE refresh_token SET expires_at = NOW(3) - INTERVAL 1 SECOND WHERE session_id IN"
+        jdbc.update("UPDATE refresh_token SET expires_at = NOW(3) - INTERVAL 1 MINUTE WHERE session_id IN"
                 + " (SELECT id FROM user_session WHERE user_id = ?)", user.getId());
         refresh(refresh(first)).andExpect(status().isUnauthorized());
     }

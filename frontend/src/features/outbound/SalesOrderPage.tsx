@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, FileText, PackageCheck, Trash2, X } from 'lucide-react'
+import { ArrowLeft, FileText, PackageCheck, Trash2, Undo2, X } from 'lucide-react'
 import { useState } from 'react'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -94,6 +94,13 @@ function Actions({ so }: { so: SalesOrder }) {
   )
 }
 
+/** Goods coming back from a shipped order (v1.1): starts a return for it. */
+function ReturnButton({ orderId }: { orderId: string }) {
+  const me = useMe()
+  if (!can(me.data, 'outbound:manage')) return null
+  return <div><Button asChild variant="outline"><Link to={'/app/returns/new/' + orderId}><Undo2 /> {t('ret.returnGoods')}</Link></Button></div>
+}
+
 function SoView({ so }: { so: SalesOrder }) {
   return (
     <div className="grid gap-4">
@@ -107,6 +114,7 @@ function SoView({ so }: { so: SalesOrder }) {
         <FormMessage tone="success">{t('so.shippedInfo', { number: so.shipped.number, at: new Date(so.shipped.at).toLocaleString(),
           who: [so.shipped.vehicleNo, so.shipped.driverName].filter(Boolean).join(' · ') || '—' })}</FormMessage>
       )}
+      {so.shipped && <ReturnButton orderId={so.id} />}
       {so.deliveryNoteNo && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm">
           <span>{t('so.packedInfo', { dn: so.deliveryNoteNo, cartons: so.cartons ?? 0 })}</span>
