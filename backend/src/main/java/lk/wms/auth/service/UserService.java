@@ -186,6 +186,16 @@ public class UserService {
         return newInvite(user, null, List.of(Role.TENANT_ADMIN));
     }
 
+    /** v2.0 sign-up: the person who confirmed their email becomes the active admin of their new company, with the password they chose. */
+    @Transactional
+    public String createSignedUpAdmin(long tenantId, String email, String fullName, String passwordHash) {
+        Role admin = roles.findByCode(Role.TENANT_ADMIN).orElseThrow();
+        AppUser user = users.save(new AppUser(email, fullName, passwordHash, AppUser.Status.ACTIVE));
+        userRoles.save(new UserRole(user.getId(), admin.getId()));
+        audit.record(tenantId, user.getId(), "COMPANY_SIGNED_UP", "app_user", user.getPublicId(), null, snapshot(user, List.of(Role.TENANT_ADMIN)));
+        return user.getPublicId();
+    }
+
     /** First Super Admin of the platform company (bootstrap command). Runs in the platform company's tenant. */
     @Transactional
     public Invite createPlatformAdmin(long tenantId, String email, String fullName) {
@@ -202,6 +212,12 @@ public class UserService {
      */
     public boolean emailFree(String email) {
         return TenantContext.callAsSystem(() -> users.findByEmail(AppUser.normalizeEmail(email)).isEmpty());
+    }
+
+    /** Everyone in the current company, invited or active (v2.0 setup wizard: has the team been invited?). */
+    @Transactional(readOnly = true)
+    public long totalCount() {
+        return users.count();
     }
 
     /** Active users of the current company (Super Admin usage). */

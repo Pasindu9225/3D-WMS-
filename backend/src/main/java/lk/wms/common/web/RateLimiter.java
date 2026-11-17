@@ -21,20 +21,25 @@ public class RateLimiter {
     /** UPLOAD: SEC-45, file uploads per user. */
     /** SCAN: phone scans (receiving, putaway, transfers, barcode lookups), which come faster than office clicks. */
     /** EXPORT: Excel/PDF exports per user; one can be 200,000 rows (security review v1.0 F1). */
-    public enum Scope { GLOBAL, LOGIN, USER, UPLOAD, SCAN, EXPORT }
+    public enum Scope { GLOBAL, LOGIN, USER, UPLOAD, SCAN, EXPORT, SIGNUP }
 
     private final Map<Scope, Integer> perMinute = new EnumMap<>(Scope.class);
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
             .expireAfterAccess(Duration.ofMinutes(5))
             .maximumSize(100_000)
             .build();
+    /** SIGNUP (v2.0): new companies per IP per hour; kept 2 hours so an idle bucket does not reset early. */
+    private final Cache<String, Bucket> hourly = Caffeine.newBuilder().expireAfterAccess(Duration.ofHours(2)).maximumSize(100_000).build();
+    private final int signupPerHour;
 
     public RateLimiter(@Value("${wms.rate-limit.global-per-minute}") int global,
             @Value("${wms.rate-limit.login-per-minute}") int login,
             @Value("${wms.rate-limit.user-per-minute}") int user,
             @Value("${wms.rate-limit.upload-per-minute:20}") int upload,
             @Value("${wms.rate-limit.scan-per-minute:300}") int scan,
-            @Value("${wms.rate-limit.export-per-minute:10}") int export) {
+            @Value("${wms.rate-limit.export-per-minute:10}") int export,
+            @Value("${wms.rate-limit.signup-per-hour:5}") int signupPerHour) {
+        this.signupPerHour = signupPerHour;
         perMinute.put(Scope.EXPORT, export);
         perMinute.put(Scope.SCAN, scan);
         perMinute.put(Scope.GLOBAL, global);
@@ -45,6 +50,11 @@ public class RateLimiter {
 
     /** @return 0 if allowed, otherwise the seconds to wait (for the Retry-After header). */
     public long tryConsume(Scope scope, String key) {
+        if (scope == Scope.SIGNUP) {
+            ConsumptionProbe p = hourly.get(key, k -> Bucket.builder()
+                    .addLimit(l -> l.capacity(signupPerHour).refillGreedy(signupPerHour, Duration.ofHours(1))).build()).tryConsumeAndReturnRemaining(1);
+            return p.isConsumed() ? 0 : TimeUnit.NANOSECONDS.toSeconds(p.getNanosToWaitForRefill()) + 1;
+        }
         int limit = perMinute.get(scope);
         Bucket bucket = buckets.get(scope + ":" + key, k -> Bucket.builder()
                 .addLimit(l -> l.capacity(limit).refillGreedy(limit, Duration.ofMinutes(1)))

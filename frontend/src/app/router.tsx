@@ -11,11 +11,14 @@ export const router = createBrowserRouter([
       { path: '/', element: <Navigate to="/app" replace /> },
       { path: '/login', lazy: () => import('@/features/auth/LoginPage').then((m) => ({ Component: m.LoginPage })) },
       { path: '/invite', lazy: () => import('@/features/auth/InvitePage').then((m) => ({ Component: m.InvitePage })) },
+      { path: '/signup', lazy: () => import('@/features/auth/SignupPage').then((m) => ({ Component: m.SignupPage })) },
+      { path: '/verify', lazy: () => import('@/features/auth/VerifyPage').then((m) => ({ Component: m.VerifyPage })) },
       {
         path: '/app',
         element: <AppLayout />,
         children: [
           { index: true, lazy: () => import('./AppHome').then((m) => ({ Component: m.AppHome })) },
+          { path: 'setup', lazy: () => import('@/features/setup/SetupPage').then((m) => ({ Component: m.SetupPage })) },
           { path: 'admin/companies', lazy: () => import('@/features/admin/CompaniesPage').then((m) => ({ Component: m.CompaniesPage })) },
           { path: 'admin/companies/:id', lazy: () => import('@/features/admin/CompanyPage').then((m) => ({ Component: m.CompanyPage })) },
           { path: 'admin/plans', lazy: () => import('@/features/admin/PlansPage').then((m) => ({ Component: m.PlansPage })) },

@@ -364,7 +364,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 **Tasks**
 
 - [x] Super Admin portal: tenants, plans, suspend/reactivate, usage — platform company + SUPER_ADMIN role (platform:read/manage); Companies (usage counts only), Company (plan and limit, suspend with reason signs everyone out, reactivate), New company with first-admin invite, Plans (price per warehouse, included warehouses); first Super Admin via the bootstrap flag
-- [ ] Self-service sign-up with email verification and a guided setup wizard
+- [x] Self-service sign-up with email verification and a guided setup wizard — /signup keeps a pending request (hashed password, hashed 24 h link) and emails the link; same answer for taken emails (they get "you already have an account"); 5 per IP per hour; /verify makes the company on wms.signup.plan and signs the admin in; /app/setup: 6 steps worked out from real data; mail via SMTP (Mailpit in dev)
 - [ ] Plans and per-warehouse billing; invoices as PDF; payment gateway (choose a Sri Lankan gateway such as PayHere, to be decided)
 - [ ] Public REST API with API keys (hashed, scoped, rate limited) and webhooks (signed)
 - [ ] Optional 2FA (TOTP) for admins

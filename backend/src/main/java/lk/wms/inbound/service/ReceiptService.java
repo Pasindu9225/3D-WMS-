@@ -65,6 +65,12 @@ public class ReceiptService {
     private final AuditService audit;
     private final StockMovementService stock;
 
+    /** Has the current company received anything yet? (v2.0 setup wizard) */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public boolean anyReceipt() {
+        return receipts.count() > 0;
+    }
+
     public ReceiptService(ReceiptRepository receipts, PurchaseOrderRepository orders, DocNumbers numbers,
             ProductService products, WarehouseService warehouses, AuditService audit, StockMovementService stock) {
         this.stock = stock;

@@ -67,7 +67,9 @@ export function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
 async function send<T>(path: string, { method = 'GET', body, headers }: RequestOptions, mayRetry: boolean): Promise<T> {
   const res = await rawFetch(path, method, body, headers)
   if (res.ok) {
-    return (res.status === 204 ? undefined : await res.json()) as T
+    if (res.status === 204) return undefined as T
+    const text = await res.text() // e.g. 202 Accepted from sign-up has no body
+    return (text ? JSON.parse(text) : undefined) as T
   }
   const problem = await toApiError(res)
   if (mayRetry && problem.code === 'CSRF_INVALID') {

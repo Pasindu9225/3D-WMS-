@@ -124,12 +124,7 @@ public class AuthService {
                 if (passwords.upgradeEncoding(user.getPasswordHash())) {
                     user.upgradeHash(passwords.encode(password));
                 }
-                UserSession session = sessions.save(new UserSession(user, ip, userAgent));
-                String refresh = tokens.newRefreshToken();
-                refreshTokens.save(new RefreshToken(session, Ulid.next(), TokenService.sha256(refresh),
-                        now.plus(TokenService.REFRESH_TTL)));
-                CurrentUser cu = sessionService.toCurrentUser(session);
-                ok = new LoginResult(tokens.issueAccessToken(cu, now), refresh, me(user, cu));
+                ok = openSession(user, ip, userAgent, now);
             }
             attempts.save(new LoginAttempt(client, emailHash, o == Outcome.SUCCESS));
             audit.record(tenantId, user.getId(), "LOGIN_" + o.name(), "app_user", user.getPublicId());
@@ -141,7 +136,28 @@ public class AuthService {
         return step.result();
     }
 
-    // ---------------------------------------------------------------- refresh (SEC-03, SEC-04)
+/** A new session and its cookies' tokens for a user already proven (password checked, or a sign-up link just confirmed). */
+    private LoginResult openSession(AppUser user, String ip, String userAgent, Instant now) {
+        UserSession session = sessions.save(new UserSession(user, ip, userAgent));
+        String refresh = tokens.newRefreshToken();
+        refreshTokens.save(new RefreshToken(session, Ulid.next(), TokenService.sha256(refresh), now.plus(TokenService.REFRESH_TTL)));
+        CurrentUser cu = sessionService.toCurrentUser(session);
+        return new LoginResult(tokens.issueAccessToken(cu, now), refresh, me(user, cu));
+    }
+
+    /** v2.0 sign-up: the person who just confirmed their email is signed in to their new company. */
+    public LoginResult signInConfirmed(long tenantId, String userPublicId, String ip, String userAgent) {
+        return inTenantTx(tenantId, () -> {
+            AppUser user = users.lockByPublicId(userPublicId).orElseThrow();
+            Instant now = Instant.now();
+            user.recordSuccessfulLogin(now);
+            LoginResult r = openSession(user, ip, userAgent, now);
+            audit.record(tenantId, user.getId(), "LOGIN_SUCCESS", "app_user", user.getPublicId());
+            return r;
+        });
+    }
+
+        // ---------------------------------------------------------------- refresh (SEC-03, SEC-04)
 
     public LoginResult refresh(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank() || rawRefreshToken.length() > 100) {

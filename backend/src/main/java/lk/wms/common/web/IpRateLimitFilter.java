@@ -21,6 +21,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class IpRateLimitFilter extends OncePerRequestFilter {
 
     static final String LOGIN_PATH = "/api/v1/auth/login";
+    static final String SIGNUP_PATH = "/api/v1/signup";
 
     private final RateLimiter limiter;
 
@@ -35,6 +36,9 @@ public class IpRateLimitFilter extends OncePerRequestFilter {
         long wait = limiter.tryConsume(RateLimiter.Scope.GLOBAL, ip);
         if (wait == 0 && "POST".equals(request.getMethod()) && LOGIN_PATH.equals(request.getRequestURI())) {
             wait = limiter.tryConsume(RateLimiter.Scope.LOGIN, ip);
+        }
+        if (wait == 0 && "POST".equals(request.getMethod()) && SIGNUP_PATH.equals(request.getRequestURI())) {
+            wait = limiter.tryConsume(RateLimiter.Scope.SIGNUP, ip);
         }
         if (wait > 0) {
             tooMany(response, wait);

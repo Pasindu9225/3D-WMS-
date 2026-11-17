@@ -71,7 +71,7 @@ public class SecurityConfig {
 
     static final String CSRF_PATH = "/api/v1/auth/csrf";
     static final String[] PUBLIC_POSTS = {"/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout",
-        "/api/v1/auth/invite/accept"};
+        "/api/v1/auth/invite/accept", "/api/v1/signup", "/api/v1/signup/verify"};
 
     /** Public auth endpoints. The access cookie is ignored here so a stale one cannot block login. */
     static final Set<String> PUBLIC_AUTH = Set.of(PUBLIC_POSTS[0], PUBLIC_POSTS[1], PUBLIC_POSTS[2], PUBLIC_POSTS[3],

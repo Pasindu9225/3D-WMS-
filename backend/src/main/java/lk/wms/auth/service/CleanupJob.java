@@ -31,10 +31,13 @@ public class CleanupJob {
     private final RefreshTokenRepository refreshTokens;
     private final UserSessionRepository sessions;
     private final UserInviteRepository invites;
+    private final lk.wms.auth.repo.SignupRequestRepository signups;
     private final TransactionTemplate tx;
 
     public CleanupJob(LoginAttemptRepository attempts, RefreshTokenRepository refreshTokens,
-            UserSessionRepository sessions, UserInviteRepository invites, PlatformTransactionManager tm) {
+            UserSessionRepository sessions, UserInviteRepository invites, lk.wms.auth.repo.SignupRequestRepository signups,
+            PlatformTransactionManager tm) {
+        this.signups = signups;
         this.attempts = attempts;
         this.refreshTokens = refreshTokens;
         this.sessions = sessions;
@@ -57,6 +60,7 @@ public class CleanupJob {
             int t = refreshTokens.deleteExpiredBefore(cutoff) + refreshTokens.deleteForOldSessions(cutoff);
             int s = sessions.deleteOlderThan(cutoff);
             int i = invites.deleteExpiredBefore(cutoff);
+            signups.deleteOlderThan(now.minus(SignupService.KEEP)); // v2.0: unconfirmed sign-ups after 7 days
             return new Result(a, t, s, i);
         }));
     }

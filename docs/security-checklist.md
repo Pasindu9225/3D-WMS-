@@ -9,7 +9,7 @@ Tick a rule only when it is implemented AND covered by a test. Note the PR or co
 - [x] **SEC-04** (v0.1): Rotate refresh token on every use; reuse of an old token revokes the whole family — task 4, AuthFlowTest
 - [x] **SEC-05** (v0.1): Session check on every request — task 4, AuthFlowTest
 - [x] **SEC-06** (v0.1): Lockout after 5 failed logins, 15 minutes, growing backoff — task 4, AuthFlowTest
-- [x] **SEC-07** (v0.1): Generic error messages — task 4, AuthFlowTest
+- [x] **SEC-07** (v0.1): Generic error messages — task 4, AuthFlowTest; v2.0: sign-up answers the same for taken emails (SignupTest)
 - [x] **SEC-08** (v0.1): Logout revokes session and token family; clear both cookies — task 4, AuthFlowTest
 - [x] **SEC-09** (v0.1): Role and permission check on every endpoint; deny by default — task 6, UserManagementTest + ArchUnit
 - [x] **SEC-10** (v0.1): No IDOR: every lookup by ID also checks tenant and warehouse access — tenant (TenantIsolationTest) + warehouse access (WarehouseTest, v0.2 task 1); new warehouse data must go through WarehouseService.requireAccess

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
-import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { z } from 'zod'
 import { PageShell } from '@/app/PageShell'
 import { Button } from '@/components/ui/button'
@@ -51,6 +51,7 @@ export function LoginPage() {
         <Button type="submit" size="lg" disabled={login.isPending}>
           {login.isPending ? t('login.submitting') : t('login.submit')}
         </Button>
+        <p className="text-center text-sm text-muted-foreground">{t('login.newHere')} <Link className="font-medium text-foreground underline" to="/signup">{t('login.createCompany')}</Link></p>
       </form>
     </PageShell>
   )
