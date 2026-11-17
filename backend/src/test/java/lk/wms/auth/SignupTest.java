@@ -53,15 +53,16 @@ class SignupTest extends ApiTest {
     @Test
     void signUpConfirmAndStartWorking() throws Exception {
         String email = "owner-" + System.nanoTime() + "@kandyfoods.lk";
-        signup("10.1.0.1", "Kandy Foods", email.toUpperCase(), "short").andExpect(status().isBadRequest()); // password rules
-        signup("10.1.0.1", "Kandy Foods", email.toUpperCase(), "a-long-enough-pass").andExpect(status().isAccepted());
+        String company = "Kandy Foods " + System.nanoTime(); // other tests also make a Kandy Foods
+        signup("10.1.0.1", company, email.toUpperCase(), "short").andExpect(status().isBadRequest()); // password rules
+        signup("10.1.0.1", company, email.toUpperCase(), "a-long-enough-pass").andExpect(status().isAccepted());
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM app_user WHERE email = ?", Integer.class, email)).isZero(); // nothing yet
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tenant WHERE name = 'Kandy Foods'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tenant WHERE name = ?", Integer.class, company)).isZero();
         String first = tokenSentTo(email);
 
         // signing up again replaces the pending one; the first link no longer works
         clearInvocations(mailer);
-        signup("10.1.0.1", "Kandy Foods", email, "a-long-enough-pass").andExpect(status().isAccepted());
+        signup("10.1.0.1", company, email, "a-long-enough-pass").andExpect(status().isAccepted());
         String token = tokenSentTo(email);
         verifyLink(first).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SIGNUP_LINK_INVALID"));
 
