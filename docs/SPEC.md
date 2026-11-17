@@ -344,7 +344,7 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Tasks**
 
-- [ ] Batch picking (many orders in one walk) and simple waves by cut-off time
+- [x] Batch picking (many orders in one walk) and simple waves by cut-off time — waves of 2-20 orders, one tote each, walked bin by bin; picking stays per order
 - [ ] Pick path ordering by bin sequence; route drawn on the 3D floor
 - [ ] Min/max replenishment for pick-face bins; auto tasks from bulk storage
 - [ ] Putaway rules editor (fixed bin, same product, closest empty, by zone and category)

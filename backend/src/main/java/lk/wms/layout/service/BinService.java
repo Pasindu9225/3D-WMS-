@@ -126,9 +126,40 @@ public class BinService {
                 .toList();
     }
 
+    /**
+     * Metres walked from the dispatch zone (or receiving, or the corner) through these bins in this order and back
+     * (v1.2 batch picking). ponytail: straight lines between racks, not around them; enough to compare walks.
+     */
+    @Transactional(readOnly = true)
+    public double walkMetres(long warehouseId, List<Long> binIdsInOrder) {
+        java.util.Map<Long, long[]> at = new java.util.HashMap<>();
+        bins.placedBins(warehouseId).forEach(b -> at.put(b.getId(), new long[] {b.getX(), b.getY()}));
+        long[] start = zonePoint(warehouseId, lk.wms.layout.domain.Zone.Type.DISPATCH);
+        if (start == null) {
+            start = receivingPoint(warehouseId);
+        }
+        double mm = 0;
+        long[] here = start;
+        for (Long id : binIdsInOrder) {
+            long[] next = at.get(id);
+            if (next != null) {
+                mm += Math.hypot(next[0] - here[0], next[1] - here[1]);
+                here = next;
+            }
+        }
+        mm += Math.hypot(start[0] - here[0], start[1] - here[1]);
+        return Math.round(mm / 100.0) / 10.0;
+    }
+
     private long[] receivingPoint(long warehouseId) {
+        long[] p = zonePoint(warehouseId, lk.wms.layout.domain.Zone.Type.RECEIVING);
+        return p == null ? new long[] {0, 0} : p;
+    }
+
+    /** The middle of the first zone of this type, or null when there is none. */
+    private long[] zonePoint(long warehouseId, lk.wms.layout.domain.Zone.Type type) {
         for (lk.wms.layout.domain.Zone z : zones.findByWarehouseId(warehouseId)) {
-            if (z.getType() == lk.wms.layout.domain.Zone.Type.RECEIVING) {
+            if (z.getType() == type) {
                 var points = json.readTree(z.getPolygon());
                 long sx = 0;
                 long sy = 0;
@@ -136,10 +167,10 @@ public class BinService {
                     sx += p.get("x").asLong();
                     sy += p.get("y").asLong();
                 }
-                return points.isEmpty() ? new long[] {0, 0} : new long[] {sx / points.size(), sy / points.size()};
+                return points.isEmpty() ? null : new long[] {sx / points.size(), sy / points.size()};
             }
         }
-        return new long[] {0, 0};
+        return null;
     }
 
     private static BinRef ref(Bin b) {

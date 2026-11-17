@@ -151,6 +151,9 @@ export interface PickSummary {
   assignee: Person | null
   startedBy: Person | null
   createdAt: string
+  /** The wave it is walked in (v1.2 batch picking) and its tote number, if any. */
+  wave: string | null
+  tote: number | null
 }
 
 /** Pick lists not finished yet, oldest first: the picker's to-do list. */
@@ -182,6 +185,8 @@ export function usePickAction() {
     onSuccess: (p) => {
       qc.setQueryData(['pick-list', p.id], p)
       void qc.invalidateQueries({ queryKey: ['pick-lists'] })
+      void qc.invalidateQueries({ queryKey: ['wave'] }) // a wave walk shows this list's lines too
+      void qc.invalidateQueries({ queryKey: ['waves'] })
       void qc.invalidateQueries({ queryKey: ['sales-order', p.orderId] })
     },
   })
@@ -311,6 +316,78 @@ export function useBoardAction() {
         ? api<PickList>(`/pick-lists/${a.id}/assign`, { method: 'POST', body: { userId: a.userId } })
         : api<PickList>(`/pick-lists/${a.id}/priority`, { method: 'POST', body: { priority: a.priority } }),
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['task-board'] })
+      void qc.invalidateQueries({ queryKey: ['pick-lists'] })
+    },
+  })
+}
+
+export interface WaveWalkLine {
+  listId: string
+  seq: number
+  tote: number
+  orderNumber: string
+  sku: string
+  productName: string
+  baseUom: string
+  binCode: string
+  batchNo: string | null
+  expiryDate: string | null
+  qtyToPick: number
+  qtyPicked: number
+  status: 'OPEN' | 'PICKED' | 'SHORT'
+}
+
+export interface Wave {
+  id: string
+  number: string
+  status: 'OPEN' | 'IN_PROGRESS' | 'DONE'
+  warehouseCode: string
+  cutOff: string | null
+  version: number
+  assignee: Person | null
+  orders: { listId: string; listNumber: string; tote: number; orderNumber: string; customerName: string; status: PickList['status']; openLines: number }[]
+  walk: WaveWalkLine[]
+  openLines: number
+  /** Straight-line metres for the combined walk, and for picking the same orders one by one. */
+  walkMetres: number
+  singleWalksMetres: number
+}
+
+export interface WaveSummary {
+  id: string
+  number: string
+  status: Wave['status']
+  warehouseCode: string
+  orders: number
+  openLines: number
+  urgent: boolean
+  assignee: Person | null
+}
+
+/** Open waves (several orders in one walk), for pickers and the board. */
+export function useWaves(enabled = true) {
+  return useQuery({ queryKey: ['waves'], queryFn: () => api<Page<WaveSummary>>('/pick-waves?size=50'), enabled, refetchInterval: 10_000 })
+}
+
+export function useWave(id: string | undefined) {
+  return useQuery({ queryKey: ['wave', id], queryFn: () => api<Wave>(`/pick-waves/${id}`), enabled: !!id })
+}
+
+/** Supervisor: make a wave from chosen lists or by cut-off date, or take one apart. */
+export function useWaveAction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (a: { kind: 'lists'; warehouseId: string; listIds: string[]; pickerId?: string }
+      | { kind: 'cutOff'; warehouseId: string; cutOff: string; maxOrders: number; pickerId?: string }
+      | { kind: 'dissolve'; id: string }): Promise<Wave | void> =>
+      a.kind === 'lists'
+        ? api<Wave>('/pick-waves', { method: 'POST', body: { warehouseId: a.warehouseId, listIds: a.listIds, pickerId: a.pickerId || undefined } })
+        : a.kind === 'cutOff'
+          ? api<Wave>('/pick-waves/by-cut-off', { method: 'POST', body: { warehouseId: a.warehouseId, cutOff: a.cutOff, maxOrders: a.maxOrders, pickerId: a.pickerId || undefined } })
+          : api<void>(`/pick-waves/${a.id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['waves'] })
       void qc.invalidateQueries({ queryKey: ['task-board'] })
       void qc.invalidateQueries({ queryKey: ['pick-lists'] })
     },

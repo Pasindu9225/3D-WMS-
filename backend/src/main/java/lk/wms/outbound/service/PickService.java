@@ -54,7 +54,7 @@ public class PickService {
 
     public record Summary(String id, String number, String status, String orderNumber, String customerName,
             String warehouseCode, int lines, int openLines, String priority, Person assignee, Person startedBy,
-            java.time.Instant createdAt) {
+            java.time.Instant createdAt, String wave, Integer tote) {
     }
 
     /** Someone on the board: public id and name. */
@@ -82,10 +82,12 @@ public class PickService {
     private final AuditService audit;
     private final lk.wms.auth.service.UserService users;
     private final lk.wms.inventory.service.StockService stockViews;
+    private final lk.wms.outbound.repo.PickWaveRepository waves;
 
     public PickService(PickListRepository lists, SalesOrderRepository orders, DocNumbers numbers, ProductService products,
             WarehouseService warehouses, StockMovementService stock, AuditService audit, lk.wms.auth.service.UserService users,
-            lk.wms.inventory.service.StockService stockViews) {
+            lk.wms.inventory.service.StockService stockViews, lk.wms.outbound.repo.PickWaveRepository waves) {
+        this.waves = waves;
         this.users = users;
         this.stockViews = stockViews;
         this.lists = lists;
@@ -129,7 +131,7 @@ public class PickService {
     public Page<Summary> list(CurrentUser cu, List<PickList.Status> statuses, Pageable pageable) {
         List<Long> ids = warehouses.assignedIds(cu);
         Long forUser = cu.permissions().contains(ASSIGN) ? null : cu.userId();
-        return summaries(lists.search(ids == null, ids == null || ids.isEmpty() ? List.of(-1L) : ids, statuses, forUser, pageable));
+        return summaries(lists.search(ids == null, ids == null || ids.isEmpty() ? List.of(-1L) : ids, statuses, forUser, true, pageable));
     }
 
     /** One warehouse at a glance: counts per stage and every open pick list with its priority and picker. */
@@ -138,7 +140,7 @@ public class PickService {
         WarehouseService.WarehouseRef wh = warehouses.requireAccess(cu, warehouseId);
         java.time.Instant today = java.time.LocalDate.now(ZONE).atStartOfDay(ZONE).toInstant();
         List<Summary> open = summaries(lists.search(false, List.of(wh.id()), List.of(PickList.Status.OPEN, PickList.Status.IN_PROGRESS),
-                null, org.springframework.data.domain.PageRequest.of(0, 100))).getContent();
+                null, false, org.springframework.data.domain.PageRequest.of(0, 100))).getContent();
         return new Board(orders.countByWarehouseIdAndStatus(wh.id(), SalesOrder.Status.DRAFT),
                 lists.countIn(wh.id(), PickList.Status.OPEN, null), lists.countIn(wh.id(), PickList.Status.IN_PROGRESS, null),
                 lists.countIn(wh.id(), PickList.Status.DONE, today),
@@ -206,11 +208,14 @@ public class PickService {
             }
         });
         Map<Long, lk.wms.auth.service.UserService.UserView> names = users.viewsByInternalId(people);
+        Map<Long, String> waveNumbers = new java.util.HashMap<>();
+        waves.byInternalIds(page.getContent().stream().map(PickList::getWaveId).filter(java.util.Objects::nonNull).distinct().toList())
+                .forEach(w -> waveNumbers.put(w.getId(), w.getNumber()));
         return page.map(p -> {
             SalesOrder o = byId.get(p.getOrderId());
             return new Summary(p.getPublicId(), p.getNumber(), p.getStatus().name(), o.getNumber(), o.getCustomerName(),
                     o.getWarehouseCode(), p.getLines().size(), open(p), p.getPriority().name(), person(names, p.getAssignedTo()),
-                    person(names, p.getStartedBy()), p.getCreatedAt());
+                    person(names, p.getStartedBy()), p.getCreatedAt(), p.getWaveId() == null ? null : waveNumbers.get(p.getWaveId()), p.getTote());
         });
     }
 
@@ -292,6 +297,13 @@ public class PickService {
         o.picking(p.getStatus() == PickList.Status.DONE);
         lists.flush();
         orders.flush();
+        if (p.getWaveId() != null) { // v1.2: the wave follows its lists
+            var wave = waves.lockById(p.getWaveId()).orElseThrow();
+            List<PickList> members = lists.findByWaveIdOrderByTote(p.getWaveId());
+            wave.follow(members.stream().anyMatch(m -> m.getStatus() != PickList.Status.OPEN),
+                    members.stream().allMatch(m -> m.getStatus() == PickList.Status.DONE));
+            waves.flush();
+        }
     }
 
     private static PickLine openLine(PickList p, int seq) {

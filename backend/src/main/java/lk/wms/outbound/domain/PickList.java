@@ -57,6 +57,13 @@ public class PickList extends TenantScoped {
     @Column(name = "assigned_to")
     private Long assignedTo;
 
+    /** The wave (v1.2 batch picking) this list is walked in, and its tote number on the trolley. */
+    @Column(name = "wave_id")
+    private Long waveId;
+
+    @Column(name = "tote")
+    private Integer tote;
+
     @Column(name = "assigned_at")
     private Instant assignedAt;
 
@@ -106,6 +113,24 @@ public class PickList extends TenantScoped {
         if (!open) {
             doneAt = Instant.now();
         }
+    }
+
+    public void joinWave(long waveId, int tote) {
+        this.waveId = waveId;
+        this.tote = tote;
+    }
+
+    public void leaveWave() {
+        this.waveId = null;
+        this.tote = null;
+    }
+
+    public Long getWaveId() {
+        return waveId;
+    }
+
+    public Integer getTote() {
+        return tote;
     }
 
     /** Gives the list to one picker, or to anyone (null). */

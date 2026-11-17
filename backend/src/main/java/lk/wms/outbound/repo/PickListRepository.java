@@ -32,10 +32,29 @@ public interface PickListRepository extends JpaRepository<PickList, Long> {
             select p from PickList p
             where (:allWarehouses = true or p.warehouseId in :warehouseIds) and p.status in :statuses
               and (:forUser is null or p.assignedTo is null or p.assignedTo = :forUser)
+              and (:singles = false or p.waveId is null)
             order by case p.priority when lk.wms.outbound.domain.PickList.Priority.URGENT then 0
                                      when lk.wms.outbound.domain.PickList.Priority.HIGH then 1 else 2 end, p.id""")
     Page<PickList> search(@Param("allWarehouses") boolean allWarehouses, @Param("warehouseIds") Collection<Long> warehouseIds,
-            @Param("statuses") Collection<PickList.Status> statuses, @Param("forUser") Long forUser, Pageable pageable);
+            @Param("statuses") Collection<PickList.Status> statuses, @Param("forUser") Long forUser,
+            @Param("singles") boolean singles, Pageable pageable);
+
+    /** Open lists not in a wave whose order is wanted by the cut-off (or has no date), oldest first ("wave by cut-off"). */
+    @Query("""
+            select p.publicId from PickList p, lk.wms.outbound.domain.SalesOrder o
+            where o.id = p.orderId and p.warehouseId = :warehouseId and p.status = lk.wms.outbound.domain.PickList.Status.OPEN
+              and p.waveId is null and (o.requestedDate is null or o.requestedDate <= :cutOff)
+            order by p.id""")
+    java.util.List<String> openForWave(@Param("warehouseId") long warehouseId, @Param("cutOff") java.time.LocalDate cutOff,
+            Pageable pageable);
+
+    /** The lists of a wave, by tote. */
+    java.util.List<PickList> findByWaveIdOrderByTote(Long waveId);
+
+    /** Locks lists in id order (two supervisors making waves at once never deadlock). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from PickList p where p.publicId in :ids order by p.id")
+    java.util.List<PickList> lockByPublicIds(@Param("ids") Collection<String> ids);
 
     /** How many lists of a warehouse are in a status (done ones only since a moment, e.g. today). */
     @Query("select count(p) from PickList p where p.warehouseId = :warehouseId and p.status = :status and (:since is null or p.doneAt >= :since)")
