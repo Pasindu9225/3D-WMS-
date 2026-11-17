@@ -32,6 +32,9 @@ beforeEach(() => {
       return Response.json(url.includes('/confirm') ? { id: 'pl1', orderId: 'so1' } : wave, { status: url.endsWith('/pick-waves') ? 201 : 200 })
     }
     if (url === '/api/v1/pick-waves/wv1') return Response.json(wave)
+    if (url === '/api/v1/pick-waves/wv1/route') {
+      return Response.json({ warehouseId: 'w1', startX: 2000, startY: 10000, stops: [{ step: 1, x: 10000, y: 9000, binCodes: ['A-01-01-01'] }], metres: 84 })
+    }
     if (url.startsWith('/api/v1/pick-waves')) return Response.json({ items: [], page: 0, size: 50, total: 0 })
     return new Response(null, { status: 404 })
   }))
@@ -57,6 +60,7 @@ it('walks a wave: one bin, two totes, each confirmed on its own list', async () 
   render(<QueryClientProvider client={client()}><RouterProvider router={router} /></QueryClientProvider>)
   expect(await screen.findByText('Put it in tote 1')).toBeInTheDocument()
   expect(screen.getByText(/walk about 84 m \(one by one: 310 m\)/)).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: /Show route \(1 stops, about 84 m\)/ })).toHaveAttribute('href', '/app/warehouses/w1/3d?route=wave:wv1')
   await user.type(screen.getByLabelText('Scan the bin label'), 'A-01-01-01')
   await user.type(screen.getByLabelText('Scan the product'), 'P1')
   await user.click(screen.getByRole('button', { name: 'Picked' }))

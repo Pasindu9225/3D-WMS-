@@ -73,6 +73,13 @@ public class PickListController {
         return picks.get(CurrentUser.require(), id);
     }
 
+    /** The walk through the list's open lines (v1.2), drawn on the 3D floor and the Lite map. */
+    @GetMapping("/{id}/route")
+    @PreAuthorize("hasAnyAuthority('picking:execute', 'outbound:read')")
+    public PickService.RouteView route(@PathVariable @Size(max = 26) String id) {
+        return picks.route(CurrentUser.require(), id);
+    }
+
     @PostMapping("/{id}/lines/{seq}/confirm")
     @PreAuthorize("hasAuthority('picking:execute')")
     public Detail confirm(@PathVariable @Size(max = 26) String id, @PathVariable int seq,

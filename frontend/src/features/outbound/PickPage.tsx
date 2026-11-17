@@ -1,4 +1,5 @@
-import { ArrowLeft, CheckCircle2, ClipboardList, Layers, MapPin } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ClipboardList, Layers, MapPin, Route } from 'lucide-react'
+import { useRoute } from '@/features/view3d/route'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -84,6 +85,7 @@ function PickWalk({ id }: { id: string }) {
       <div>
         <h1 className="text-xl font-semibold"><span className="font-mono">{p.number}</span> · {p.orderNumber}</h1>
         <p className="text-sm text-muted-foreground">{p.customerName} · {t('pick.linesLeft', { n: p.openLines, of: p.lines.length })}</p>
+        {next && <ShowRoute param={'list:' + p.id} />}
       </div>
       {next ? <PickLineCard key={`${next.seq}:${next.qtyPicked}`} listId={p.id} line={next} />
         : <FormMessage tone="success"><CheckCircle2 className="mr-1 inline size-4" />{t('pick.allDone')}</FormMessage>}
@@ -218,6 +220,7 @@ function WaveWalk({ id }: { id: string }) {
       <div>
         <h1 className="text-xl font-semibold"><span className="font-mono">{w.number}</span> · {t('wave.orders', { n: w.orders.length })}</h1>
         <p className="text-sm text-muted-foreground">{t('wave.linesLeft', { n: w.openLines })} · {t('wave.walk', { m: Math.round(w.walkMetres), single: Math.round(w.singleWalksMetres) })}</p>
+        {next && <ShowRoute param={'wave:' + w.id} />}
       </div>
       {next ? <PickLineCard key={`${next.listId}:${next.seq}:${next.qtyPicked}`} listId={next.listId} line={next} tote={next.tote} orderNumber={next.orderNumber} />
         : <FormMessage tone="success"><CheckCircle2 className="mr-1 inline size-4" />{t('wave.allDone')}</FormMessage>}
@@ -233,5 +236,17 @@ function WaveWalk({ id }: { id: string }) {
         ))}
       </ol>
     </div>
+  )
+}
+
+/** Opens the warehouse plan with this walk drawn on it (v1.2). */
+function ShowRoute({ param }: { param: string }) {
+  const route = useRoute(param)
+  if (!route.data || route.data.stops.length === 0) return null
+  return (
+    <Link to={'/app/warehouses/' + route.data.warehouseId + '/3d?route=' + param}
+      className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+      <Route className="size-4" /> {t('route.show', { n: route.data.stops.length, m: Math.round(route.data.metres) })}
+    </Link>
   )
 }

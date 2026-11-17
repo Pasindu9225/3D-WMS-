@@ -1,6 +1,7 @@
 import { ArrowLeft, Cuboid, Map, RotateCcw, Scan, Search, Square, ZoomIn, ZoomOut } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router'
+import { useRoute } from './route'
 import { Button } from '@/components/ui/button'
 import { FormMessage } from '@/components/ui/input'
 import { can, useMe } from '@/features/auth/session'
@@ -66,6 +67,9 @@ export function View3DIndexPage() {
 
 export function View3DPage() {
   const { id = '' } = useParams()
+  const [search] = useSearchParams()
+  const routeQuery = useRoute(search.get('route'))
+  const route = routeQuery.data && routeQuery.data.warehouseId === id ? routeQuery.data : null
   const me = useMe()
   const warehouse = useWarehouse(id)
   const scene = useScene(id)
@@ -189,7 +193,7 @@ export function View3DPage() {
         {notPublished && <p className="p-6 text-muted-foreground">{t('view3d.notPublished')}</p>}
         {scene.isError && !notPublished && <div className="p-6"><FormMessage tone="error">{errorMessage(scene.error)}</FormMessage></div>}
         {scene.data && view === 'lite' && (
-          <LiteMap scene={scene.data} colors={colors} selectedBin={selected} selectedRack={rack} onRack={setRack} />
+          <LiteMap scene={scene.data} colors={colors} selectedBin={selected} selectedRack={rack} onRack={setRack} route={route} />
         )}
         {scene.data && view === 'lite' && rack !== null && (
           <RackBins scene={scene.data} rack={rack} colors={colors} selectedBin={selected} onBin={setSelected}
@@ -204,7 +208,7 @@ export function View3DPage() {
         )}
         {scene.data && view === '3d' && (
           <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">{t('view3d.loading3d')}</p>}>
-            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} />}
+            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} route={route} />}
           </Suspense>
         )}
         {/* Bottom bar: legend left and camera right; stacked on phones (camera above) so nothing overlaps. */}
@@ -230,6 +234,7 @@ export function View3DPage() {
               </ul>
               {mode === 'status' && <p className="text-muted-foreground">{t('view3d.status.note')}</p>}
               {mode === 'expiry' && <p className="text-muted-foreground">{t('view3d.expiry.note')}</p>}
+              {route && <p className="font-medium text-cyan-700 dark:text-cyan-300">{t('route.label', { n: route.stops.length, m: Math.round(route.metres) })}</p>}
             </div>
             {view === '3d' && (
               <div className="pointer-events-auto flex flex-col items-end gap-2 self-end">

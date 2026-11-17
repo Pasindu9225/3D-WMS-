@@ -8,6 +8,7 @@ import type { CameraApi } from './camera'
 import { slowFromFrameTimes } from './perf'
 import { ZONE_COLOR } from './colors'
 import { buildInstances, floorBox, type BoxSpec } from './sceneLayout'
+import { routePoints, type PickRoute } from './route'
 
 const M = 1 / 1000
 
@@ -70,8 +71,10 @@ function Boxes({ specs, color, colors, onPick }: {
  * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
  * draw call each, whatever the number of racks.
  */
-export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow, onFrame }: {
+export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow, onFrame, route }: {
   scene: Scene
+  /** A pick walk drawn on the floor (v1.2), if any. */
+  route?: PickRoute | null
   /** Boxes from buildInstances(scene), worked out by the page so search and fly-to use the same positions. */
   parts: ReturnType<typeof buildInstances>
   /** One CSS colour per bin (colour mode worked out by the page). */
@@ -132,6 +135,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       <Boxes specs={parts.bins} color="#94a3b8" colors={binColors} onPick={onSelect} />
       {selected !== null && parts.bins[selected] && <Highlight spec={parts.bins[selected]!} />}
       <Boxes specs={doors} color="#facc15" />
+      {route && route.stops.length > 0 && <RouteLine route={route} />}
       <Rig box={box} onCamera={onCamera} />
       {onSlow && <FpsWatch onSlow={onSlow} />}
       {onFrame && <Spin onFrame={onFrame} />}
@@ -233,4 +237,27 @@ function Spin({ onFrame }: { onFrame: (delta: number) => void }) {
     invalidate() // render on demand: ask for the next frame straight away
   })
   return null
+}
+
+/** The pick walk as a bright line just above the floor, with a marker at every stop (no extra library). */
+function RouteLine({ route }: { route: PickRoute }) {
+  const line = useMemo(() => {
+    const geometry = new THREE.BufferGeometry().setFromPoints(routePoints(route).map((p) => new THREE.Vector3(p.x * M, 0.06, p.y * M)))
+    return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: '#22d3ee' }))
+  }, [route])
+  useEffect(() => () => {
+    line.geometry.dispose()
+    ;(line.material as THREE.Material).dispose()
+  }, [line])
+  return (
+    <>
+      <primitive object={line} />
+      {route.stops.map((s) => (
+        <mesh key={s.step} position={[s.x * M, 0.15, s.y * M]}>
+          <cylinderGeometry args={[0.35, 0.35, 0.1, 20]} />
+          <meshBasicMaterial color="#0e7490" />
+        </mesh>
+      ))}
+    </>
+  )
 }

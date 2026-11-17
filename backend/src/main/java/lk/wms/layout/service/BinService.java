@@ -1,6 +1,8 @@
 package lk.wms.layout.service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lk.wms.common.audit.AuditService;
 import lk.wms.common.errors.ApiException;
 import lk.wms.common.security.CurrentUser;
@@ -149,6 +151,64 @@ public class BinService {
         }
         mm += Math.hypot(start[0] - here[0], start[1] - here[1]);
         return Math.round(mm / 100.0) / 10.0;
+    }
+
+    /** One stop of a pick route: a rack position (mm, plan coordinates) and the bins taken from there, in order. */
+    public record Stop(int step, long x, long y, List<String> binCodes) {
+    }
+
+    /** Where a pick walk starts and ends, its stops in walking order, and its length. */
+    public record Route(long startX, long startY, List<Stop> stops, double metres) {
+    }
+
+    /**
+     * Walking order (v1.2 task 2): from the start point, always the nearest rack not yet visited (straight line, ties by
+     * bin code), and inside a rack level by level, then by code. Bins not placed on the floor go last, by code.
+     * ponytail: nearest-neighbour, not an optimal tour; good for a trolley walk of tens of racks.
+     */
+    @Transactional(readOnly = true)
+    public List<Long> walkOrder(long warehouseId, java.util.Collection<Long> binIds) {
+        return walk(warehouseId, binIds).ordered();
+    }
+
+    /** The walk through these bins as stops (one per rack visit) from and back to the start point. */
+    @Transactional(readOnly = true)
+    public Route route(long warehouseId, java.util.Collection<Long> binIds) {
+        Walk w = walk(warehouseId, binIds);
+        return new Route(w.start()[0], w.start()[1], w.stops(), walkMetres(warehouseId, w.ordered()));
+    }
+
+    private record Walk(long[] start, List<Long> ordered, List<Stop> stops) {
+    }
+
+    private Walk walk(long warehouseId, java.util.Collection<Long> binIds) {
+        java.util.Set<Long> wanted = new java.util.HashSet<>(binIds);
+        Map<String, List<BinRepository.PlacedBin>> byRack = new java.util.LinkedHashMap<>(); // rack = its floor position
+        bins.placedBins(warehouseId).stream().filter(b -> wanted.contains(b.getId()))
+                .sorted(java.util.Comparator.comparing(BinRepository.PlacedBin::getCode))
+                .forEach(b -> byRack.computeIfAbsent(b.getX() + ":" + b.getY(), k -> new ArrayList<>()).add(b));
+        long[] start = zonePoint(warehouseId, lk.wms.layout.domain.Zone.Type.DISPATCH);
+        if (start == null) {
+            start = receivingPoint(warehouseId);
+        }
+        List<Long> ordered = new ArrayList<>();
+        List<Stop> stops = new ArrayList<>();
+        long[] here = start;
+        while (!byRack.isEmpty()) {
+            final long[] from = here;
+            String next = byRack.entrySet().stream()
+                    .min(java.util.Comparator.<Map.Entry<String, List<BinRepository.PlacedBin>>>comparingDouble(e ->
+                            Math.hypot(e.getValue().get(0).getX() - from[0], e.getValue().get(0).getY() - from[1]))
+                            .thenComparing(e -> e.getValue().get(0).getCode()))
+                    .orElseThrow().getKey();
+            List<BinRepository.PlacedBin> rack = byRack.remove(next);
+            rack.sort(java.util.Comparator.comparing((BinRepository.PlacedBin b) -> b.getLevelNo()).thenComparing(BinRepository.PlacedBin::getCode));
+            rack.forEach(b -> ordered.add(b.getId()));
+            here = new long[] {rack.get(0).getX(), rack.get(0).getY()};
+            stops.add(new Stop(stops.size() + 1, here[0], here[1], rack.stream().map(BinRepository.PlacedBin::getCode).toList()));
+        }
+        binIds.stream().filter(id -> !ordered.contains(id)).sorted().forEach(ordered::add); // not on the floor: last
+        return new Walk(start, ordered, stops);
     }
 
     private long[] receivingPoint(long warehouseId) {

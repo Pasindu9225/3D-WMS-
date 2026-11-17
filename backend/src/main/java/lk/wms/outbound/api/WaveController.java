@@ -73,6 +73,12 @@ public class WaveController {
         return waves.get(CurrentUser.require(), id);
     }
 
+    @GetMapping("/{id}/route")
+    @PreAuthorize("hasAnyAuthority('picking:execute', 'outbound:read')")
+    public lk.wms.outbound.service.PickService.RouteView route(@PathVariable @Size(max = 26) String id) {
+        return waves.route(CurrentUser.require(), id);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('tasks:assign')")
     @ResponseStatus(HttpStatus.NO_CONTENT)

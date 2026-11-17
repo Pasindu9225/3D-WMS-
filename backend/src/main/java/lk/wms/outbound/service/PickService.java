@@ -83,11 +83,14 @@ public class PickService {
     private final lk.wms.auth.service.UserService users;
     private final lk.wms.inventory.service.StockService stockViews;
     private final lk.wms.outbound.repo.PickWaveRepository waves;
+    private final lk.wms.layout.service.BinService bins;
 
     public PickService(PickListRepository lists, SalesOrderRepository orders, DocNumbers numbers, ProductService products,
             WarehouseService warehouses, StockMovementService stock, AuditService audit, lk.wms.auth.service.UserService users,
-            lk.wms.inventory.service.StockService stockViews, lk.wms.outbound.repo.PickWaveRepository waves) {
+            lk.wms.inventory.service.StockService stockViews, lk.wms.outbound.repo.PickWaveRepository waves,
+            lk.wms.layout.service.BinService bins) {
         this.waves = waves;
+        this.bins = bins;
         this.users = users;
         this.stockViews = stockViews;
         this.lists = lists;
@@ -102,7 +105,9 @@ public class PickService {
     /** Called by release: one line per reserved place, in bin-code order (the walk through the aisles). */
     PickList createFor(CurrentUser cu, SalesOrder o, List<Allocation> got, Map<Integer, LineInfo> info) {
         PickList list = new PickList(numbers.next(cu, KIND), o.getId(), o.getWarehouseId());
-        got.stream().sorted(Comparator.comparing(Allocation::binCode).thenComparing(Allocation::line)).forEach(a -> {
+        // v1.2: lines in walking order (nearest rack first from the dispatch zone), not just by bin code
+        List<Long> walk = bins.walkOrder(o.getWarehouseId(), got.stream().map(Allocation::binId).distinct().toList());
+        got.stream().sorted(Comparator.comparingInt((Allocation a) -> walk.indexOf(a.binId())).thenComparing(Allocation::line)).forEach(a -> {
             LineInfo i = info.get(a.line());
             list.add(new PickLine.Spec(a.line(), a.productId(), i.sku(), i.productName(), i.baseUom(), a.binId(), a.binCode(),
                     a.batchNo(), a.expiry(), a.qty()));
@@ -288,6 +293,24 @@ public class PickService {
         audit.record(cu.tenantId(), cu.userId(), "PICK_SHORT", "pick_list", p.getPublicId(), null,
                 Map.of("line", seq, "sku", line.getSku(), "bin", line.getBinCode(), "missing", missing, "reason", reason.name()));
         return detail(p, o);
+    }
+
+    /** The route of a list's open lines (v1.2), for the 3D view and the Lite map. */
+    @Transactional(readOnly = true)
+    public RouteView route(CurrentUser cu, String publicId) {
+        PickList p = lists.findByPublicId(publicId).orElse(null);
+        access(cu, p);
+        return routeView(p.getWarehouseId(), p.getLines().stream().filter(l -> l.getStatus() == PickLine.Status.OPEN)
+                .map(PickLine::getBinId).distinct().toList());
+    }
+
+    /** A pick route for the screens: the warehouse to open, the start point, the stops in walking order, metres. */
+    public record RouteView(String warehouseId, long startX, long startY, List<lk.wms.layout.service.BinService.Stop> stops, double metres) {
+    }
+
+    RouteView routeView(long warehouseId, List<Long> binIds) {
+        var r = bins.route(warehouseId, binIds);
+        return new RouteView(warehouses.publicIdOf(warehouseId), r.startX(), r.startY(), r.stops(), r.metres());
     }
 
     // ---------------------------------------------------------------- helpers

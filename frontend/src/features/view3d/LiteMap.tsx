@@ -3,13 +3,16 @@ import { rackPolygon } from '@/features/layout/geometry'
 import { t } from '@/lib/i18n'
 import type { Scene } from './api'
 import { ZONE_COLOR } from './colors'
+import { routePoints, type PickRoute } from './route'
 
 /**
  * Lite mode: the warehouse as a flat SVG plan for weak PCs. No WebGL and no three.js download; racks take the
  * colour of their bins (the worst status wins), a click opens the rack's bins.
  */
-export function LiteMap({ scene, colors, selectedBin, selectedRack, onRack }: {
+export function LiteMap({ scene, colors, selectedBin, selectedRack, onRack, route }: {
   scene: Scene
+  /** A pick walk to draw over the plan (v1.2), if any. */
+  route?: PickRoute | null
   /** Per-bin colours (same as the 3D view), so both modes tell the same story. */
   colors: string[]
   selectedBin: number | null
@@ -58,6 +61,7 @@ export function LiteMap({ scene, colors, selectedBin, selectedRack, onRack }: {
           </polygon>
         )
       })}
+      {route && route.stops.length > 0 && <RouteOverlay route={route} />}
     </svg>
   )
 }
@@ -105,5 +109,23 @@ export function RackBins({ scene, rack, colors, selectedBin, onBin, onClose }: {
         </tbody>
       </table>
     </section>
+  )
+}
+
+/** The pick walk on the plan: a line from the start through every stop and back, numbered stops. */
+function RouteOverlay({ route }: { route: PickRoute }) {
+  const pts = routePoints(route)
+  return (
+    <g aria-label={t('route.label', { n: route.stops.length, m: Math.round(route.metres) })} role="img">
+      <polyline points={pts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#22d3ee" strokeWidth={180}
+        strokeLinejoin="round" strokeDasharray="600 300" />
+      <circle cx={route.startX} cy={route.startY} r={700} fill="#22d3ee" />
+      {route.stops.map((s) => (
+        <g key={s.step}>
+          <circle cx={s.x} cy={s.y} r={900} fill="#0e7490" stroke="#ffffff" strokeWidth={120} />
+          <text x={s.x} y={s.y} fill="#ffffff" fontSize={1000} fontWeight={700} textAnchor="middle" dominantBaseline="central">{s.step}</text>
+        </g>
+      ))}
+    </g>
   )
 }

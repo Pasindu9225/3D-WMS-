@@ -166,6 +166,15 @@ public class WaveService {
                 Map.of("number", wave.getNumber(), "lists", locked.stream().map(PickList::getNumber).toList()));
     }
 
+    /** The route of the wave's open lines, for the 3D view and the Lite map. */
+    @Transactional(readOnly = true)
+    public PickService.RouteView route(CurrentUser cu, String publicId) {
+        PickWave w = visible(cu, waves.findByPublicId(publicId).orElse(null));
+        List<Long> open = lists.findByWaveIdOrderByTote(w.getId()).stream().flatMap(p -> p.getLines().stream())
+                .filter(l -> l.getStatus() == PickLine.Status.OPEN).map(PickLine::getBinId).distinct().toList();
+        return picks.routeView(w.getWarehouseId(), open);
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private PickWave visible(CurrentUser cu, PickWave w) {
@@ -194,8 +203,10 @@ public class WaveService {
             }
             singles += bins.walkMetres(w.getWarehouseId(), p.getLines().stream().map(PickLine::getBinId).toList());
         }
-        walk.sort(Comparator.comparing(WalkLine::binCode).thenComparingInt(WalkLine::tote).thenComparingInt(WalkLine::seq));
-        double together = bins.walkMetres(w.getWarehouseId(), walk.stream().map(l -> binIds.get(l.binCode())).distinct().toList());
+        List<Long> order = bins.walkOrder(w.getWarehouseId(), binIds.values().stream().distinct().toList()); // v1.2: walking order
+        walk.sort(Comparator.comparingInt((WalkLine l) -> order.indexOf(binIds.get(l.binCode()))).thenComparingInt(WalkLine::tote)
+                .thenComparingInt(WalkLine::seq));
+        double together = bins.walkMetres(w.getWarehouseId(), order);
         Long assigned = members.isEmpty() ? null : members.get(0).getAssignedTo();
         return new WaveView(w.getPublicId(), w.getNumber(), w.getStatus().name(), warehouses.codeOf(w.getWarehouseId()), w.getCutOff(),
                 w.getVersion(), person(assigned), orderViews, walk, members.stream().mapToInt(WaveService::open).sum(), together,

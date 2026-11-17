@@ -1174,5 +1174,7 @@
   "error.WAVE_SIZE": "A wave takes 2 to 20 orders.",
   "error.WAVE_TOO_SMALL": "Fewer than 2 open orders are wanted by that date.",
   "error.LIST_NOT_FREE": "One of those lists is already started or in another wave.",
-  "error.WAVE_STARTED": "Picking has started in this wave; it cannot be taken apart."
+  "error.WAVE_STARTED": "Picking has started in this wave; it cannot be taken apart.",
+  "route.label": "Route: {n} stops · about {m} m",
+  "route.show": "Show route ({n} stops, about {m} m)"
 }
