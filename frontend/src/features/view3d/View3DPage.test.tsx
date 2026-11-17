@@ -7,7 +7,12 @@ import { View3DPage } from './View3DPage'
 
 vi.mock('./live', () => ({ useLiveBins: () => 'live' })) // no sockets in unit tests
 // The fake canvas reports "slow" when the page passes onSlow, so the Lite suggestion can be tested.
-vi.mock('./SceneCanvas', () => ({ SceneCanvas: ({ onSlow }: { onSlow?: () => void }) => <p>3D canvas<button type="button" onClick={onSlow}>simulate slow</button></p> }))
+vi.mock('./SceneCanvas', () => ({
+  SceneCanvas: ({ onSlow, drone }: { onSlow?: () => void; drone?: { playing: boolean; speed: number; tour: unknown[]; onStop: () => void } | null }) => (
+    <p>3D canvas<button type="button" onClick={onSlow}>simulate slow</button>
+      {drone && <span>drone {drone.playing ? 'flying' : 'paused'} at {drone.speed}x over {drone.tour.length} points<button type="button" onClick={drone.onStop}>simulate landing</button></span>}</p>
+  ),
+}))
 
 let sceneReply: Response
 const SCENE = { publishedAt: 'x', floor: [0, 0, 10000, 0, 10000, 10000, 0, 10000], openings: [], zones: [],
@@ -86,4 +91,25 @@ it('offers the Lite map when 3D is slow, and switching remembers the choice', as
   expect(await screen.findByRole('img', { name: 'Warehouse plan' })).toBeInTheDocument()
   expect(localStorage.getItem('wms.3d.view')).toBe('lite')
   localStorage.removeItem('wms.3d.view')
+})
+
+it('drone view: flies, pauses, changes speed, and stops with the button, Esc or at the end of the flight', async () => {
+  sceneReply = Response.json(SCENE)
+  const user = userEvent.setup()
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: 'Drone view (fly around)' }))
+  expect(screen.getByText(/drone flying at 1x over 16 points/)).toBeInTheDocument() // 13 round the floor, 2 along the rack, the finish
+  await user.click(screen.getByRole('button', { name: 'Pause' }))
+  expect(screen.getByText(/drone paused/)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Play' }))
+  await user.click(screen.getByRole('button', { name: '2×' }))
+  expect(screen.getByText(/drone flying at 2x/)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Stop the drone' }))
+  expect(screen.queryByText(/^drone/)).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Drone view (fly around)' }))
+  await user.keyboard('{Escape}')
+  expect(screen.queryByText(/^drone/)).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Drone view (fly around)' }))
+  await user.click(screen.getByRole('button', { name: 'simulate landing' }))
+  expect(screen.queryByRole('group', { name: 'Drone view' })).not.toBeInTheDocument()
 })

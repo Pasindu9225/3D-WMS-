@@ -1390,5 +1390,11 @@
   "setup.cardBody": "{done} of {total} steps done.",
   "setup.cardGo": "Continue",
   "setup.cardHide": "Hide",
-  "error.SIGNUP_LINK_INVALID": "This link has expired or was already used. Sign up again to get a new one."
+  "error.SIGNUP_LINK_INVALID": "This link has expired or was already used. Sign up again to get a new one.",
+  "drone.start": "Drone view (fly around)",
+  "drone.bar": "Drone view",
+  "drone.play": "Play",
+  "drone.pause": "Pause",
+  "drone.stop": "Stop the drone",
+  "drone.progress": "Flight done"
 }

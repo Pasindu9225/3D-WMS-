@@ -381,7 +381,8 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 
 **Tasks**
 
-- [ ] Drone view: the camera flies a smooth path over the whole warehouse, then along each aisle; play / pause / speed; can fly along a pick route; any colour mode (zone, status, expiry, pick heat) stays on
+- [x] Drone view: the camera flies a smooth path over the whole warehouse, then along each aisle; play / pause / speed; can fly along a pick route; any colour mode (zone, status, expiry, pick heat) stays on
+  — done: plane button in the 3D view; once round the floor, low past every rack nearest-first, ends looking down; with a route on screen it flies the pick walk; pause, 0.5× / 1× / 2×, progress, stop (button, Esc, drag or click); about 137 fps on the dev PC
 - [ ] Walk-through: first-person view at eye height (1.7 m); keys (W A S D / arrows) and mouse to look on a PC, on-screen joystick on phones and tablets; cannot walk through racks or walls; click a bin to see what is in it; "you are here" dot on the Lite map
 
 **Deliverables:** two new camera modes in the 3D view, no new library (three.js, React Three Fiber and drei are already in the app).

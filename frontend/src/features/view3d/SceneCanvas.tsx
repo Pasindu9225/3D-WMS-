@@ -1,4 +1,5 @@
 import { CameraControls } from '@react-three/drei'
+import { DRONE_SPEED, type Keyframe } from './drone'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
@@ -71,9 +72,11 @@ function Boxes({ specs, color, colors, onPick }: {
  * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
  * draw call each, whatever the number of racks.
  */
-export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow, onFrame, route }: {
+export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow, onFrame, route, drone }: {
   scene: Scene
   /** A pick walk drawn on the floor (v1.2), if any. */
+  /** The drone flight (v2.1) while it is on. */
+  drone?: DroneProps | null
   route?: PickRoute | null
   /** Boxes from buildInstances(scene), worked out by the page so search and fly-to use the same positions. */
   parts: ReturnType<typeof buildInstances>
@@ -137,6 +140,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       <Boxes specs={doors} color="#facc15" />
       {route && route.stops.length > 0 && <RouteLine route={route} />}
       <Rig box={box} onCamera={onCamera} />
+      {drone && <Drone {...drone} />}
       {onSlow && <FpsWatch onSlow={onSlow} />}
       {onFrame && <Spin onFrame={onFrame} />}
     </Canvas>
@@ -179,6 +183,68 @@ function Rig({ box, onCamera }: { box: { cx: number; cz: number; size: number };
     <CameraControls ref={controls} makeDefault maxPolarAngle={Math.PI / 2.05} minDistance={1.5} maxDistance={box.size * 4}
       smoothTime={0.25} />
   )
+}
+
+export interface DroneProps {
+  tour: Keyframe[]
+  playing: boolean
+  speed: number
+  /** 0..1, reported a few times a second. */
+  onProgress: (done: number) => void
+  /** The flight ended, or someone dragged, scrolled or clicked in the view. */
+  onStop: () => void
+}
+
+/**
+ * Flies the camera along smooth curves through the tour (v2.1). It drives the orbit controls (which stay switched off
+ * for the mouse), so stopping leaves the camera exactly where it is and normal moving carries on from there.
+ */
+function Drone({ tour, playing, speed, onProgress, onStop }: DroneProps) {
+  const controls = useThree((state) => state.controls) as unknown as CameraControls | null
+  const invalidate = useThree((state) => state.invalidate)
+  const dom = useThree((state) => state.gl.domElement)
+  const curves = useMemo(() => {
+    const pos = new THREE.CatmullRomCurve3(tour.map((k) => new THREE.Vector3(k.pos.x, k.pos.y, k.pos.z)), false, 'centripetal')
+    const look = new THREE.CatmullRomCurve3(tour.map((k) => new THREE.Vector3(k.look.x, k.look.y, k.look.z)), false, 'centripetal')
+    return { pos, look, length: Math.max(1, pos.getLength()) }
+  }, [tour])
+  const done = useRef(0)
+  const reported = useRef(0)
+  const p = useMemo(() => new THREE.Vector3(), [])
+  const l = useMemo(() => new THREE.Vector3(), [])
+  useEffect(() => {
+    if (!controls) return
+    controls.enabled = false
+    const stop = () => onStop()
+    dom.addEventListener('pointerdown', stop)
+    dom.addEventListener('wheel', stop, { passive: true })
+    return () => {
+      controls.enabled = true
+      dom.removeEventListener('pointerdown', stop)
+      dom.removeEventListener('wheel', stop)
+    }
+  }, [controls, dom, onStop])
+  useEffect(() => {
+    if (playing) invalidate()
+  }, [playing, invalidate])
+  useFrame((_, delta) => {
+    if (!playing || !controls) return
+    done.current = Math.min(1, done.current + (Math.min(delta, 0.1) * DRONE_SPEED * speed) / curves.length)
+    curves.pos.getPointAt(done.current, p)
+    curves.look.getPointAt(done.current, l)
+    void controls.setLookAt(p.x, p.y, p.z, l.x, l.y, l.z, false)
+    if (done.current >= 1) {
+      onProgress(1)
+      onStop()
+      return
+    }
+    if (done.current - reported.current >= 0.01) {
+      reported.current = done.current
+      onProgress(done.current)
+    }
+    invalidate() // render on demand: ask for the next frame straight away
+  })
+  return null
 }
 
 /** Bright frame around the selected bin, a little larger so it shows from every side. */

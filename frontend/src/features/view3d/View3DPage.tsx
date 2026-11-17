@@ -1,4 +1,4 @@
-import { ArrowLeft, Cuboid, Map, RotateCcw, Scan, Search, Square, ZoomIn, ZoomOut } from 'lucide-react'
+import { ArrowLeft, Cuboid, Map, Pause, Plane, Play, RotateCcw, Scan, Search, Square, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router'
 import { useRoute } from './route'
@@ -17,6 +17,7 @@ import { binColors, legend, type ColorMode } from './colors'
 import { LiteMap, RackBins } from './LiteMap'
 import { buildInstances, floorBox } from './sceneLayout'
 import { findBin, suggestions } from './search'
+import { droneTour } from './drone'
 
 // three.js and React Three Fiber load only here, never in the main bundle (SPEC v0.3).
 const SceneCanvas = lazy(() => import('./SceneCanvas').then((m) => ({ default: m.SceneCanvas })))
@@ -108,6 +109,12 @@ export function View3DPage() {
     }
   }
   const onSlow = useCallback(() => setSlow(true), [])
+  // Drone view (v2.1): null when off; the tour is worked out once when it starts.
+  const [drone, setDrone] = useState<{ playing: boolean; speed: number; done: number } | null>(null)
+  const droneOn = drone !== null
+  const tour = useMemo(() => (droneOn && scene.data ? droneTour(scene.data, route) : null), [droneOn, scene.data, route])
+  const stopDrone = useCallback(() => setDrone(null), [])
+  const onDroneProgress = useCallback((done: number) => setDrone((d) => (d ? { ...d, done } : d)), [])
 
   const find = (text: string) => {
     const i = findBin(codes, text)
@@ -125,6 +132,7 @@ export function View3DPage() {
     const step = floorBox(floor).size * 0.05
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        setDrone(null)
         setSelected(null)
         setRack(null)
         return
@@ -208,7 +216,8 @@ export function View3DPage() {
         )}
         {scene.data && view === '3d' && (
           <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">{t('view3d.loading3d')}</p>}>
-            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} route={route} />}
+            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} route={route}
+              drone={drone && tour ? { tour, playing: drone.playing, speed: drone.speed, onProgress: onDroneProgress, onStop: stopDrone } : null} />}
           </Suspense>
         )}
         {/* Bottom bar: legend left and camera right; stacked on phones (camera above) so nothing overlaps. */}
@@ -245,7 +254,21 @@ export function View3DPage() {
                   <Button variant="ghost" size="icon" aria-label={t('view3d.zoomOut')} title={t('view3d.zoomOut')} onClick={() => camera.current?.zoom(-1)}><ZoomOut /></Button>
                   <Button variant="ghost" size="icon" aria-label={t('view3d.top')} title={t('view3d.top')} onClick={() => camera.current?.top()}><Scan /></Button>
                   <Button variant="ghost" size="icon" aria-label={t('view3d.reset')} title={t('view3d.reset')} onClick={() => camera.current?.reset()}><RotateCcw /></Button>
+                  <Button variant={drone ? 'default' : 'ghost'} size="icon" aria-label={t('drone.start')} title={t('drone.start')} aria-pressed={!!drone}
+                    onClick={() => { setSelected(null); setDrone(drone ? null : { playing: true, speed: 1, done: 0 }) }}><Plane /></Button>
                 </div>
+                {drone && (
+                  <div role="group" aria-label={t('drone.bar')} className="flex items-center gap-1 rounded-lg border bg-card/90 p-1 shadow-sm">
+                    <Button variant="ghost" size="icon" aria-label={drone.playing ? t('drone.pause') : t('drone.play')}
+                      onClick={() => setDrone({ ...drone, playing: !drone.playing })}>{drone.playing ? <Pause /> : <Play />}</Button>
+                    {[0.5, 1, 2].map((s) => (
+                      <button key={s} type="button" aria-pressed={drone.speed === s} onClick={() => setDrone({ ...drone, speed: s })}
+                        className={`rounded px-2 py-1 text-xs font-medium ${drone.speed === s ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>{s}×</button>
+                    ))}
+                    <span className="w-16 px-1 text-center text-xs tabular-nums" aria-label={t('drone.progress')}>{Math.round(drone.done * 100)}%</span>
+                    <Button variant="ghost" size="icon" aria-label={t('drone.stop')} onClick={stopDrone}><X /></Button>
+                  </div>
+                )}
                 <p className="hidden rounded bg-card/80 px-2 py-1 text-xs text-muted-foreground sm:block">{t('view3d.keys')}</p>
               </div>
             )}
