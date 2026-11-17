@@ -1268,5 +1268,11 @@
   "notify.minutesAgo": "{n} min ago",
   "notify.hoursAgo": "{n} h ago",
   "notify.daysAgo": "{n} days ago",
-  "error.NOTIFICATION_NOT_FOUND": "This notification does not exist."
+  "error.NOTIFICATION_NOT_FOUND": "This notification does not exist.",
+  "view3d.colorBy.heat": "Pick heat",
+  "view3d.heat.none": "Not picked",
+  "view3d.heat.one": "{n} picks",
+  "view3d.heat.range": "{from}–{to} picks",
+  "view3d.heat.note": "Lines picked from each bin in the last 30 days; red = the busiest bins.",
+  "view3d.bin.picks": "Picked (30 days)"
 }

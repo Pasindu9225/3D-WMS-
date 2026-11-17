@@ -47,6 +47,8 @@ export function BinPanel({ scene, index, warehouseId, canManage, onClose }: {
         <dd>{bin ? t('bins.volume', { m3: Math.round(bin.maxVolumeCm3 / 10_000) / 100 }) : '…'}</dd>
         <dt className="text-muted-foreground">{t('view3d.bin.full')}</dt>
         <dd>{fill}%</dd>
+        <dt className="text-muted-foreground">{t('view3d.bin.picks')}</dt>
+        <dd>{scene.picks?.[index] ?? 0}</dd>
       </dl>
       <div className="flex flex-wrap gap-1.5">
         {flags & BLOCKED ? <Badge tone="bad">{t('bins.col.blocked')}</Badge> : null}

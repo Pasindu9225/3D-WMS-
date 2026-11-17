@@ -11,6 +11,13 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             + " where m.type = lk.wms.inventory.domain.StockMovement.Type.PICK and m.createdAt >= :since group by m.productId")
     java.util.List<Object[]> pickCounts(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
 
+    /** [binId, picks] in a warehouse since a time: lines picked from each bin (v1.2 heat map). */
+    @org.springframework.data.jpa.repository.Query("select m.fromBinId, count(m) from StockMovement m where m.warehouseId = :warehouseId"
+            + " and m.type = lk.wms.inventory.domain.StockMovement.Type.PICK and m.fromBinId is not null and m.createdAt >= :since"
+            + " group by m.fromBinId")
+    java.util.List<Object[]> picksByBin(@org.springframework.data.repository.query.Param("warehouseId") long warehouseId,
+            @org.springframework.data.repository.query.Param("since") java.time.Instant since);
+
     /** A move already made with this Idempotency-Key (tenant-filtered). */
     boolean existsByClientRef(String clientRef);
 

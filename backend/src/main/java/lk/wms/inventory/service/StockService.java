@@ -230,6 +230,18 @@ public class StockService {
         return out;
     }
 
+    /** Days the heat map looks back. */
+    public static final int HEAT_DAYS = 30;
+
+    /** Lines picked from each bin of a warehouse in the last 30 days (bins never picked are absent). Caller checked access. */
+    @Transactional(readOnly = true)
+    public Map<Long, Integer> binPicks(long warehouseId) {
+        Map<Long, Integer> out = new HashMap<>();
+        ledger.picksByBin(warehouseId, java.time.Instant.now().minus(java.time.Duration.ofDays(HEAT_DAYS)))
+                .forEach(r -> out.put(((Number) r[0]).longValue(), ((Number) r[1]).intValue()));
+        return out;
+    }
+
     /** One lot that expires soon (or has expired): where it is and how much. */
     public record ExpiringLot(long productId, String place, String batchNo, java.time.LocalDate expiry, BigDecimal qty) {
     }

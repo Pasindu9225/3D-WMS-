@@ -50,12 +50,12 @@ public class SceneService {
     }
 
     public record SceneView(String publishedAt, int[] floor, List<LayoutDocument.Opening> openings, List<ZoneView> zones,
-            List<RackView> racks, BinArrays bins, String flags, int[] fill, Integer[] expiryDays) {
+            List<RackView> racks, BinArrays bins, String flags, int[] fill, Integer[] expiryDays, int[] picks) {
     }
 
     /** flags as in the scene; fill = how full each bin is, 0 to 100 (1 at least when it holds anything); expiryDays = days
      * until the earliest expiry in each bin (negative = expired), null when it holds nothing dated. */
-    public record StatusView(String publishedAt, String flags, int[] fill, Integer[] expiryDays) {
+    public record StatusView(String publishedAt, String flags, int[] fill, Integer[] expiryDays, int[] picks) {
     }
 
     private final WarehouseService warehouses;
@@ -127,7 +127,8 @@ public class SceneService {
                     r.getRotationDeg(), r.getWidthMm(), r.getDepthMm(), r.getHeightMm(), binsPerLevel[i], heights));
         }
         return new SceneView(published.getPublishedAt().toString(), flat(doc.floor()), doc.openings(), zoneViews,
-                rackViews, arrays, flags(binRows), fill(w.id(), binRows), expiryDays(w.id(), binRows));
+                rackViews, arrays, flags(binRows), fill(w.id(), binRows), expiryDays(w.id(), binRows),
+                picks(w.id(), binRows));
     }
 
     /** Status only, in the same bin order as the scene; the viewer refetches the scene when publishedAt changes. */
@@ -135,7 +136,8 @@ public class SceneService {
     public StatusView status(CurrentUser cu, String warehouseId) {
         WarehouseRef w = warehouses.requireAccess(cu, warehouseId);
         List<SceneBin> rows = bins.findByWarehouseIdOrderById(w.id());
-        return new StatusView(published(w).getPublishedAt().toString(), flags(rows), fill(w.id(), rows), expiryDays(w.id(), rows));
+        return new StatusView(published(w).getPublishedAt().toString(), flags(rows), fill(w.id(), rows), expiryDays(w.id(), rows),
+                picks(w.id(), rows));
     }
 
     private LayoutVersion published(WarehouseRef w) {
@@ -152,6 +154,16 @@ public class SceneService {
         for (int i = 0; i < rows.size(); i++) {
             java.time.LocalDate d = earliest.get(rows.get(i).getId());
             out[i] = d == null ? null : (int) java.time.temporal.ChronoUnit.DAYS.between(today, d);
+        }
+        return out;
+    }
+
+    /** Lines picked from each bin in the last 30 days (v1.2 heat map), 0 when never. */
+    private int[] picks(long warehouseId, List<SceneBin> rows) {
+        Map<Long, Integer> picks = stock.binPicks(warehouseId);
+        int[] out = new int[rows.size()];
+        for (int i = 0; i < rows.size(); i++) {
+            out[i] = picks.getOrDefault(rows.get(i).getId(), 0);
         }
         return out;
     }

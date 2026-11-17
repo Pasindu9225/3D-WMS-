@@ -1,7 +1,7 @@
 import type { ZoneType } from '@/features/warehouses/api'
 import { BLOCKED, PICK_FACE, type Scene } from './api'
 
-export type ColorMode = 'zone' | 'status' | 'expiry'
+export type ColorMode = 'zone' | 'status' | 'expiry' | 'heat'
 export type ExpiryBand = 'EXPIRED' | 'D30' | 'D60' | 'D90' | 'LATER' | 'NONE'
 export type BinStatus = 'EMPTY' | 'PARTLY' | 'FULL' | 'BLOCKED' | 'PICK_FACE'
 
@@ -33,6 +33,24 @@ export const EXPIRY_COLOR: Record<ExpiryBand, string> = {
   NONE: '#cbd5e1',
 }
 
+/** Pick heat (v1.2): step 0 = not picked, then 1 (cool blue) to 5 (red), by share of the busiest bin. */
+export const HEAT_COLOR = ['#cbd5e1', '#3b82f6', '#06b6d4', '#facc15', '#f97316', '#dc2626'] as const
+
+export function heatStep(picks: number, max: number): number {
+  return picks <= 0 || max <= 0 ? 0 : Math.min(5, Math.ceil((5 * picks) / max))
+}
+
+/** Pick ranges of each heat step for the legend; steps that no count can reach (few picks) are left out. */
+export function heatRanges(max: number): { step: number; from: number; to: number }[] {
+  const out: { step: number; from: number; to: number }[] = []
+  for (let k = 1; k <= 5 && max > 0; k++) {
+    const from = Math.floor(((k - 1) * max) / 5) + 1
+    const to = Math.floor((k * max) / 5)
+    if (from <= to) out.push({ step: k, from, to })
+  }
+  return out
+}
+
 /** Band of a bin from the days until its earliest expiry (null = nothing dated in it). */
 export function expiryBand(days: number | null | undefined): ExpiryBand {
   if (days === null || days === undefined) return 'NONE'
@@ -59,6 +77,10 @@ export function binColors(scene: Scene, mode: ColorMode, flags: string): string[
   if (mode === 'expiry') {
     return scene.bins.rack.map((_, i) => EXPIRY_COLOR[expiryBand(scene.expiryDays?.[i])])
   }
+  if (mode === 'heat') {
+    const max = Math.max(0, ...(scene.picks ?? []))
+    return scene.bins.rack.map((_, i) => HEAT_COLOR[heatStep(scene.picks?.[i] ?? 0, max)]!)
+  }
   if (mode === 'status') {
     return scene.bins.rack.map((_, i) => STATUS_COLOR[statusOf(Number(flags[i] ?? 0), (scene.fill?.[i] ?? 0) / 100)])
   }
@@ -70,7 +92,11 @@ export function binColors(scene: Scene, mode: ColorMode, flags: string): string[
 }
 
 /** Legend rows for the current mode: only what is on screen (zone types present, every status). */
-export function legend(scene: Scene, mode: ColorMode): { key: string; color: string }[] {
+export function legend(scene: Scene, mode: ColorMode): { key: string; color: string; from?: number; to?: number }[] {
+  if (mode === 'heat') {
+    const max = Math.max(0, ...(scene.picks ?? []))
+    return [{ key: 'NONE', color: HEAT_COLOR[0] }, ...heatRanges(max).map((r) => ({ key: `H${r.step}`, color: HEAT_COLOR[r.step]!, from: r.from, to: r.to }))]
+  }
   if (mode === 'expiry') return (Object.keys(EXPIRY_COLOR) as ExpiryBand[]).map((b) => ({ key: b, color: EXPIRY_COLOR[b] }))
   if (mode === 'status') return (Object.keys(STATUS_COLOR) as BinStatus[]).map((s) => ({ key: s, color: STATUS_COLOR[s] }))
   const types = [...new Set(scene.zones.map((z) => z.type))]

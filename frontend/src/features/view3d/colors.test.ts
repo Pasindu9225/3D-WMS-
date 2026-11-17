@@ -39,3 +39,19 @@ it('colours bins by their soonest expiry: expired, 30, 60, 90 days, later, nothi
   expect(binColors(dated, 'expiry', '0000')).toEqual([EXPIRY_COLOR.EXPIRED, EXPIRY_COLOR.D30, EXPIRY_COLOR.LATER, EXPIRY_COLOR.NONE])
   expect(legend(scene, 'expiry')).toHaveLength(6)
 })
+
+it('pick heat (v1.2): busiest bin red, unpicked grey, steps by share of the busiest', async () => {
+  const { HEAT_COLOR, heatRanges, heatStep } = await import('./colors')
+  expect(heatStep(0, 20)).toBe(0)
+  expect(heatStep(1, 20)).toBe(1)
+  expect(heatStep(4, 20)).toBe(1)
+  expect(heatStep(5, 20)).toBe(2)
+  expect(heatStep(20, 20)).toBe(5)
+  const hot = { ...scene, picks: [0, 3, 12, 20] } as unknown as Scene
+  expect(binColors(hot, 'heat', '0000')).toEqual([HEAT_COLOR[0], HEAT_COLOR[1], HEAT_COLOR[3], HEAT_COLOR[5]])
+  expect(heatRanges(20)).toEqual([{ step: 1, from: 1, to: 4 }, { step: 2, from: 5, to: 8 }, { step: 3, from: 9, to: 12 },
+    { step: 4, from: 13, to: 16 }, { step: 5, from: 17, to: 20 }])
+  expect(heatRanges(2)).toEqual([{ step: 3, from: 1, to: 1 }, { step: 5, from: 2, to: 2 }]) // few picks: only reachable steps
+  expect(legend(hot, 'heat').map((l) => l.key)).toEqual(['NONE', 'H1', 'H2', 'H3', 'H4', 'H5'])
+  expect(legend({ ...scene } as Scene, 'heat').map((l) => l.key)).toEqual(['NONE']) // nothing picked yet
+})

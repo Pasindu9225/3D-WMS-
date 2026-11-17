@@ -33,6 +33,9 @@ class WaveTest extends ApiTest {
     @Autowired
     StockMovementService moves;
 
+    @Autowired
+    lk.wms.inventory.repo.StockMovementRepository ledger;
+
     long tenant;
     AppUser adminUser;
     Cookie admin;
@@ -123,6 +126,16 @@ class WaveTest extends ApiTest {
         }
         send(picker, get("/api/v1/pick-waves/" + wave)).andExpect(jsonPath("$.status").value("DONE")).andExpect(jsonPath("$.openLines").value(0));
         assertThat(jdbc.queryForList("SELECT status FROM sales_order WHERE tenant_id = ?", String.class, tenant)).containsOnly("PICKED");
+
+        // v1.2 heat map: lines picked per bin, last 30 days, in scene order (each rack's bin was picked twice)
+        String scene = send(admin, get("/api/v1/warehouses/" + warehouse + "/scene")).andReturn().getResponse().getContentAsString();
+        List<Integer> picks = JsonPath.read(scene, "$.picks");
+        assertThat(picks).containsExactly(2, 2, 2);
+        String status = send(picker, get("/api/v1/warehouses/" + warehouse + "/bin-status")).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<Integer>>read(status, "$.picks")).containsExactly(2, 2, 2);
+        // only picks after the cut-off count (the ledger cannot be back-dated, so ask from a moment after the picks)
+        assertThat(TenantContext.callAs(tenant, () -> ledger.picksByBin(warehouseId, java.time.Instant.now().plusSeconds(1)))).isEmpty();
+        assertThat(TenantContext.callAs(tenant, () -> ledger.picksByBin(warehouseId, java.time.Instant.now().minusSeconds(3600)))).hasSize(3);
 
         String c = releasedList(null);
         send(admin, post("/api/v1/pick-waves").content("{\"warehouseId\":\"" + warehouse + "\",\"listIds\":[\"" + a + "\",\"" + c + "\"]}"))

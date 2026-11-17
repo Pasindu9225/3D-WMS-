@@ -30,6 +30,8 @@ export interface Scene {
   fill?: number[]
   /** Days until the earliest expiry in each bin (negative = expired), null when nothing dated is in it. */
   expiryDays?: (number | null)[]
+  /** Lines picked from each bin in the last 30 days (v1.2 heat map). */
+  picks?: number[]
 }
 
 export const BLOCKED = 1

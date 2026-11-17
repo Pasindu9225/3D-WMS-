@@ -36,7 +36,7 @@ function savedView(): ViewMode {
 function savedMode(): ColorMode {
   try {
     const m = localStorage.getItem(MODE_KEY)
-    return m === 'status' || m === 'expiry' ? m : 'zone'
+    return m === 'status' || m === 'expiry' || m === 'heat' ? m : 'zone'
   } catch {
     return 'zone'
   }
@@ -216,7 +216,7 @@ export function View3DPage() {
           <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div className="pointer-events-auto space-y-2 rounded-lg border bg-card/90 p-2 text-xs shadow-sm sm:max-w-[60%]">
               <div role="radiogroup" aria-label={t('view3d.colorBy')} className="flex gap-1">
-                {(['zone', 'status', 'expiry'] as ColorMode[]).map((m) => (
+                {(['zone', 'status', 'expiry', 'heat'] as ColorMode[]).map((m) => (
                   <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
                     className={`rounded px-2 py-1 font-medium ${mode === m ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
                     {t(`view3d.colorBy.${m}` as MessageKey)}
@@ -227,13 +227,15 @@ export function View3DPage() {
                 {legend(scene.data, mode).map((l) => (
                   <li key={l.key} className="flex items-center gap-1.5">
                     <span className="size-3 rounded-sm" style={{ background: l.color }} />
-                    {mode === 'zone' ? t(`layout.zoneType.${l.key}` as MessageKey)
+                    {mode === 'heat' ? (l.key === 'NONE' ? t('view3d.heat.none') : l.from === l.to ? t('view3d.heat.one', { n: l.from ?? 0 }) : t('view3d.heat.range', { from: l.from ?? 0, to: l.to ?? 0 }))
+                      : mode === 'zone' ? t(`layout.zoneType.${l.key}` as MessageKey)
                       : mode === 'expiry' ? t(`view3d.expiry.${l.key}` as MessageKey) : t(`view3d.status.${l.key}` as MessageKey)}
                   </li>
                 ))}
               </ul>
               {mode === 'status' && <p className="text-muted-foreground">{t('view3d.status.note')}</p>}
               {mode === 'expiry' && <p className="text-muted-foreground">{t('view3d.expiry.note')}</p>}
+              {mode === 'heat' && <p className="text-muted-foreground">{t('view3d.heat.note')}</p>}
               {route && <p className="font-medium text-cyan-700 dark:text-cyan-300">{t('route.label', { n: route.stops.length, m: Math.round(route.metres) })}</p>}
             </div>
             {view === '3d' && (
