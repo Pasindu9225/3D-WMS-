@@ -12,4 +12,8 @@ public interface FileObjectRepository extends JpaRepository<FileObject, Long> {
     /** By internal id from a product row; a query (not findById) so the tenant filter applies. */
     @Query("select f from FileObject f where f.id = :id")
     Optional<FileObject> findLive(@Param("id") long id);
+
+    /** Bytes stored by the current company (Super Admin usage). */
+    @org.springframework.data.jpa.repository.Query("select coalesce(sum(f.sizeBytes), 0) from FileObject f")
+    long totalBytes();
 }

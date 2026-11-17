@@ -25,6 +25,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     /** Login lookup: call inside TenantContext.callAsSystem, since the tenant is not known yet. */
     Optional<AppUser> findByEmail(String email);
 
+    /** Active users of the current company (tenant filter). */
+    long countByStatus(AppUser.Status status);
+
     /** Spring escapes % and _ in "Containing", so the search text is matched literally. */
     Page<AppUser> findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(String name, String email,
             Pageable pageable);

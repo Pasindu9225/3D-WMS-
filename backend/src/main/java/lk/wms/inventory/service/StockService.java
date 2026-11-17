@@ -230,6 +230,12 @@ public class StockService {
         return out;
     }
 
+    /** Stock movements of the current company in the last 30 days (Super Admin usage). */
+    @Transactional(readOnly = true)
+    public long movementsLast30Days() {
+        return ledger.countByCreatedAtGreaterThanEqual(java.time.Instant.now().minus(java.time.Duration.ofDays(30)));
+    }
+
     /** Days the heat map looks back. */
     public static final int HEAT_DAYS = 30;
 

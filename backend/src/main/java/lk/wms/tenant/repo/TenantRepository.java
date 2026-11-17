@@ -23,6 +23,22 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
     @Query("select t.status from Tenant t where t.id = :id")
     Optional<Tenant.Status> findStatus(@Param("id") long id);
 
+    /** Customer companies (never the platform one) for the Super Admin list; name search uses ESCAPE '!'. */
+    @Query("select t from Tenant t where t.platform = false and (:q = '' or lower(t.name) like lower(concat('%', :q, '%')) escape '!')"
+            + " and (:status is null or t.status = :status)")
+    org.springframework.data.domain.Page<Tenant> search(@Param("q") String q, @Param("status") Tenant.Status status,
+            org.springframework.data.domain.Pageable pageable);
+
+    Optional<Tenant> findByPublicId(String publicId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from Tenant t where t.publicId = :publicId")
+    Optional<Tenant> lockByPublicId(@Param("publicId") String publicId);
+
+    Optional<Tenant> findFirstByPlatformTrue();
+
+    long countByPlanCode(String planCode);
+
     /** Row lock: two warehouse creations at once cannot both slip under the plan limit. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t.maxWarehouses from Tenant t where t.id = :id")

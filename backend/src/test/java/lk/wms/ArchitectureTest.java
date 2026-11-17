@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 class ArchitectureTest {
 
     static final List<String> MODULES = List.of(
-            "auth", "tenant", "layout", "catalog", "inbound", "inventory", "outbound", "task", "report", "notify");
+            "auth", "tenant", "layout", "catalog", "inbound", "inventory", "outbound", "task", "report", "notify", "platform");
 
     /** SEC-09: deny by default. A new endpoint without a permission fails the build. */
     @ArchTest

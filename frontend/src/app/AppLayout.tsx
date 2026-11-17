@@ -1,5 +1,5 @@
 import { NotificationBell } from '@/features/notify/NotificationBell'
-import { Signpost, ArrowUpFromLine, PackageX, ArrowDownToLine, ArrowLeftRight, Barcode, Scale, Boxes, FileText, ShoppingCart, Store, ListChecks, PackageOpen, Truck as TruckOut, LayoutDashboard, Gauge, PackageCheck, Truck, ClipboardCheck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
+import { Building2, BadgeDollarSign, Signpost, ArrowUpFromLine, PackageX, ArrowDownToLine, ArrowLeftRight, Barcode, Scale, Boxes, FileText, ShoppingCart, Store, ListChecks, PackageOpen, Truck as TruckOut, LayoutDashboard, Gauge, PackageCheck, Truck, ClipboardCheck, ClipboardList, Cuboid, LogOut, Menu, MonitorSmartphone, Package, ShieldCheck, User, Users, Warehouse } from 'lucide-react'
 import { useState, type ComponentType } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -25,6 +25,8 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
+  { to: '/app/admin/companies', label: 'nav.adminCompanies', icon: Building2, permission: 'platform:read' },
+  { to: '/app/admin/plans', label: 'nav.adminPlans', icon: BadgeDollarSign, permission: 'platform:read' },
   { to: '/app/dashboard', label: 'nav.dashboard', icon: Gauge, permission: 'reports:read' },
   { to: '/app/warehouses', label: 'nav.warehouses', icon: Warehouse, permission: 'warehouses:read' },
   { to: '/app/rack-types', label: 'nav.rackTypes', icon: Boxes, permission: 'warehouses:read' },

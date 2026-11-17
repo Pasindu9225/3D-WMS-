@@ -18,6 +18,14 @@ public interface UserSessionRepository extends JpaRepository<UserSession, String
     @Query("select s from UserSession s where s.user.id = :userId and s.revokedAt is null")
     List<UserSession> findActiveByUserId(@Param("userId") long userId);
 
+    /** Live sessions of the current company (tenant filter), e.g. to sign everyone out when it is suspended. */
+    @Query("select s from UserSession s where s.revokedAt is null")
+    List<UserSession> findActive();
+
+    /** When anyone of the current company was last active (Super Admin usage). */
+    @Query("select max(s.lastSeenAt) from UserSession s")
+    java.time.Instant lastSeen();
+
     /** Cleanup: revoked, or unused long enough that its refresh token has expired. */
     @Modifying
     @Query("delete from UserSession s where s.revokedAt < :cutoff or s.lastSeenAt < :cutoff")

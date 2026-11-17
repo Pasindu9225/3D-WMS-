@@ -199,6 +199,12 @@ public class ProductService {
         return out;
     }
 
+    /** Live products and stored file bytes of the current company (Super Admin usage). */
+    @Transactional(readOnly = true)
+    public long[] usage() {
+        return new long[] {products.liveIds().size(), files.totalBytes()};
+    }
+
     /** What a low-stock alert says about a product (v1.2 notifications). */
     public record Watch(String sku, String name, String baseUom, java.math.BigDecimal reorderPoint) {
     }

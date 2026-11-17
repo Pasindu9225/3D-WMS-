@@ -96,6 +96,24 @@ public class SessionService {
         return ids;
     }
 
+    /** Company suspended (v2.0): every session of the current company ends now. Run in that company's tenant. */
+    public int revokeCompany() {
+        Instant now = Instant.now();
+        List<String> ids = new ArrayList<>();
+        for (UserSession s : sessions.findActive()) {
+            s.revoke(now);
+            refreshTokens.revokeBySession(s.getId(), now);
+            ids.add(s.getId());
+        }
+        evictAfterCommit(ids);
+        return ids.size();
+    }
+
+    /** Last time anyone of the current company used the app, or null. */
+    public Instant lastSeen() {
+        return sessions.lastSeen();
+    }
+
     /** Role change: keep the sessions, but drop their cached permissions so the change applies now. */
     public void refreshPermissions(long userId) {
         evictAfterCommit(sessions.findActiveByUserId(userId).stream().map(UserSession::getId).toList());

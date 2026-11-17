@@ -17,6 +17,8 @@ import org.hibernate.annotations.Immutable;
 public class Role {
 
     public static final String TENANT_ADMIN = "TENANT_ADMIN";
+    /** Platform operator (v2.0); only users of the platform company, never given by a company admin. */
+    public static final String SUPER_ADMIN = "SUPER_ADMIN";
 
     @Id
     private Long id;

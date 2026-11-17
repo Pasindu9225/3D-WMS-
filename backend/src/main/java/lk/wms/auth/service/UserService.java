@@ -106,7 +106,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public List<RoleView> roles() {
-        return roles.findAllWithPermissions().stream()
+        return roles.findAllWithPermissions().stream().filter(r -> !Role.SUPER_ADMIN.equals(r.getCode())) // platform only
                 .map(r -> new RoleView(r.getCode(), r.getName(),
                         r.getPermissions().stream().map(Permission::getCode).sorted().toList()))
                 .toList();
@@ -184,6 +184,30 @@ public class UserService {
         audit.record(tenantId, null, "USER_INVITED", "app_user", user.getPublicId(), null,
                 snapshot(user, List.of(Role.TENANT_ADMIN)));
         return newInvite(user, null, List.of(Role.TENANT_ADMIN));
+    }
+
+    /** First Super Admin of the platform company (bootstrap command). Runs in the platform company's tenant. */
+    @Transactional
+    public Invite createPlatformAdmin(long tenantId, String email, String fullName) {
+        Role role = roles.findByCode(Role.SUPER_ADMIN).orElseThrow();
+        AppUser user = users.save(new AppUser(email, fullName, passwords.encode(tokens.newRefreshToken()), AppUser.Status.INVITED));
+        userRoles.save(new UserRole(user.getId(), role.getId()));
+        audit.record(tenantId, null, "USER_INVITED", "app_user", user.getPublicId(), null, snapshot(user, List.of(Role.SUPER_ADMIN)));
+        return newInvite(user, null, List.of(Role.SUPER_ADMIN));
+    }
+
+    /**
+     * Is this email free in every company? (Sign-in is by email before the company is known.) No transaction here on
+     * purpose: one opened first would be bound to the caller's company and the system lookup would only see that company.
+     */
+    public boolean emailFree(String email) {
+        return TenantContext.callAsSystem(() -> users.findByEmail(AppUser.normalizeEmail(email)).isEmpty());
+    }
+
+    /** Active users of the current company (Super Admin usage). */
+    @Transactional(readOnly = true)
+    public long activeCount() {
+        return users.countByStatus(AppUser.Status.ACTIVE);
     }
 
     /**
@@ -298,7 +322,7 @@ public class UserService {
     private List<Role> resolveRoles(List<String> requested) {
         Set<String> wanted = new LinkedHashSet<>(requested);
         List<Role> found = roles.findByCodeIn(wanted);
-        if (found.size() != wanted.size()) {
+        if (found.size() != wanted.size() || wanted.contains(Role.SUPER_ADMIN)) { // never given by a company admin
             throw new ApiException(HttpStatus.BAD_REQUEST, "ROLE_UNKNOWN", "One or more roles do not exist");
         }
         return found;
