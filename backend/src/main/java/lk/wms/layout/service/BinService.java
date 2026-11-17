@@ -107,7 +107,14 @@ public class BinService {
 
     /** A bin a putaway could use: zone type, level, and its distance from where goods arrive. */
     public record Candidate(long id, String publicId, String code, String zoneType, int level, long distanceMm,
-            boolean blocked, long maxWeightG, long maxVolumeCm3) {
+            boolean blocked, long maxWeightG, long maxVolumeCm3, String zoneCode) {
+    }
+
+    /** Codes of the zones in the published layout (putaway rules). */
+    @Transactional(readOnly = true)
+    public java.util.Set<String> zoneCodes(long warehouseId) {
+        return zones.findByWarehouseId(warehouseId).stream().map(lk.wms.layout.domain.Zone::getCode)
+                .collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new));
     }
 
     /**
@@ -122,7 +129,7 @@ public class BinService {
         return bins.placedBins(warehouseId).stream()
                 .map(b -> new Candidate(b.getId(), b.getPublicId(), b.getCode(), b.getZoneType().name(), b.getLevelNo(),
                         Math.round(Math.hypot(b.getX() - origin[0], b.getY() - origin[1])), b.getBlocked(), b.getMaxWeightG(),
-                        b.getMaxVolumeCm3()))
+                        b.getMaxVolumeCm3(), b.getZoneCode()))
                 .sorted(java.util.Comparator.comparingLong(Candidate::distanceMm).thenComparingInt(Candidate::level)
                         .thenComparing(Candidate::code))
                 .toList();

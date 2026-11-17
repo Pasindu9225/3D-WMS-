@@ -48,6 +48,7 @@ export const router = createBrowserRouter([
           { path: 'returns', lazy: () => import('@/features/outbound/ReturnsPage').then((m) => ({ Component: m.ReturnsPage })) },
           { path: 'returns/new/:orderId', lazy: () => import('@/features/outbound/NewReturnPage').then((m) => ({ Component: m.NewReturnPage })) },
           { path: 'returns/:id', lazy: () => import('@/features/outbound/ReturnPage').then((m) => ({ Component: m.ReturnPage })) },
+          { path: 'putaway-rules', lazy: () => import('@/features/inventory/PutawayRulesPage').then((m) => ({ Component: m.PutawayRulesPage })) },
           { path: 'refill-rules', lazy: () => import('@/features/inventory/RefillRulesPage').then((m) => ({ Component: m.RefillRulesPage })) },
           { path: 'refill', lazy: () => import('@/features/inventory/RefillPage').then((m) => ({ Component: m.RefillPage })) },
           { path: 'refill/:id', lazy: () => import('@/features/inventory/RefillPage').then((m) => ({ Component: m.RefillPage })) },

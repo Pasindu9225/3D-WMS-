@@ -66,6 +66,7 @@ export function ProductsPage() {
             <Th className="hidden md:table-cell">{t('products.col.barcode')}</Th>
             <Th className="hidden sm:table-cell">{t('products.col.units')}</Th>
             <Th className="hidden lg:table-cell">{t('products.col.weight')}</Th>
+            <Th className="hidden lg:table-cell">{t('products.col.category')}</Th>
             <Th className="hidden sm:table-cell" title={t('abc.hint')}>{t('products.col.abc')}</Th>
             <Th className="w-1"><span className="sr-only">{t('users.col.actions')}</span></Th>
           </tr>
@@ -89,6 +90,7 @@ export function ProductsPage() {
                 {[p.baseUom, ...p.units.map((u) => `${u.uom} = ${u.factor} ${p.baseUom}`)].join(' · ')}
               </td>
               <td className="hidden tabular-nums lg:table-cell">{p.weightG === null ? '—' : formatKg(p.weightG)}</td>
+              <td className="hidden text-sm lg:table-cell">{p.category ?? '—'}</td>
               <td className="hidden font-mono font-medium sm:table-cell">{p.abcClass ?? '—'}</td>
               <td className="whitespace-nowrap text-right">
                 {manage && (
@@ -101,7 +103,7 @@ export function ProductsPage() {
             </Tr>
           ))}
           {data && data.items.length === 0 && (
-            <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">{q ? t('products.noMatch') : t('products.empty')}</td></tr>
+            <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">{q ? t('products.noMatch') : t('products.empty')}</td></tr>
           )}
         </tbody>
       </Table>
@@ -143,6 +145,7 @@ const schema = z.object({
   volume: optional((v) => { const c = parseVolume(v); return c !== null && c <= 100_000_000 }, t('products.volumeRule')),
   cost: optional((v) => parseMoney(v) !== null, t('products.costRule')),
   reorder: optional((v) => /^\d{1,8}(\.\d{1,3})?$/.test(v), t('products.reorderRule')),
+  category: z.string().trim().max(40, t('common.tooLong')),
   trackBatch: z.boolean(),
   trackExpiry: z.boolean(),
   units: z.array(z.object({
@@ -166,10 +169,11 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           volume: product.volumeCm3 === null ? '' : String(product.volumeCm3 / 1000),
           cost: product.costMinor === null ? '' : (product.costMinor / 100).toFixed(2),
           reorder: product.reorderPoint == null ? '' : String(product.reorderPoint),
+          category: product.category ?? '',
           trackBatch: product.trackBatch, trackExpiry: product.trackExpiry,
           units: product.units.map((u) => ({ uom: u.uom, factor: String(u.factor), barcode: u.barcode ?? '' })),
         }
-      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', reorder: '', trackBatch: false, trackExpiry: false, units: [] },
+      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', reorder: '', category: '', trackBatch: false, trackExpiry: false, units: [] },
   })
   const units = useFieldArray({ control: form.control, name: 'units' })
   const { errors } = form.formState
@@ -185,6 +189,7 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
     volumeCm3: v.volume ? parseVolume(v.volume) : null,
     costMinor: v.cost ? parseMoney(v.cost) : null,
     reorderPoint: v.reorder ? Number(v.reorder) : null,
+    category: v.category ? v.category : null,
     trackBatch: v.trackBatch,
     trackExpiry: v.trackExpiry,
     units: v.units.map((u) => ({ uom: u.uom, factor: u.factor, barcode: u.barcode || null })),
@@ -224,6 +229,9 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           </Field>
           <Field label={t('products.reorderField')} error={errors.reorder?.message}>
             {(p) => <Input {...p} inputMode="decimal" placeholder="20" {...form.register('reorder')} />}
+          </Field>
+          <Field label={t('products.categoryField')} error={errors.category?.message}>
+            {(p) => <Input {...p} maxLength={40} placeholder="Frozen" {...form.register('category')} />}
           </Field>
         </div>
         <div className="flex flex-wrap gap-4 text-sm">

@@ -19,7 +19,7 @@ export interface Suggestion {
   code: string
   zoneType: string
   level: number
-  why: 'SAME_PRODUCT' | 'EMPTY_STORAGE'
+  why: 'FIXED_BIN' | 'RULE_ZONE' | 'SAME_PRODUCT' | 'EMPTY_STORAGE'
   distanceM: number
 }
 

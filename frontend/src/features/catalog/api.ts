@@ -28,6 +28,8 @@ export interface Product {
   version: number
   /** A, B or C by how often it is picked (weekly); null until first worked out. */
   abcClass: 'A' | 'B' | 'C' | null
+  /** Free text that putaway rules match, e.g. Frozen; null = none. */
+  category: string | null
 }
 
 export type ProductInput = Omit<Product, 'id' | 'sku' | 'hasImage' | 'version' | 'abcClass'> & { sku?: string; version?: number }

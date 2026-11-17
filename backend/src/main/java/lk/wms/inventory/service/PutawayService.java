@@ -36,7 +36,7 @@ public class PutawayService {
             BigDecimal qty, Instant receivedAt) {
     }
 
-    public enum Why { SAME_PRODUCT, EMPTY_STORAGE }
+    public enum Why { FIXED_BIN, RULE_ZONE, SAME_PRODUCT, EMPTY_STORAGE }
 
     public record Suggestion(String binId, String code, String zoneType, int level, Why why, double distanceM) {
     }
@@ -52,15 +52,17 @@ public class PutawayService {
     private final BinService bins;
     private final ProductService products;
     private final AuditService audit;
+    private final PutawayRuleService putawayRules;
 
     public PutawayService(StockRepository stock, StockMovementService moves, WarehouseService warehouses, BinService bins,
-            ProductService products, AuditService audit) {
+            ProductService products, AuditService audit, PutawayRuleService putawayRules) {
         this.stock = stock;
         this.moves = moves;
         this.warehouses = warehouses;
         this.bins = bins;
         this.products = products;
         this.audit = audit;
+        this.putawayRules = putawayRules;
     }
 
     @Transactional(readOnly = true)
@@ -99,22 +101,54 @@ public class PutawayService {
         BigDecimal needV = times(qty, size == null ? null : size.volumeCm3());
 
         List<Candidate> all = bins.putawayCandidates(cu, w.id()); // nearest first
+        List<PutawayRuleService.Match> rules = putawayRules.matching(w.id(), product.id(), products.category(product.id()));
+        Fit fit = new Fit(load, sameProduct, needW, needV);
         List<Suggestion> out = new ArrayList<>();
-        for (int rank = 2; rank >= 1 && out.size() < MAX_SUGGESTIONS; rank--) { // same batch, then same product
-            for (Candidate c : all) {
-                if (out.size() < MAX_SUGGESTIONS && sameProduct.getOrDefault(c.id(), 0) == rank && !"QUARANTINE".equals(c.zoneType())
-                        && fits(c, load.get(c.id()), needW, needV)) {
-                    out.add(suggestion(c, Why.SAME_PRODUCT));
+        Set<Long> taken = new HashSet<>();
+        for (PutawayRuleService.Match r : rules) { // fixed bins first
+            if (r.binId() != null) {
+                all.stream().filter(c -> c.id() == r.binId() && !"QUARANTINE".equals(c.zoneType()) && fits(c, load.get(c.id()), needW, needV))
+                        .findFirst().ifPresent(c -> add(out, taken, c, Why.FIXED_BIN));
+            }
+        }
+        boolean only = false;
+        for (PutawayRuleService.Match r : rules) { // then the rules' zones
+            if (r.zoneCode() != null) {
+                fill(out, taken, all.stream().filter(c -> r.zoneCode().equals(c.zoneCode())).toList(), fit, Why.RULE_ZONE, Why.RULE_ZONE, false);
+                only |= r.onlyZone();
+            }
+        }
+        if (!only) { // then the built-in order: same batch, same product, nearest empty storage bin
+            fill(out, taken, all, fit, Why.SAME_PRODUCT, Why.EMPTY_STORAGE, true);
+        }
+        return out;
+    }
+
+    private record Fit(Map<Long, BigDecimal[]> load, Map<Long, Integer> sameProduct, BigDecimal needW, BigDecimal needV) {
+    }
+
+    /** Same batch, then same product, then empty bins (storage zones only, or any zone but quarantine) among these candidates. */
+    private static void fill(List<Suggestion> out, Set<Long> taken, List<Candidate> among, Fit f, Why same, Why empty, boolean storageOnly) {
+        for (int rank = 2; rank >= 1; rank--) {
+            for (Candidate c : among) {
+                if (f.sameProduct().getOrDefault(c.id(), 0) == rank && !"QUARANTINE".equals(c.zoneType())
+                        && fits(c, f.load().get(c.id()), f.needW(), f.needV())) {
+                    add(out, taken, c, same);
                 }
             }
         }
-        for (Candidate c : all) {
-            if (out.size() < MAX_SUGGESTIONS && "STORAGE".equals(c.zoneType()) && !load.containsKey(c.id())
-                    && fits(c, null, needW, needV)) {
-                out.add(suggestion(c, Why.EMPTY_STORAGE));
+        for (Candidate c : among) {
+            if ((storageOnly ? "STORAGE".equals(c.zoneType()) : !"QUARANTINE".equals(c.zoneType())) && !f.load().containsKey(c.id())
+                    && fits(c, null, f.needW(), f.needV())) {
+                add(out, taken, c, empty);
             }
         }
-        return out;
+    }
+
+    private static void add(List<Suggestion> out, Set<Long> taken, Candidate c, Why why) {
+        if (out.size() < MAX_SUGGESTIONS && taken.add(c.id())) {
+            out.add(suggestion(c, why));
+        }
     }
 
     /** Moves goods from the receiving area into the bin whose label was scanned. Retry-safe with the key. */
@@ -124,6 +158,7 @@ public class PutawayService {
         WarehouseService.WarehouseRef w = warehouses.requireAccess(cu, warehouseId);
         ProductService.Basic product = products.basic(productId);
         BinService.BinRef bin = bins.byCode(cu, w.id(), binCode.trim().toUpperCase(java.util.Locale.ROOT));
+        checkOnlyZone(cu, w.id(), product.id(), bin);
         StockMovementService.Outcome outcome = moves.move(new StockMovementService.Move(StockMovementService.Kind.PUTAWAY, w.id(),
                 product.id(), batchNo, expiry, StockMovementService.Place.RECEIVING, StockMovementService.Place.bin(bin.id()),
                 qty, null, null, null, cu.userId(), clientRef));
@@ -136,6 +171,22 @@ public class PutawayService {
                         && Objects.equals(s.getExpiryDate(), expiry))
                 .map(Stock::getQtyOnHand).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new Done(bin.code(), qty, left, outcome == StockMovementService.Outcome.ALREADY_DONE);
+    }
+
+    /** An "only this zone" rule: a bin outside its zone(s) is refused, unless a rule names that very bin. */
+    private void checkOnlyZone(CurrentUser cu, long warehouseId, long productId, BinService.BinRef bin) {
+        List<PutawayRuleService.Match> rules = putawayRules.matching(warehouseId, productId, products.category(productId));
+        Set<String> zones = new java.util.TreeSet<>();
+        rules.stream().filter(PutawayRuleService.Match::onlyZone).forEach(r -> zones.add(r.zoneCode()));
+        if (zones.isEmpty() || rules.stream().anyMatch(r -> Objects.equals(r.binId(), bin.id()))) {
+            return;
+        }
+        String zone = bins.putawayCandidates(cu, warehouseId).stream().filter(c -> c.id() == bin.id()).map(Candidate::zoneCode).findFirst()
+                .orElse(null);
+        if (!zones.contains(zone)) {
+            throw new lk.wms.common.errors.ApiException(org.springframework.http.HttpStatus.CONFLICT, "OUTSIDE_ZONE",
+                    "This product goes only in zone " + String.join(" or ", zones) + "; " + bin.code() + " is not there");
+        }
     }
 
     private static boolean fits(Candidate c, BigDecimal[] load, BigDecimal needW, BigDecimal needV) {

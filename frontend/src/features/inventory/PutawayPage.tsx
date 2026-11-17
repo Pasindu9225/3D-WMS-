@@ -127,7 +127,7 @@ function PutawayItem({ warehouseId, item, onBack, onDone }: {
               <span className="grid flex-1">
                 <span className="font-mono text-lg font-semibold">{s.code}</span>
                 <span className="text-xs text-muted-foreground">
-                  {t(s.why === 'SAME_PRODUCT' ? 'putaway.why.SAME_PRODUCT' : 'putaway.why.EMPTY_STORAGE')} · {t('putaway.away', { m: s.distanceM })}
+                  {t(`putaway.why.${s.why}`)} · {t('putaway.away', { m: s.distanceM })}
                 </span>
               </span>
             </li>

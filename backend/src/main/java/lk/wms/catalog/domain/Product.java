@@ -71,6 +71,10 @@ public class Product extends TenantScoped {
     @Column(name = "abc_at", insertable = false, updatable = false)
     private java.time.Instant abcAt;
 
+    /** Free text used by putaway rules (v1.2), e.g. Frozen. */
+    @Column(length = 40)
+    private String category;
+
     @Column(name = "image_file_id")
     private Long imageFileId;
 
@@ -100,8 +104,9 @@ public class Product extends TenantScoped {
     }
 
     public void set(String name, String barcode, String baseUom, Integer weightG, Integer volumeCm3, boolean trackBatch,
-            boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint) {
+            boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, String category) {
         this.reorderPoint = reorderPoint;
+        this.category = category;
         this.name = name;
         this.barcode = barcode;
         this.baseUom = baseUom;
@@ -185,6 +190,10 @@ public class Product extends TenantScoped {
 
     public java.math.BigDecimal getReorderPoint() {
         return reorderPoint;
+    }
+
+    public String getCategory() {
+        return category;
     }
 
     public String getAbcClass() {

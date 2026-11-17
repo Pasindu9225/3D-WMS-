@@ -33,12 +33,12 @@ public class ProductService {
 
     public record ProductView(String id, String sku, String barcode, String name, String baseUom, Integer weightG,
             Integer volumeCm3, boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, boolean hasImage,
-            List<UnitView> units, int version, String abcClass) {
+            List<UnitView> units, int version, String abcClass, String category) {
     }
 
     /** Fields the user sets; the SKU is fixed once created (labels, orders and imports refer to it). */
     public record ProductSpec(String name, String barcode, String baseUom, Integer weightG, Integer volumeCm3,
-            boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, List<UnitSpec> units) {
+            boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, String category, List<UnitSpec> units) {
     }
 
     /** A barcode lookup (scanning): the product and how many base units one scan of it means. */
@@ -197,6 +197,12 @@ public class ProductService {
         java.util.Map<Long, java.math.BigDecimal> out = new java.util.HashMap<>();
         products.reorderPoints().forEach(r -> out.put(((Number) r[0]).longValue(), (java.math.BigDecimal) r[1]));
         return out;
+    }
+
+    /** A product's category (putaway rules), or null. */
+    @Transactional(readOnly = true)
+    public String category(long productId) {
+        return products.withIds(java.util.List.of(productId)).stream().findFirst().map(Product::getCategory).orElse(null);
     }
 
     public record Basic(long id, String publicId, String sku, String name, String baseUom, Long costMinor) {
@@ -418,7 +424,7 @@ public class ProductService {
 
     private static void apply(Product p, ProductSpec s) {
         p.set(s.name().trim(), s.barcode(), s.baseUom(), s.weightG(), s.volumeCm3(), s.trackBatch(), s.trackExpiry(),
-                s.costMinor(), s.reorderPoint());
+                s.costMinor(), s.reorderPoint(), s.category() == null || s.category().isBlank() ? null : s.category().trim());
         p.setUnits(s.units());
     }
 
@@ -436,6 +442,6 @@ public class ProductService {
         return new ProductView(p.getPublicId(), p.getSku(), p.getBarcode(), p.getName(), p.getBaseUom(), p.getWeightG(),
                 p.getVolumeCm3(), p.isTrackBatch(), p.isTrackExpiry(), p.getCostMinor(), p.getReorderPoint(), p.getImageFileId() != null,
                 p.getUnits().stream().map(u -> new UnitView(u.getUom(), u.getFactor(), u.getBarcode())).toList(),
-                p.getVersion(), p.getAbcClass());
+                p.getVersion(), p.getAbcClass(), p.getCategory());
     }
 }

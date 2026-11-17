@@ -48,11 +48,14 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
         Integer getY();
 
         lk.wms.layout.domain.Zone.Type getZoneType();
+
+        String getZoneCode();
     }
 
     @Query("""
             select b.id as id, b.publicId as publicId, b.code as code, b.blocked as blocked, b.maxWeightG as maxWeightG,
-                   b.maxVolumeCm3 as maxVolumeCm3, l.levelNo as levelNo, r.posXMm as x, r.posYMm as y, z.type as zoneType
+                   b.maxVolumeCm3 as maxVolumeCm3, l.levelNo as levelNo, r.posXMm as x, r.posYMm as y, z.type as zoneType,
+                   z.code as zoneCode
             from Bin b, lk.wms.layout.domain.RackLevel l, lk.wms.layout.domain.Rack r, lk.wms.layout.domain.Zone z
             where b.levelId = l.id and l.rackId = r.id and r.zoneId = z.id and b.warehouseId = :warehouseId""")
     List<PlacedBin> placedBins(@Param("warehouseId") long warehouseId);
