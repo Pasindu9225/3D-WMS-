@@ -10,19 +10,22 @@ export function Dialog({
   title,
   description,
   children,
+  wide = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
   description?: string
   children: ReactNode
+  /** A form with a side panel (e.g. a live preview): up to 48rem instead of 28rem. */
+  wide?: boolean
 }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/50" />
         <DialogPrimitive.Content
-          className="fixed top-1/2 left-1/2 z-50 grid max-h-[90dvh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border bg-card p-6 text-card-foreground shadow-lg"
+          className={'fixed top-1/2 left-1/2 z-50 grid max-h-[90dvh] w-[calc(100vw-2rem)] ' + (wide ? 'max-w-3xl' : 'max-w-md') + ' -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border bg-card p-6 text-card-foreground shadow-lg'}
         >
           <div className="space-y-1 pr-6">
             <DialogPrimitive.Title className="text-lg font-semibold">{title}</DialogPrimitive.Title>

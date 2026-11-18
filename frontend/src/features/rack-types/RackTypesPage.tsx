@@ -145,13 +145,14 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
     uprightColor: v.uprightColor,
     beamColor: v.beamColor,
   }, { onSuccess: onClose }))
-  const look = useWatch({ control: form.control, name: ['style', 'uprightColor', 'beamColor', 'levels', 'binsPerLevel'] })
+  const look = useWatch({ control: form.control, name: ['style', 'uprightColor', 'beamColor', 'levels', 'binsPerLevel', 'width', 'height', 'depth', 'weight'] })
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()} title={type ? t('rackTypes.editTitle') : t('rackTypes.new')}
-      description={t('rackTypes.formHint', { unit })}>
-      <form noValidate className="grid gap-4" onSubmit={submit}>
+      description={t('rackTypes.formHint', { unit })} wide>
+      <form noValidate className="grid gap-6 md:grid-cols-[1fr_15rem]" onSubmit={submit}>
+        <div className="grid min-w-0 gap-4">
         {save.isError && Object.keys(server).length === 0 && <FormMessage tone="error">{errorMessage(save.error)}</FormMessage>}
-        <div className="grid grid-cols-[8rem_1fr] gap-3">
+        <div className="grid grid-cols-[7rem_1fr] gap-3">
           <Field label={t('rackTypes.col.code')} error={errors.code?.message ?? server.code}>
             {(p) => <Input {...p} className="font-mono uppercase" maxLength={20} placeholder="PAL27" disabled={!!type}
               {...form.register('code', { setValueAs: (v: string) => v.toUpperCase() })} />}
@@ -160,7 +161,7 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
             {(p) => <Input {...p} maxLength={80} placeholder={t('rackTypes.namePlaceholder')} {...form.register('name')} />}
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label={t('layout.rackW', { unit })} error={errors.width?.message}>
             {(p) => <Input {...p} inputMode="decimal" {...form.register('width')} />}
           </Field>
@@ -171,7 +172,7 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
             {(p) => <Input {...p} inputMode="decimal" {...form.register('height')} />}
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label={look[0] === 'FLOOR' ? t('rackTypes.palletsHigh') : t('rackTypes.levels')} error={errors.levels?.message}>
             {(p) => <Input {...p} type="number" min={1} max={20} {...form.register('levels')} />}
           </Field>
@@ -182,7 +183,7 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
             {(p) => <Input {...p} inputMode="decimal" {...form.register('weight')} />}
           </Field>
         </div>
-        <fieldset className="grid grid-cols-[1fr_auto] items-end gap-3 rounded-md border p-3">
+        <fieldset className="grid gap-3 rounded-md border p-3">
           <legend className="px-1 text-sm font-medium">{t('rackTypes.look')}</legend>
           <div className="grid gap-3">
             <Field label={t('rackTypes.style')}>
@@ -203,10 +204,19 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
               </label>
             </div>
           </div>
-          <RackPreview style={look[0]} upright={look[1]} beam={look[2]} levels={Number(look[3]) || 1} slots={Number(look[4]) || 1} />
         </fieldset>
         {type && <p className="text-xs text-muted-foreground">{t('rackTypes.editNote')}</p>}
-        <div className="flex justify-end gap-2">
+        </div>
+        {/* Live preview beside the fields (below them on a phone): redrawn on every keystroke. */}
+        <div className="grid content-start gap-2 md:sticky md:top-0">
+          <p className="text-sm font-medium">{t('rackTypes.previewTitle')}</p>
+          <RackPreview style={look[0]} upright={look[1]} beam={look[2]} levels={Number(look[3]) || 1} slots={Number(look[4]) || 1}
+            widthMm={parse(look[5], unit)} heightMm={parse(look[6], unit)} />
+          <p className="text-xs leading-relaxed text-muted-foreground" data-testid="rack-summary">
+            {summary(look, unit)}
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 md:col-span-2">
           <Button type="button" variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={save.isPending}>{save.isPending ? t('common.saving') : t('common.save')}</Button>
         </div>
@@ -215,12 +225,34 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
   )
 }
 
-/** A small front view of the rack in its chosen look: uprights, beams (or shelves) and loads. */
-function RackPreview({ style, upright, beam, levels, slots }: { style: 'PALLET' | 'SHELF' | 'FLOOR'; upright: string; beam: string; levels: number; slots: number }) {
-  const n = Math.min(Math.max(levels, 1), 8)
-  const s = Math.min(Math.max(slots, 1), 6)
-  const w = 120
-  const h = 130
+/** One line under the preview: size, places and load, as typed so far (blank parts are skipped). */
+function summary(look: string[], unit: Unit): string {
+  const [style, , , levels, slots, width, height, depth, weight] = look
+  const size = [width, depth, height].map((v) => parse(v ?? '', unit))
+  const parts: string[] = []
+  if (size.every((v) => v !== null)) parts.push(size.map((v) => formatWith(v!, unit)).join(' × '))
+  const l = Number(levels)
+  const b = Number(slots)
+  if (l >= 1 && b >= 1) parts.push(t(style === 'FLOOR' ? 'rackTypes.summaryFloor' : 'rackTypes.summary', { levels: l, bins: b, places: l * b }))
+  const g = parseWeight(weight ?? '')
+  if (g) parts.push(t('rackTypes.summaryWeight', { weight: formatKg(g) }))
+  return parts.join(' · ')
+}
+
+/**
+ * Front view of the rack in its chosen look: uprights, beams (or shelves) and loads, drawn to the typed width and
+ * height (a typical 2.7 m × 4.8 m rack until both are typed), so changing any field shows at once.
+ */
+function RackPreview({ style, upright, beam, levels, slots, widthMm, heightMm }: {
+  style: 'PALLET' | 'SHELF' | 'FLOOR'; upright: string; beam: string; levels: number; slots: number
+  widthMm?: number | null; heightMm?: number | null
+}) {
+  const n = Math.min(Math.max(levels, 1), 20)
+  const s = Math.min(Math.max(slots, 1), 50)
+  // Fit the real proportions into a 220 × 260 box; very thin or flat racks are kept readable.
+  const ratio = Math.min(4, Math.max(0.25, (widthMm || 2700) / (heightMm || 4800)))
+  const w = Math.round(ratio >= 220 / 260 ? 220 : 260 * ratio)
+  const h = Math.round(ratio >= 220 / 260 ? 220 / ratio : 260)
   const rows = Array.from({ length: n }, (_, i) => i)
   const cols = Array.from({ length: s }, (_, i) => i)
   const levelH = (h - 10) / n

@@ -86,3 +86,24 @@ it('floor storage: the form asks for pallet positions and pallets high; the prev
   expect(screen.getByLabelText('Pallet positions')).toBeInTheDocument()
   expect(screen.getByRole('img', { name: 'Preview of the rack' }).querySelectorAll('rect[fill="#1d4ed8"]')).toHaveLength(0)
 })
+
+it('shows a live preview while typing: drawn to the typed proportions, with a summary of places and load', async () => {
+  const user = userEvent.setup()
+  useEditor.getState().setUnit('m')
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RackTypesPage />
+    </QueryClientProvider>,
+  )
+  await user.click(await screen.findByRole('button', { name: /New rack type/ }))
+  const preview = () => screen.getByRole('img', { name: 'Preview of the rack' })
+  expect(screen.getByTestId('rack-summary')).toHaveTextContent('4 levels × 3 bins = 12 places · up to 1,000 kg per level')
+
+  await user.type(screen.getByLabelText('Width (m)'), '5.4')
+  await user.type(screen.getByLabelText('Depth (m)'), '1.1')
+  await user.type(screen.getByLabelText('Height (m)'), '2.7')
+  expect(Number(preview().getAttribute('width'))).toBeGreaterThan(Number(preview().getAttribute('height'))) // wide and low
+  await user.clear(screen.getByLabelText('Levels'))
+  await user.type(screen.getByLabelText('Levels'), '2')
+  expect(screen.getByTestId('rack-summary')).toHaveTextContent('5.4 m × 1.1 m × 2.7 m · 2 levels × 3 bins = 6 places')
+})

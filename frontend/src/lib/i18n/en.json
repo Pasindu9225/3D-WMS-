@@ -1421,5 +1421,9 @@
   "layout.place.DOCK": "Click on a wall to place a loading dock. Esc or right-click to stop.",
   "layout.place.RACK": "Click inside a zone to place the rack. Esc or right-click to stop.",
   "layout.place.missed": "Racks stand inside zones: click inside a zone.",
-  "layout.place.done": "Done"
+  "layout.place.done": "Done",
+  "rackTypes.previewTitle": "Live preview",
+  "rackTypes.summary": "{levels} levels × {bins} bins = {places} places",
+  "rackTypes.summaryFloor": "{levels} pallets high × {bins} positions = {places} places",
+  "rackTypes.summaryWeight": "up to {weight} per level"
 }
