@@ -9,7 +9,9 @@ import { areaM2, bounds } from './geometry'
 import { LengthInput } from './LengthInput'
 import { formatArea } from './units'
 
-const ZONE_TYPES: ZoneType[] = ['RECEIVING', 'STORAGE', 'PICKING', 'DISPATCH', 'QUARANTINE', 'COLD']
+/** The nine main UN dangerous goods classes a zone can take. */
+const HAZARD_CLASSES = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+const ZONE_TYPES: ZoneType[] = ['RECEIVING', 'STORAGE', 'PICKING', 'DISPATCH', 'QUARANTINE', 'COLD', 'FROZEN']
 const SELECT = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm'
 /** Server rule for zone and rack codes; typing is forced to upper case and filtered to this. */
 const code = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)
@@ -37,6 +39,24 @@ export function ZonePanel({ index }: { index: number }) {
           </select>
         )}
       </Field>
+      <fieldset className="space-y-1 text-sm">
+        <legend className="font-medium">{t('layout.zone.hazard')}</legend>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {HAZARD_CLASSES.map((c) => {
+            const on = zone.hazardClasses?.includes(c) ?? false
+            const toggle = () => {
+              const next = on ? (zone.hazardClasses ?? []).filter((x) => x !== c) : [...(zone.hazardClasses ?? []), c].sort()
+              updateZone(index, { hazardClasses: next.length ? next : null })
+            }
+            return (
+              <label key={c} className="flex items-center gap-1" title={t(('hazard.' + c) as MessageKey)}>
+                <input type="checkbox" checked={on} onChange={toggle} /> {c}
+              </label>
+            )
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">{t('layout.zone.hazardHint')}</p>
+      </fieldset>
       <div className="grid grid-cols-2 gap-2 text-sm">
         <label className="grid gap-1">{t('layout.posX', { unit })}
           <LengthInput label={t('layout.posX', { unit })} mm={b.minX} className="w-full" onCommit={(mm) => moveZone(index, mm - b.minX, 0)} />

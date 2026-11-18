@@ -77,6 +77,23 @@ class ImportApiTest extends ApiTest {
     }
 
     @Test
+    void handlingColumnsImport() throws Exception { // v2.1
+        String csv = "sku,name,base_uom,hs_code,storage_temp,hazard_class,stack_max,fragile\n"
+                + "FISH-1,Frozen fish,EA,0303.89,frozen,,4,no\n"
+                + "BLEACH-1,Bleach,EA,2828 90,,8,,yes\n";
+        importCsv(admin, "products", "p.csv", csv).andExpect(status().isOk()).andExpect(jsonPath("$.saved").value(true));
+        send(admin, get("/api/v1/products?q=FISH")).andExpect(jsonPath("$.items[0].handling.hsCode").value("030389"))
+                .andExpect(jsonPath("$.items[0].handling.storageTemp").value("FROZEN"))
+                .andExpect(jsonPath("$.items[0].handling.stackMax").value(4));
+        send(admin, get("/api/v1/products?q=BLEACH")).andExpect(jsonPath("$.items[0].handling.hazardClass").value("8"))
+                .andExpect(jsonPath("$.items[0].handling.storageTemp").value("AMBIENT"))
+                .andExpect(jsonPath("$.items[0].handling.fragile").value(true));
+        String bad = importCsv(admin, "products", "p.csv", "sku,name,base_uom,hazard_class,storage_temp\nX-1,X,EA,10,warm\n")
+                .andExpect(jsonPath("$.saved").value(false)).andReturn().getResponse().getContentAsString();
+        assertThat(bad).contains("\"field\":\"hazard_class\"", "\"field\":\"storage_temp\"");
+    }
+
+    @Test
     void anyBadRowMeansNothingIsSavedAndEveryProblemIsListedByRow() throws Exception {
         String csv = "sku,name,base_uom,weight_kg,track_expiry,units,barcode\n"
                 + "GOOD-1,Fine,EA,1,no,,111\n"

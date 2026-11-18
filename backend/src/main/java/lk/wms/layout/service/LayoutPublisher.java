@@ -127,7 +127,7 @@ public class LayoutPublisher {
         // 2. Zones: update or create (deleting the old ones waits until no rack points at them).
         for (LayoutDocument.Zone z : doc.zones()) {
             Zone zone = zoneByCode.computeIfAbsent(z.code(), code -> new Zone(w.getId(), code));
-            zone.set(z.type(), z.name(), json.writeValueAsString(z.polygon()));
+            zone.set(z.type(), z.name(), json.writeValueAsString(z.polygon()), z.hazardList());
             zones.save(zone);
         }
 

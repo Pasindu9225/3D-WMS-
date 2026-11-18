@@ -1,6 +1,7 @@
 package lk.wms.layout.service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lk.wms.common.audit.AuditService;
@@ -31,8 +32,12 @@ public class BinService {
     private final lk.wms.layout.repo.ZoneRepository zones;
     private final tools.jackson.databind.json.JsonMapper json;
 
+    private final lk.wms.layout.repo.RackTemplateRepository templates;
+
     public BinService(BinRepository bins, WarehouseService warehouses, AuditService audit,
-            ApplicationEventPublisher events, lk.wms.layout.repo.ZoneRepository zones, tools.jackson.databind.json.JsonMapper json) {
+            ApplicationEventPublisher events, lk.wms.layout.repo.ZoneRepository zones, tools.jackson.databind.json.JsonMapper json,
+            lk.wms.layout.repo.RackTemplateRepository templates) {
+        this.templates = templates;
         this.zones = zones;
         this.json = json;
         this.bins = bins;
@@ -106,8 +111,14 @@ public class BinService {
     }
 
     /** A bin a putaway could use: zone type, level, and its distance from where goods arrive. */
+    /**
+     * A place putaway may use. v2.1 handling rules: rackId and position find the pallets under it on a floor row;
+     * style is the rack type's (PALLET, SHELF, FLOOR); place* is the place's own size in mm; zoneHazards the main
+     * UN classes its zone takes ("3,8", null = none).
+     */
     public record Candidate(long id, String publicId, String code, String zoneType, int level, long distanceMm,
-            boolean blocked, long maxWeightG, long maxVolumeCm3, String zoneCode) {
+            boolean blocked, long maxWeightG, long maxVolumeCm3, String zoneCode, long rackId, int position, String style,
+            int placeWidthMm, int placeDepthMm, int placeHeightMm, String zoneHazards) {
     }
 
     /** Codes of the zones in the published layout (putaway rules). */
@@ -126,10 +137,25 @@ public class BinService {
     public List<Candidate> putawayCandidates(CurrentUser cu, long warehouseId) {
         warehouses.requireAccess(cu, warehouseId);
         long[] origin = receivingPoint(warehouseId);
-        return bins.placedBins(warehouseId).stream()
-                .map(b -> new Candidate(b.getId(), b.getPublicId(), b.getCode(), b.getZoneType().name(), b.getLevelNo(),
-                        Math.round(Math.hypot(b.getX() - origin[0], b.getY() - origin[1])), b.getBlocked(), b.getMaxWeightG(),
-                        b.getMaxVolumeCm3(), b.getZoneCode()))
+        List<BinRepository.PlacedBin> rows = bins.placedBins(warehouseId);
+        Map<Long, int[]> grid = new HashMap<>(); // rack -> [levels, places per level]
+        for (BinRepository.PlacedBin b : rows) {
+            int[] g = grid.computeIfAbsent(b.getRackId(), k -> new int[2]);
+            g[0] = Math.max(g[0], b.getLevelNo());
+            g[1] = Math.max(g[1], b.getPositionNo());
+        }
+        Map<Long, String> style = new HashMap<>();
+        templates.findByIdIn(rows.stream().map(BinRepository.PlacedBin::getTemplateId).collect(java.util.stream.Collectors.toSet()))
+                .forEach(t -> style.put(t.getId(), t.getStyle().name()));
+        return rows.stream()
+                .map(b -> {
+                    int[] g = grid.get(b.getRackId());
+                    return new Candidate(b.getId(), b.getPublicId(), b.getCode(), b.getZoneType().name(), b.getLevelNo(),
+                            Math.round(Math.hypot(b.getX() - origin[0], b.getY() - origin[1])), b.getBlocked(), b.getMaxWeightG(),
+                            b.getMaxVolumeCm3(), b.getZoneCode(), b.getRackId(), b.getPositionNo(),
+                            style.getOrDefault(b.getTemplateId(), "PALLET"), b.getRackWidthMm() / g[1], b.getRackDepthMm(),
+                            b.getRackHeightMm() / g[0], b.getZoneHazards());
+                })
                 .sorted(java.util.Comparator.comparingLong(Candidate::distanceMm).thenComparingInt(Candidate::level)
                         .thenComparing(Candidate::code))
                 .toList();

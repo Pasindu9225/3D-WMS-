@@ -34,13 +34,37 @@ public class ProductService {
     public record ProductView(String id, String sku, String barcode, String name, String baseUom, Integer weightG,
             Integer volumeCm3, boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, boolean hasImage,
             List<UnitView> units, int version, String abcClass, String category, Integer cartonLengthMm, Integer cartonWidthMm,
-            Integer cartonHeightMm, Integer unitsPerCarton) {
+            Integer cartonHeightMm, Integer unitsPerCarton, Handling handling) {
+    }
+
+    /**
+     * How the product must be stored (v2.1): HS customs code (digits only), storage temperature, UN dangerous goods
+     * class or division (null = not dangerous), how many high it may stand counting itself (null = no limit) and
+     * whether anything may stand on it. Validated here because the request reuses it (SEC-20).
+     */
+    public record Handling(
+            @jakarta.validation.constraints.Pattern(regexp = "[0-9]{6,10}") String hsCode,
+            @jakarta.validation.constraints.Pattern(regexp = "AMBIENT|CHILLED|FROZEN") String storageTemp,
+            @jakarta.validation.constraints.Pattern(regexp = "[1-9](\\.[1-6])?") String hazardClass,
+            @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(50) Integer stackMax,
+            Boolean fragile) { // boxed: a request may leave it out (then false)
+
+        public static final Handling NONE = new Handling(null, "AMBIENT", null, null, false);
+
+        public Handling {
+            fragile = Boolean.TRUE.equals(fragile);
+        }
+
+        /** Blank storage temperature means ambient. */
+        public String temp() {
+            return storageTemp == null || storageTemp.isBlank() ? "AMBIENT" : storageTemp;
+        }
     }
 
     /** Fields the user sets; the SKU is fixed once created (labels, orders and imports refer to it). */
     public record ProductSpec(String name, String barcode, String baseUom, Integer weightG, Integer volumeCm3,
             boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, String category, List<UnitSpec> units,
-            Integer cartonLengthMm, Integer cartonWidthMm, Integer cartonHeightMm, Integer unitsPerCarton) {
+            Integer cartonLengthMm, Integer cartonWidthMm, Integer cartonHeightMm, Integer unitsPerCarton, Handling handling) {
     }
 
     /** A barcode lookup (scanning): the product and how many base units one scan of it means. */
@@ -472,6 +496,8 @@ public class ProductService {
                 s.costMinor(), s.reorderPoint(), s.category() == null || s.category().isBlank() ? null : s.category().trim());
         p.setUnits(s.units());
         p.setCarton(s.cartonLengthMm(), s.cartonWidthMm(), s.cartonHeightMm(), s.unitsPerCarton());
+        Handling h = s.handling() == null ? Handling.NONE : s.handling();
+        p.setHandling(h.hsCode(), h.temp(), h.hazardClass(), h.stackMax(), h.fragile());
     }
 
     private Product find(String publicId) {
@@ -489,6 +515,20 @@ public class ProductService {
                 p.getVolumeCm3(), p.isTrackBatch(), p.isTrackExpiry(), p.getCostMinor(), p.getReorderPoint(), p.getImageFileId() != null,
                 p.getUnits().stream().map(u -> new UnitView(u.getUom(), u.getFactor(), u.getBarcode())).toList(),
                 p.getVersion(), p.getAbcClass(), p.getCategory(), p.getCartonLengthMm(), p.getCartonWidthMm(), p.getCartonHeightMm(),
-                p.getUnitsPerCarton());
+                p.getUnitsPerCarton(), handling(p));
+    }
+
+    private static Handling handling(Product p) {
+        return new Handling(p.getHsCode(), p.getStorageTemp(), p.getHazardClass(), p.getStackMax(), p.isFragile());
+    }
+
+    /** Handling of these products (internal ids), for putaway's rules. */
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, Handling> handling(java.util.Collection<Long> productIds) {
+        java.util.Map<Long, Handling> out = new java.util.HashMap<>();
+        if (!productIds.isEmpty()) {
+            products.withIds(productIds).forEach(p -> out.put(p.getId(), handling(p)));
+        }
+        return out;
     }
 }

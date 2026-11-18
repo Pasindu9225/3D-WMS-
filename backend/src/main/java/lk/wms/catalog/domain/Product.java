@@ -88,6 +88,22 @@ public class Product extends TenantScoped {
     @Column(length = 40)
     private String category;
 
+    /** Handling (v2.1): HS customs code, storage temperature, UN hazard class, stack limit, fragile. */
+    @Column(name = "hs_code", length = 10)
+    private String hsCode;
+
+    @Column(name = "storage_temp", nullable = false)
+    private String storageTemp = "AMBIENT";
+
+    @Column(name = "hazard_class", length = 4)
+    private String hazardClass;
+
+    @Column(name = "stack_max")
+    private Integer stackMax;
+
+    @Column(nullable = false)
+    private boolean fragile;
+
     @Column(name = "image_file_id")
     private Long imageFileId;
 
@@ -210,6 +226,34 @@ public class Product extends TenantScoped {
         this.cartonWidthMm = widthMm;
         this.cartonHeightMm = heightMm;
         this.unitsPerCarton = unitsPerCarton;
+    }
+
+    public void setHandling(String hsCode, String storageTemp, String hazardClass, Integer stackMax, boolean fragile) {
+        this.hsCode = hsCode;
+        this.storageTemp = storageTemp;
+        this.hazardClass = hazardClass;
+        this.stackMax = stackMax;
+        this.fragile = fragile;
+    }
+
+    public String getHsCode() {
+        return hsCode;
+    }
+
+    public String getStorageTemp() {
+        return storageTemp;
+    }
+
+    public String getHazardClass() {
+        return hazardClass;
+    }
+
+    public Integer getStackMax() {
+        return stackMax;
+    }
+
+    public boolean isFragile() {
+        return fragile;
     }
 
     public Integer getCartonLengthMm() {

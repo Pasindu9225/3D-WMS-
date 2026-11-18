@@ -35,6 +35,22 @@ export interface Product {
   cartonWidthMm?: number | null
   cartonHeightMm?: number | null
   unitsPerCarton?: number | null
+  /** How it must be stored (v2.1); putaway follows it. */
+  handling?: Handling | null
+}
+
+export type StorageTemp = 'AMBIENT' | 'CHILLED' | 'FROZEN'
+
+export interface Handling {
+  /** World customs (HS) code, digits only, e.g. 090230; null = not given. */
+  hsCode: string | null
+  storageTemp: StorageTemp
+  /** UN dangerous goods class or division, e.g. 3 or 5.1; null = not dangerous. */
+  hazardClass: string | null
+  /** How many high it may stand, counting itself (1 = do not stack); null = no limit. */
+  stackMax: number | null
+  /** Nothing may stand on it. */
+  fragile: boolean
 }
 
 export type ProductInput = Omit<Product, 'id' | 'sku' | 'hasImage' | 'version' | 'abcClass'> & { sku?: string; version?: number }

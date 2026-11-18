@@ -11,7 +11,7 @@ import { Pager, Table, Th, Tr } from '@/components/ui/table'
 import { can, useMe } from '@/features/auth/session'
 import { formatKg, parseMoney, parseCarton, parseVolume, parseWeight } from '@/features/layout/units'
 import { errorMessage, fieldErrors } from '@/lib/errors'
-import { t } from '@/lib/i18n'
+import { t, type MessageKey } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
 import { ImportDialog } from './ImportDialog'
 import { imageUrl, PRODUCT_PAGE_SIZE, useArchiveProduct, useProductImage, useProducts, useRecalculateAbc, useSaveProduct, type Product } from './api'
@@ -78,10 +78,11 @@ export function ProductsPage() {
               <td>
                 {p.hasImage && <img src={imageUrl(p)} alt="" loading="lazy" className="mr-2 inline size-8 rounded object-cover align-middle" />}
                 {p.name}
-                {(p.trackBatch || p.trackExpiry) && (
-                  <span className="ml-2 inline-flex gap-1">
+                {(p.trackBatch || p.trackExpiry || handlingChips(p.handling).length > 0) && (
+                  <span className="ml-2 inline-flex flex-wrap gap-1">
                     {p.trackBatch && <Badge tone="neutral">{t('products.batch')}</Badge>}
                     {p.trackExpiry && <Badge tone="warn">{t('products.expiry')}</Badge>}
+                    {handlingChips(p.handling).map((c) => <Badge key={c} tone="neutral">{c}</Badge>)}
                   </span>
                 )}
               </td>
@@ -131,6 +132,23 @@ export function ProductsPage() {
   )
 }
 
+/** UN dangerous goods classes and divisions for the select (v2.1). */
+const HAZARDS = ['1', '2.1', '2.2', '2.3', '3', '4.1', '4.2', '4.3', '5.1', '5.2', '6.1', '6.2', '7', '8', '9']
+const SELECT = 'h-9 w-full rounded-md border border-input bg-background px-2 text-sm'
+/** HS codes are written with dots or spaces (0902.30); stored as digits. */
+const hsDigits = (v: string) => v.replace(/[.\s]/g, '')
+
+/** Short chips for the product list: ❄ chilled or frozen, ⚠ class, fragile, stack limit. */
+function handlingChips(h: Product['handling']): string[] {
+  if (!h) return []
+  const out: string[] = []
+  if (h.storageTemp !== 'AMBIENT') out.push('❄ ' + t(('products.temp.' + h.storageTemp) as MessageKey))
+  if (h.hazardClass) out.push('⚠ ' + t('products.hazardChip', { cls: h.hazardClass }))
+  if (h.fragile) out.push(t('products.fragileChip'))
+  if (h.stackMax) out.push(t('products.stackChip', { n: h.stackMax }))
+  return out
+}
+
 const BARCODE = /^[0-9A-Za-z-]{1,64}$/
 const UOM = /^[A-Z]{1,10}$/
 const optional = (test: (v: string) => boolean, message: string) =>
@@ -148,6 +166,11 @@ const schema = z.object({
   category: z.string().trim().max(40, t('common.tooLong')),
   carton: optional((v) => parseCarton(v) !== null, t('products.cartonRule')),
   unitsPerCarton: optional((v) => /^\d{1,6}$/.test(v) && Number(v) >= 1, t('products.unitsPerCartonRule')),
+  hsCode: optional((v) => /^\d{6,10}$/.test(hsDigits(v)), t('products.hsRule')),
+  storageTemp: z.enum(['AMBIENT', 'CHILLED', 'FROZEN']),
+  hazardClass: z.string(),
+  stackMax: optional((v) => /^[0-9]{1,2}$/.test(v) && Number(v) >= 1 && Number(v) <= 50, t('products.stackRule')),
+  fragile: z.boolean(),
   trackBatch: z.boolean(),
   trackExpiry: z.boolean(),
   units: z.array(z.object({
@@ -174,10 +197,13 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           category: product.category ?? '',
           carton: product.cartonLengthMm ? `${product.cartonLengthMm / 10}x${product.cartonWidthMm! / 10}x${product.cartonHeightMm! / 10}` : '',
           unitsPerCarton: product.unitsPerCarton ? String(product.unitsPerCarton) : '',
+          hsCode: product.handling?.hsCode ?? '', storageTemp: product.handling?.storageTemp ?? 'AMBIENT',
+          hazardClass: product.handling?.hazardClass ?? '', stackMax: product.handling?.stackMax ? String(product.handling.stackMax) : '',
+          fragile: product.handling?.fragile ?? false,
           trackBatch: product.trackBatch, trackExpiry: product.trackExpiry,
           units: product.units.map((u) => ({ uom: u.uom, factor: String(u.factor), barcode: u.barcode ?? '' })),
         }
-      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', reorder: '', category: '', carton: '', unitsPerCarton: '', trackBatch: false, trackExpiry: false, units: [] },
+      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', reorder: '', category: '', carton: '', unitsPerCarton: '', hsCode: '', storageTemp: 'AMBIENT', hazardClass: '', stackMax: '', fragile: false, trackBatch: false, trackExpiry: false, units: [] },
   })
   const units = useFieldArray({ control: form.control, name: 'units' })
   const { errors } = form.formState
@@ -198,6 +224,13 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
     cartonWidthMm: v.carton ? parseCarton(v.carton)![1] : null,
     cartonHeightMm: v.carton ? parseCarton(v.carton)![2] : null,
     unitsPerCarton: v.unitsPerCarton ? Number(v.unitsPerCarton) : null,
+    handling: {
+      hsCode: v.hsCode ? hsDigits(v.hsCode) : null,
+      storageTemp: v.storageTemp,
+      hazardClass: v.hazardClass || null,
+      stackMax: v.stackMax ? Number(v.stackMax) : null,
+      fragile: v.fragile,
+    },
     trackBatch: v.trackBatch,
     trackExpiry: v.trackExpiry,
     units: v.units.map((u) => ({ uom: u.uom, factor: u.factor, barcode: u.barcode || null })),
@@ -252,6 +285,34 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           <label className="flex items-center gap-2"><input type="checkbox" {...form.register('trackBatch')} /> {t('products.trackBatch')}</label>
           <label className="flex items-center gap-2"><input type="checkbox" {...form.register('trackExpiry')} /> {t('products.trackExpiry')}</label>
         </div>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">{t('products.handling')}</legend>
+          <p className="text-xs text-muted-foreground">{t('products.handlingHint')}</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label={t('products.hsField')} error={errors.hsCode?.message ?? server['handling.hsCode']}>
+              {(p) => <Input {...p} inputMode="numeric" className="font-mono" placeholder="0902.30" maxLength={14} {...form.register('hsCode')} />}
+            </Field>
+            <Field label={t('products.tempField')}>
+              {(p) => (
+                <select {...p} className={SELECT} {...form.register('storageTemp')}>
+                  {(['AMBIENT', 'CHILLED', 'FROZEN'] as const).map((k) => <option key={k} value={k}>{t(('products.temp.' + k) as MessageKey)}</option>)}
+                </select>
+              )}
+            </Field>
+            <Field label={t('products.hazardField')} error={server['handling.hazardClass']}>
+              {(p) => (
+                <select {...p} className={SELECT} {...form.register('hazardClass')}>
+                  <option value="">{t('products.hazardNone')}</option>
+                  {HAZARDS.map((c) => <option key={c} value={c}>{c} · {t(('hazard.' + c) as MessageKey)}</option>)}
+                </select>
+              )}
+            </Field>
+            <Field label={t('products.stackField')} error={errors.stackMax?.message ?? server['handling.stackMax']}>
+              {(p) => <Input {...p} inputMode="numeric" placeholder={t('products.stackPlaceholder')} {...form.register('stackMax')} />}
+            </Field>
+          </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...form.register('fragile')} /> {t('products.fragileField')}</label>
+        </fieldset>
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">{t('products.units')}</legend>
           <p className="text-xs text-muted-foreground">{t('products.unitsHint')}</p>

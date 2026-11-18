@@ -17,7 +17,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "zone")
 public class Zone extends TenantScoped {
 
-    public enum Type { RECEIVING, STORAGE, PICKING, DISPATCH, QUARANTINE, COLD }
+    public enum Type { RECEIVING, STORAGE, PICKING, DISPATCH, QUARANTINE, COLD, FROZEN }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,10 +48,19 @@ public class Zone extends TenantScoped {
         this.code = code;
     }
 
-    public void set(String type, String name, String polygonJson) {
+    /** Main UN hazard classes allowed, "3,8" (v2.1); null = no dangerous goods. */
+    @Column(name = "hazard_classes", length = 20)
+    private String hazardClasses;
+
+    public void set(String type, String name, String polygonJson, String hazardClasses) {
         this.type = Type.valueOf(type);
         this.name = name;
         this.polygon = polygonJson;
+        this.hazardClasses = hazardClasses;
+    }
+
+    public String getHazardClasses() {
+        return hazardClasses;
     }
 
     public Long getId() {

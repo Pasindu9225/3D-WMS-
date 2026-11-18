@@ -14,6 +14,7 @@ const ZONE_FILL: Record<ZoneType, string> = {
   DISPATCH: 'rgba(245,158,11,0.20)',
   QUARANTINE: 'rgba(239,68,68,0.18)',
   COLD: 'rgba(14,165,233,0.22)',
+  FROZEN: 'rgba(99,102,241,0.22)',
 }
 
 /** Rack fill by live check: red = overlap or outside its zone, amber = aisle narrower than the minimum. */

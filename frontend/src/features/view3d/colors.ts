@@ -16,6 +16,7 @@ export const ZONE_COLOR: Record<ZoneType, string> = {
   DISPATCH: '#f59e0b',
   QUARANTINE: '#ef4444',
   COLD: '#0ea5e9',
+  FROZEN: '#6366f1',
 }
 
 /** Status colours: blocked stands out most; empty is quiet so filled bins catch the eye. */

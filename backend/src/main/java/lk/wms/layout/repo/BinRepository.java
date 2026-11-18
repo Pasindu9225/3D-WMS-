@@ -50,12 +50,28 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
         lk.wms.layout.domain.Zone.Type getZoneType();
 
         String getZoneCode();
+
+        /** v2.1 handling rules: the rack, the place's slot, the rack's size and type, the zone's hazard classes. */
+        Long getRackId();
+
+        Short getPositionNo();
+
+        Long getTemplateId();
+
+        Integer getRackWidthMm();
+
+        Integer getRackDepthMm();
+
+        Integer getRackHeightMm();
+
+        String getZoneHazards();
     }
 
     @Query("""
             select b.id as id, b.publicId as publicId, b.code as code, b.blocked as blocked, b.maxWeightG as maxWeightG,
                    b.maxVolumeCm3 as maxVolumeCm3, l.levelNo as levelNo, r.posXMm as x, r.posYMm as y, z.type as zoneType,
-                   z.code as zoneCode
+                   z.code as zoneCode, r.id as rackId, b.positionNo as positionNo, r.templateId as templateId,
+                   r.widthMm as rackWidthMm, r.depthMm as rackDepthMm, r.heightMm as rackHeightMm, z.hazardClasses as zoneHazards
             from Bin b, lk.wms.layout.domain.RackLevel l, lk.wms.layout.domain.Rack r, lk.wms.layout.domain.Zone z
             where b.levelId = l.id and l.rackId = r.id and r.zoneId = z.id and b.warehouseId = :warehouseId""")
     List<PlacedBin> placedBins(@Param("warehouseId") long warehouseId);

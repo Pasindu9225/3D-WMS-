@@ -238,13 +238,17 @@ public class StockService {
                 main.put(bin, new Object[] {((Number) r[1]).longValue(), qty});
             }
         }
-        Map<Long, ProductService.Carton> cartons = products.cartons(main.values().stream().map(v -> (Long) v[0]).distinct().toList());
+        List<Long> ids = main.values().stream().map(v -> (Long) v[0]).distinct().toList();
+        Map<Long, ProductService.Carton> cartons = products.cartons(ids);
+        Map<Long, ProductService.Handling> handling = products.handling(ids);
         Map<Long, int[]> out = new HashMap<>();
         main.forEach((bin, v) -> {
             ProductService.Carton c = cartons.get((Long) v[0]);
             if (c != null && ((BigDecimal) v[1]).signum() > 0) {
                 int count = ((BigDecimal) v[1]).divide(BigDecimal.valueOf(c.units()), 0, java.math.RoundingMode.CEILING).intValue();
-                out.put(bin, new int[] {c.lengthMm(), c.widthMm(), c.heightMm(), Math.max(1, count)});
+                ProductService.Handling h = handling.getOrDefault((Long) v[0], ProductService.Handling.NONE);
+                int layers = h.fragile() ? 1 : h.stackMax() == null ? 0 : h.stackMax(); // 0 = as high as fits
+                out.put(bin, new int[] {c.lengthMm(), c.widthMm(), c.heightMm(), Math.max(1, count), layers});
             }
         });
         return out;

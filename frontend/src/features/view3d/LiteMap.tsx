@@ -5,6 +5,7 @@ import { t } from '@/lib/i18n'
 import type { Scene } from './api'
 import { ZONE_COLOR } from './colors'
 import { routePoints, type PickRoute } from './route'
+import { zoneTitle } from './sceneLayout'
 
 /**
  * Lite mode: the warehouse as a flat SVG plan for weak PCs. No WebGL and no three.js download; racks take the
@@ -107,11 +108,12 @@ function placeLabels(scene: Scene, outline: { x: number; y: number }[], fs: numb
       minY = Math.min(minY, z.polygon[i + 1]!)
     }
     const h = fs * 1.7
-    const w = h + fs * 0.6 + z.name.length * fs * 0.56 + fs * 0.8
+    const name = zoneTitle(z)
+    const w = h + fs * 0.6 + name.length * fs * 0.56 + fs * 0.8
     const above = minY - h - fs * 0.3
     const box = { x: minX, y: above > floorTop ? above : minY + fs * 0.5, w, h }
     placed.push(box)
-    return { code: z.code, name: z.name, type: z.type, ...box }
+    return { code: z.code, name, type: z.type, ...box }
   })
   const openings = scene.openings.map((o) => {
     const { n, w: width } = wallSide(o, outline)

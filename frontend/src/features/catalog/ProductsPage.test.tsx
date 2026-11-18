@@ -39,11 +39,16 @@ it('creates a product from kg, a box size in cm, a price and a case unit', async
   await user.click(screen.getByRole('button', { name: 'Add a unit' }))
   await user.type(screen.getByLabelText('Unit 1'), 'case')
   await user.type(screen.getByLabelText('Base units'), '12')
+  await user.type(screen.getByLabelText('HS code (customs)'), '1513.11')
+  await user.selectOptions(screen.getByLabelText('Dangerous goods (UN class)'), '3')
+  await user.type(screen.getByLabelText('Stack up to (how many high)'), '4')
+  await user.click(screen.getByLabelText('Fragile: nothing may stand on it'))
   await user.click(screen.getByRole('button', { name: 'Save' }))
 
   await waitFor(() => expect(requests.some((r) => r.method === 'POST')).toBe(true))
   expect(JSON.parse(requests.find((r) => r.method === 'POST')!.body!)).toEqual({
     sku: 'OIL-1L', name: 'Coconut oil 1L', barcode: '4791234000011', baseUom: 'EA', weightG: 950, volumeCm3: 2000,
     costMinor: 125050, reorderPoint: null, category: null, cartonLengthMm: null, cartonWidthMm: null, cartonHeightMm: null, unitsPerCarton: null, trackBatch: false, trackExpiry: true, units: [{ uom: 'CASE', factor: 12, barcode: null }],
+    handling: { hsCode: '151311', storageTemp: 'AMBIENT', hazardClass: '3', stackMax: 4, fragile: true },
   })
-})
+}, 15_000) // a long form: much typing

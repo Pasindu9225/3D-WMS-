@@ -2,7 +2,7 @@
 /**
  * Fills a company with sample data for testing, through the app's own API (as a person would): a 60 m × 40 m
  * warehouse "DEMO1" with doors, docks and five zones; pallet racking, shelving and floor storage; published; then
- * suppliers, customers, 15 products with real carton sizes, purchase orders received and put away (so the 3D view
+ * suppliers, customers, 20 products with real carton sizes and handling rules, purchase orders received and put away (so the 3D view
  * shows stock), and three sales orders (two released for picking).
  *
  * Local testing only. Sign-in comes from the environment, never from this file:
@@ -68,9 +68,15 @@ const CUSTOMERS = [
   { code: 'CUS-JAF', name: 'Jaffna Traders', address: '3 Hospital Rd, Jaffna' },
 ]
 
-// sku, name, category, supplier, weight g, carton L×W×H cm, units per carton, cost (LKR), cartons to buy, expiry?
+// sku, name, category, supplier, weight g, carton L×W×H cm, units per carton, cost (LKR), cartons to buy, expiry?,
+// handling (v2.1: HS customs code, storage temperature, UN hazard class, stack limit, fragile)
 const PRODUCTS = [
-  ['RICE-5KG', 'Samba rice 5 kg', 'Food', 'SUP-CEY', 5100, [50, 35, 30], 4, 1450, 40, false],
+  ['RICE-5KG', 'Samba rice 5 kg', 'Food', 'SUP-CEY', 5100, [50, 35, 30], 4, 1450, 40, false, { hsCode: '100630', stackMax: 5 }],
+  ['FISH-1KG', 'Frozen seer fish 1 kg', 'Frozen', 'SUP-CEY', 1050, [40, 30, 20], 10, 2400, 16, true, { hsCode: '030389', storageTemp: 'FROZEN', stackMax: 6 }],
+  ['ICEC-1L', 'Vanilla ice cream 1 L', 'Frozen', 'SUP-CEY', 600, [36, 24, 20], 8, 850, 16, true, { hsCode: '210500', storageTemp: 'FROZEN' }],
+  ['EGGS-30', 'Eggs, tray of 30', 'Food', 'SUP-CEY', 1900, [60, 30, 25], 4, 1350, 12, true, { hsCode: '040721', stackMax: 1, fragile: true }],
+  ['BLCH-1L', 'Bleach 1 L', 'Chemicals', 'SUP-LAN', 1100, [30, 22, 26], 12, 380, 20, false, { hsCode: '282890', hazardClass: '8', stackMax: 3 }],
+  ['THIN-1L', 'Paint thinner 1 L', 'Chemicals', 'SUP-LAN', 900, [30, 22, 26], 12, 720, 12, false, { hsCode: '381400', hazardClass: '3', stackMax: 3 }],
   ['DHAL-1KG', 'Red dhal 1 kg', 'Food', 'SUP-CEY', 1020, [40, 30, 20], 12, 420, 30, false],
   ['TEA-400G', 'Ceylon black tea 400 g', 'Food', 'SUP-CEY', 420, [36, 24, 22], 24, 980, 25, true],
   ['MILK-1L', 'UHT milk 1 L', 'Food', 'SUP-CEY', 1050, [30, 20, 25], 12, 390, 50, true],
@@ -96,6 +102,9 @@ function layout(types) {
     { code: 'R', type: 'RECEIVING', name: 'Goods in', polygon: rect(0, 30000, 12000, 40000) },
     { code: 'F', type: 'STORAGE', name: 'Floor stacking', polygon: rect(14000, 30000, 46000, 40000) },
     { code: 'D', type: 'DISPATCH', name: 'Goods out', polygon: rect(48000, 30000, 60000, 40000) },
+    // v2.1 handling rules: a freezer and a dangerous goods store in the east wing
+    { code: 'Z', type: 'FROZEN', name: 'Freezer', polygon: rect(61000, 2000, 71000, 18000) },
+    { code: 'H', type: 'STORAGE', name: 'Chemicals', polygon: rect(61000, 22000, 71000, 38000), hazardClasses: ['3', '8'] },
   ]
   const racks = []
   const add = (prefix, zone, templateId, x, y) =>
@@ -107,6 +116,9 @@ function layout(types) {
   for (let row = 0; row < 8; row++) for (let i = 0; i < 7; i++) add('P', 'P', types['DEMO-SHELF'], 44000 + i * 2000, 3500 + row * 3000)
   // floor stacking: 2 rows of 6
   for (let row = 0; row < 2; row++) for (let i = 0; i < 6; i++) add('F', 'F', types['DEMO-FLOOR'], 17000 + i * 5200, 31500 + row * 4000)
+  // freezer and chemicals store: 3 rows of 3 pallet racks each
+  for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) add('Z', 'Z', types['DEMO-PAL'], 62850 + i * 2700, 4000 + row * 5000)
+  for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) add('H', 'H', types['DEMO-PAL'], 62850 + i * 2700, 24000 + row * 5000)
   const openings = [
     { kind: 'DOCK', label: 'Dock 1 (in)', x: 3500, y: 40000, widthMm: 3000, heightMm: 4500 },
     { kind: 'DOCK', label: 'Dock 2 (in)', x: 8500, y: 40000, widthMm: 3000, heightMm: 4500 },
@@ -115,7 +127,7 @@ function layout(types) {
     { kind: 'DOOR', label: 'Staff door', x: 0, y: 28000, widthMm: 1200, heightMm: 2100 },
     { kind: 'DOOR', label: 'Office door', x: 30000, y: 0, widthMm: 1500, heightMm: 2400 },
   ]
-  return { floor: rect(0, 0, 60000, 40000), openings, zones, racks, settings: { minAisleMm: 1200 } }
+  return { floor: rect(0, 0, 72000, 40000), openings, zones, racks, settings: { minAisleMm: 1200 } }
 }
 
 // ---------------------------------------------------------------- run
@@ -144,8 +156,19 @@ async function main() {
   // warehouse (built once)
   const warehouses = (await must('GET', '/api/v1/warehouses?size=100')).items
   let wh = warehouses.find((w) => w.code === 'DEMO1')
-  if (wh && wh.layoutStatus === 'PUBLISHED') {
+  const built = wh && wh.layoutStatus === 'PUBLISHED' ? await must('GET', `/api/v1/warehouses/${wh.id}/layout`) : null
+  if (built && built.layout.zones.some((z) => z.code === 'Z')) {
     console.log('Warehouse DEMO1 is already built; skipping layout')
+  } else if (built) { // built before the freezer and chemicals store existed: add the east wing, racks keep their places
+    const fresh = layout(types)
+    const wing = (z) => z === 'Z' || z === 'H'
+    const doc = { ...built.layout, floor: fresh.floor, // keep what is published (it may have been edited); add the east wing
+      zones: [...built.layout.zones, ...fresh.zones.filter((z) => wing(z.code))],
+      racks: [...built.layout.racks.map((r) => (r.templateId === types['DEMO-FLOOR'] && !r.widthMm ? { ...r, widthMm: 5000 } : r)), // as published, even if the type was widened since
+        ...fresh.racks.filter((r) => wing(r.zone))] }
+    const saved = await must('PUT', `/api/v1/warehouses/${wh.id}/layout`, { baseRevision: built.revision, layout: doc })
+    const pub = await must('POST', `/api/v1/warehouses/${wh.id}/layout/publish`, { baseRevision: saved.revision })
+    console.log(`Warehouse DEMO1 extended with a freezer and a chemicals store: ${pub.racks} racks, ${pub.bins} places`)
   } else {
     wh ??= await must('POST', '/api/v1/warehouses', { code: 'DEMO1', name: 'Demo DC Colombo', widthM: 60, lengthM: 40, wallHeightM: 9 })
     const current = await must('GET', `/api/v1/warehouses/${wh.id}/layout`)
@@ -160,17 +183,23 @@ async function main() {
 
   // products
   const ids = {}
-  for (const [sku, name, category, , weightG, [l, w, h], perCarton, cost, , expiry] of PRODUCTS) {
-    const r = await api('POST', '/api/v1/products', {
-      sku, name, baseUom: 'EA', weightG, volumeCm3: Math.round((l * w * h) / perCarton), trackBatch: expiry, trackExpiry: expiry,
-      costMinor: cost * 100, reorderPoint: perCarton * 3, category, cartonLengthMm: l * 10, cartonWidthMm: w * 10,
-      cartonHeightMm: h * 10, unitsPerCarton: perCarton,
-      units: perCarton > 1 ? [{ uom: 'CASE', factor: perCarton }] : [],
-    })
-    if (r.status >= 300 && r.status !== 409) throw new Error(`product ${sku}: ${r.status} ${JSON.stringify(r.data)}`)
+  const body = ([sku, name, category, , weightG, [l, w, h], perCarton, cost, , expiry, handling]) => ({
+    sku, name, baseUom: 'EA', weightG, volumeCm3: Math.round((l * w * h) / perCarton), trackBatch: expiry, trackExpiry: expiry,
+    costMinor: cost * 100, reorderPoint: perCarton * 3, category, cartonLengthMm: l * 10, cartonWidthMm: w * 10,
+    cartonHeightMm: h * 10, unitsPerCarton: perCarton,
+    units: perCarton > 1 ? [{ uom: 'CASE', factor: perCarton }] : [],
+    handling: handling ?? null,
+  })
+  for (const spec of PRODUCTS) {
+    const r = await api('POST', '/api/v1/products', body(spec))
+    if (r.status >= 300 && r.status !== 409) throw new Error(`product ${spec[0]}: ${r.status} ${JSON.stringify(r.data)}`)
   }
-  for (const p of (await must('GET', '/api/v1/products?size=100')).items) ids[p.sku] = p.id
-  console.log(`Products: ${PRODUCTS.length} (with carton sizes)`)
+  for (const p of (await must('GET', '/api/v1/products?size=100')).items) {
+    ids[p.sku] = p.id
+    const spec = PRODUCTS.find((s) => s[0] === p.sku)
+    if (spec?.[10] && !p.handling?.hsCode) await must('PUT', `/api/v1/products/${p.id}`, { ...body(spec), version: p.version }) // made before handling existed
+  }
+  console.log(`Products: ${PRODUCTS.length} (with carton sizes and handling: frozen, dangerous goods, fragile, stack limits)`)
 
   // only stock up once: if anything is already in DEMO1, stop here
   const stock = await must('GET', `/api/v1/stock?warehouse=${wh.id}&size=1`).catch(() => ({ total: 0 }))

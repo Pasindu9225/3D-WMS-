@@ -10,7 +10,8 @@ export interface Scene {
   /** Height of the outer walls (mm); older servers and the stress page leave it out (no walls drawn). */
   wallHeightMm?: number
   openings: Opening[]
-  zones: { code: string; type: ZoneType; name: string; polygon: number[] }[]
+  /** hazardClasses: main UN classes the zone takes, "3,8" (v2.1); null = none. */
+  zones: { code: string; type: ZoneType; name: string; polygon: number[]; hazardClasses?: string | null }[]
   racks: {
     code: string
     zone: string
@@ -38,7 +39,7 @@ export interface Scene {
   expiryDays?: (number | null)[]
   /** Lines picked from each bin in the last 30 days (v1.2 heat map). */
   picks?: number[]
-  /** Real cartons per bin (v2.1): [length, width, height mm, count] of its main product, null without a carton size. */
+  /** Real cartons per bin (v2.1): [length, width, height mm, count, most layers (0 = as high as fits)] of its main product, null without a carton size. */
   cartons?: (number[] | null)[]
 }
 

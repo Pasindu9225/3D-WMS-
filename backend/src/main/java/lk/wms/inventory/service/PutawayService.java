@@ -102,12 +102,15 @@ public class PutawayService {
 
         List<Candidate> all = bins.putawayCandidates(cu, w.id()); // nearest first
         List<PutawayRuleService.Match> rules = putawayRules.matching(w.id(), product.id(), products.category(product.id()));
-        Fit fit = new Fit(load, sameProduct, needW, needV);
+        Placed placed = placed(all, inBins, product.id());
+        java.util.function.Predicate<Candidate> ok = c -> placed.refusal(product, c, qty) == null;
+        Fit fit = new Fit(load, sameProduct, needW, needV, ok, home(placed.handling(product.id())));
         List<Suggestion> out = new ArrayList<>();
         Set<Long> taken = new HashSet<>();
         for (PutawayRuleService.Match r : rules) { // fixed bins first
             if (r.binId() != null) {
-                all.stream().filter(c -> c.id() == r.binId() && !"QUARANTINE".equals(c.zoneType()) && fits(c, load.get(c.id()), needW, needV))
+                all.stream().filter(c -> c.id() == r.binId() && !"QUARANTINE".equals(c.zoneType()) && fits(c, load.get(c.id()), needW, needV)
+                        && ok.test(c))
                         .findFirst().ifPresent(c -> add(out, taken, c, Why.FIXED_BIN));
             }
         }
@@ -124,7 +127,66 @@ public class PutawayService {
         return out;
     }
 
-    private record Fit(Map<Long, BigDecimal[]> load, Map<Long, Integer> sameProduct, BigDecimal needW, BigDecimal needV) {
+    /** home: the zone type empty places come from by default: STORAGE, or COLD / FROZEN for chilled and frozen goods. */
+    private record Fit(Map<Long, BigDecimal[]> load, Map<Long, Integer> sameProduct, BigDecimal needW, BigDecimal needV,
+            java.util.function.Predicate<Candidate> ok, String home) {
+    }
+
+    private static String home(ProductService.Handling h) {
+        return switch (h.temp()) {
+            case "CHILLED" -> "COLD";
+            case "FROZEN" -> "FROZEN";
+            default -> "STORAGE";
+        };
+    }
+
+    /**
+     * What already stands where (v2.1 handling rules): every product's handling, the hazard classes in each rack,
+     * the pallets in each floor-row column and how much of the product each place holds.
+     */
+    private record Placed(Map<Long, ProductService.Handling> handlingById, Map<Long, Map<Long, String>> hazardsByRack,
+            Map<String, List<long[]>> columns, Map<Long, BigDecimal> sameUnits, Map<Long, ProductService.Carton> cartons) {
+
+        ProductService.Handling handling(long productId) {
+            return handlingById.getOrDefault(productId, ProductService.Handling.NONE);
+        }
+
+        HandlingRules.Refusal refusal(ProductService.Basic product, Candidate c, BigDecimal qty) {
+            List<String> rackHazards = hazardsByRack.getOrDefault(c.rackId(), Map.of()).entrySet().stream()
+                    .filter(e -> e.getKey() != product.id()).map(Map.Entry::getValue).toList();
+            List<HandlingRules.Below> below = columns.getOrDefault(c.rackId() + "/" + c.position(), List.of()).stream()
+                    .filter(x -> x[0] < c.level()).map(x -> new HandlingRules.Below((int) x[0], handling(x[1]))).toList();
+            return HandlingRules.check(product.name(), handling(product.id()), c, rackHazards, below,
+                    sameUnits.getOrDefault(c.id(), BigDecimal.ZERO).add(qty), cartons.get(product.id()));
+        }
+    }
+
+    private Placed placed(List<Candidate> all, List<Stock> inBins, long productId) {
+        Map<Long, Candidate> byId = new HashMap<>();
+        all.forEach(c -> byId.put(c.id(), c));
+        Set<Long> ids = new HashSet<>(inBins.stream().map(Stock::getProductId).toList());
+        ids.add(productId);
+        Map<Long, ProductService.Handling> handling = products.handling(ids);
+        Map<Long, Map<Long, String>> hazards = new HashMap<>();
+        Map<String, List<long[]>> columns = new HashMap<>();
+        Map<Long, BigDecimal> same = new HashMap<>();
+        for (Stock s : inBins) {
+            Candidate c = byId.get(s.getBinId());
+            if (c == null || s.getQtyOnHand().signum() <= 0) {
+                continue;
+            }
+            ProductService.Handling h = handling.getOrDefault(s.getProductId(), ProductService.Handling.NONE);
+            if (h.hazardClass() != null) {
+                hazards.computeIfAbsent(c.rackId(), k -> new HashMap<>()).put(s.getProductId(), h.hazardClass());
+            }
+            if ("FLOOR".equals(c.style())) {
+                columns.computeIfAbsent(c.rackId() + "/" + c.position(), k -> new ArrayList<>()).add(new long[] {c.level(), s.getProductId()});
+            }
+            if (s.getProductId() == productId) {
+                same.merge(c.id(), s.getQtyOnHand(), BigDecimal::add);
+            }
+        }
+        return new Placed(handling, hazards, columns, same, products.cartons(List.of(productId)));
     }
 
     /** Same batch, then same product, then empty bins (storage zones only, or any zone but quarantine) among these candidates. */
@@ -132,14 +194,14 @@ public class PutawayService {
         for (int rank = 2; rank >= 1; rank--) {
             for (Candidate c : among) {
                 if (f.sameProduct().getOrDefault(c.id(), 0) == rank && !"QUARANTINE".equals(c.zoneType())
-                        && fits(c, f.load().get(c.id()), f.needW(), f.needV())) {
+                        && fits(c, f.load().get(c.id()), f.needW(), f.needV()) && f.ok().test(c)) {
                     add(out, taken, c, same);
                 }
             }
         }
         for (Candidate c : among) {
-            if ((storageOnly ? "STORAGE".equals(c.zoneType()) : !"QUARANTINE".equals(c.zoneType())) && !f.load().containsKey(c.id())
-                    && fits(c, null, f.needW(), f.needV())) {
+            if ((storageOnly ? f.home().equals(c.zoneType()) : !"QUARANTINE".equals(c.zoneType())) && !f.load().containsKey(c.id())
+                    && fits(c, null, f.needW(), f.needV()) && f.ok().test(c)) {
                 add(out, taken, c, empty);
             }
         }
@@ -159,6 +221,9 @@ public class PutawayService {
         ProductService.Basic product = products.basic(productId);
         BinService.BinRef bin = bins.byCode(cu, w.id(), binCode.trim().toUpperCase(java.util.Locale.ROOT));
         checkOnlyZone(cu, w.id(), product.id(), bin);
+        if (clientRef == null || !moves.isDone(clientRef)) { // a retry already passed the rules
+            checkHandling(cu, w.id(), product, bin, qty);
+        }
         StockMovementService.Outcome outcome = moves.move(new StockMovementService.Move(StockMovementService.Kind.PUTAWAY, w.id(),
                 product.id(), batchNo, expiry, StockMovementService.Place.RECEIVING, StockMovementService.Place.bin(bin.id()),
                 qty, null, null, null, cu.userId(), clientRef));
@@ -186,6 +251,24 @@ public class PutawayService {
         if (!zones.contains(zone)) {
             throw new lk.wms.common.errors.ApiException(org.springframework.http.HttpStatus.CONFLICT, "OUTSIDE_ZONE",
                     "This product goes only in zone " + String.join(" or ", zones) + "; " + bin.code() + " is not there");
+        }
+    }
+
+    /**
+     * v2.1 handling rules at the scan: temperature, dangerous goods and stack limits. A bin a rule names is not
+     * exempt: a fixed bin cannot make frozen fish safe in a warm zone.
+     */
+    // ponytail: checked before the bin lock, like checkOnlyZone; two scans in the same instant could both pass a stack
+    // limit (capacity is still checked under the lock). Move into StockMovementService if that ever matters.
+    private void checkHandling(CurrentUser cu, long warehouseId, ProductService.Basic product, BinService.BinRef bin, BigDecimal qty) {
+        List<Candidate> all = bins.putawayCandidates(cu, warehouseId);
+        Candidate c = all.stream().filter(x -> x.id() == bin.id()).findFirst().orElse(null);
+        if (c == null) {
+            return;
+        }
+        HandlingRules.Refusal r = placed(all, stock.inBins(warehouseId), product.id()).refusal(product, c, qty);
+        if (r != null) {
+            throw new lk.wms.common.errors.ApiException(org.springframework.http.HttpStatus.CONFLICT, r.code(), r.message());
         }
     }
 

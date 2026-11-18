@@ -147,10 +147,10 @@ class WaveTest extends ApiTest {
         jdbc.update("UPDATE product SET carton_length_mm = 600, carton_width_mm = 400, carton_height_mm = 300, units_per_carton = 12 WHERE tenant_id = ? AND sku = 'P1'", tenant);
         String withCartons = send(admin, get("/api/v1/warehouses/" + warehouse + "/scene")).andReturn().getResponse().getContentAsString();
         List<List<Integer>> cartons = JsonPath.read(withCartons, "$.cartons");
-        assertThat(cartons.get(0)).containsExactly(600, 400, 300, 9);
+        assertThat(cartons.get(0)).containsExactly(600, 400, 300, 9, 0); // 0: no stack limit
         assertThat(cartons.get(1)).isNull(); // P2 has no carton size: the simple stack
         String status2 = send(picker, get("/api/v1/warehouses/" + warehouse + "/bin-status")).andReturn().getResponse().getContentAsString();
-        assertThat(JsonPath.<List<Integer>>read(status2, "$.cartons[0]")).containsExactly(600, 400, 300, 9);
+        assertThat(JsonPath.<List<Integer>>read(status2, "$.cartons[0]")).containsExactly(600, 400, 300, 9, 0); // 0: no stack limit
 
         String c = releasedList(null);
         send(admin, post("/api/v1/pick-waves").content("{\"warehouseId\":\"" + warehouse + "\",\"listIds\":[\"" + a + "\",\"" + c + "\"]}"))

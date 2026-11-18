@@ -37,7 +37,8 @@ public class SceneService {
     static final int BLOCKED = 1;
     static final int PICK_FACE = 2;
 
-    public record ZoneView(String code, String type, String name, int[] polygon) {
+    /** hazardClasses: main UN classes the zone takes, "3,8" (v2.1), null = none. */
+    public record ZoneView(String code, String type, String name, int[] polygon, String hazardClasses) {
     }
 
     /** levels: height from the floor of each level, bottom first; bins sit on these shelves. */
@@ -92,7 +93,7 @@ public class SceneService {
         List<Zone> zoneRows = zones.findByWarehouseId(w.id());
         Map<Long, String> zoneCodes = zoneRows.stream().collect(Collectors.toMap(Zone::getId, Zone::getCode));
         List<ZoneView> zoneViews = zoneRows.stream()
-                .map(z -> new ZoneView(z.getCode(), z.getType().name(), z.getName(), flat(points(z.getPolygon()))))
+                .map(z -> new ZoneView(z.getCode(), z.getType().name(), z.getName(), flat(points(z.getPolygon())), z.getHazardClasses()))
                 .toList();
 
         List<Rack> rackRows = racks.findByWarehouseId(w.id());
@@ -163,7 +164,7 @@ public class SceneService {
         return out;
     }
 
-/** Each bin's real cartons [length, width, height mm, count] (v2.1), null when its main product has no carton size. */
+/** Each bin's real cartons [length, width, height mm, count, most layers or 0] (v2.1), null when its main product has no carton size. */
     private int[][] cartons(long warehouseId, List<SceneBin> rows) {
         Map<Long, int[]> byBin = stock.binCartons(warehouseId);
         int[][] out = new int[rows.size()][];

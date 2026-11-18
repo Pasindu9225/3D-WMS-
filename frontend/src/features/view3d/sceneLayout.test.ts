@@ -111,6 +111,7 @@ it('real cartons: as many per layer as fit (turned if more fit), layers up to th
   expect(cartonGrid(300, 500, 200, 8, 1.2, 1.0, 0.25)).toHaveLength(8)
   // 1000x300 fits only turned (300 along the 1.2 m side, 1000 across the 1.0 m): 4 per layer
   expect(cartonGrid(1000, 300, 200, 4, 1.2, 1.0, 0.25)).toHaveLength(4)
+  expect(cartonGrid(600, 400, 300, 12, 1.2, 1.0, 0.9, MAX_CARTONS_PER_PLACE, 1)).toHaveLength(4) // stack limit 1: one layer
   expect(cartonGrid(2000, 2000, 200, 1, 1.2, 1.0, 0.5)).toBeNull() // bigger than the pallet: the simple stack instead
   expect(cartonGrid(100, 100, 100, 1000, 1.2, 1.0, 1)).toHaveLength(MAX_CARTONS_PER_PLACE)
 })
@@ -181,4 +182,11 @@ describe('name tags never pile up (v2.1)', () => {
     const doorApart = { x: 400, y: 300, w: 80, h: 24 }
     expect(declutter([zone, dockOnTop, doorApart, null])).toEqual([true, false, true, false])
   })
+})
+
+it('zone names show cold and dangerous goods zones', async () => {
+  const { zoneTitle } = await import('./sceneLayout')
+  expect(zoneTitle({ code: 'A', type: 'STORAGE', name: 'Bulk', polygon: [] })).toBe('Bulk')
+  expect(zoneTitle({ code: 'Z', type: 'FROZEN', name: 'Freezer', polygon: [] })).toBe('❄ Freezer')
+  expect(zoneTitle({ code: 'H', type: 'STORAGE', name: 'Chemicals', polygon: [], hazardClasses: '3,8' })).toBe('⚠ Chemicals · 3, 8')
 })

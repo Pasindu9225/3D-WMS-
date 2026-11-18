@@ -8,7 +8,7 @@ import type { Scene } from './api'
 import type { CameraApi } from './camera'
 import { slowFromFrameTimes } from './perf'
 import { ZONE_COLOR } from './colors'
-import { buildInstances, centreOf, contentBox, edgeStripes, floorBox, wallParts, type BoxSpec } from './sceneLayout'
+import { buildInstances, centreOf, contentBox, edgeStripes, floorBox, wallParts, zoneTitle, type BoxSpec } from './sceneLayout'
 import { boxTexture, cartonTexture, declutter, hazardTexture, labelTexture, leafTexture, palletTexture, shutterTexture, tagTexture } from './textures'
 import { routePoints, type PickRoute } from './route'
 
@@ -188,7 +188,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
   const tagItems = useMemo<TagItem[]>(() => [
     ...scene.zones.map((z) => {
       const c = centreOf(z.polygon)
-      return { key: 'z' + z.code, text: z.name || z.code, badge: z.code, accent: ZONE_COLOR[z.type], at: [c.x * M, 1, c.y * M] as [number, number, number], h: 0.032 }
+      return { key: 'z' + z.code, text: zoneTitle(z), badge: z.code, accent: ZONE_COLOR[z.type], at: [c.x * M, 1, c.y * M] as [number, number, number], h: 0.032 }
     }),
     ...[...scene.openings].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'DOCK' ? -1 : 1)).map((o) => ({
       key: 'o' + o.label + o.x + o.y, text: o.label, accent: o.kind === 'DOCK' ? '#f59e0b' : '#3b82f6',

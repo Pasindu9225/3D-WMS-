@@ -71,7 +71,7 @@ interface EditorState {
   moveOpening: (index: number, p: Point) => void
   updateOpening: (index: number, patch: Partial<Pick<Opening, 'label' | 'widthMm' | 'heightMm' | 'kind'>>) => void
   removeOpening: (index: number) => void
-  updateZone: (index: number, patch: Partial<Pick<Zone, 'code' | 'name' | 'type'>>) => void
+  updateZone: (index: number, patch: Partial<Pick<Zone, 'code' | 'name' | 'type' | 'hazardClasses'>>) => void
   moveZonePoint: (zone: number, point: number, p: Point) => void
   removeZone: (index: number) => void
   /** Moves the zone and the racks standing in it. */

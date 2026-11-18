@@ -33,13 +33,20 @@ export const MAX_CARTONS_PER_PLACE = 48
 export const MAX_CARTONS = 60_000
 const CARTON_GAP = 0.012 // a hairline between cartons so sizes read
 
+/** A zone's name as tags show it: ❄ for chilled and frozen stores, ⚠ and the classes for dangerous goods. */
+export function zoneTitle(z: Scene['zones'][number]): string {
+  const name = z.name || z.code
+  const cold = z.type === 'COLD' || z.type === 'FROZEN' ? '❄ ' : ''
+  return z.hazardClasses ? '⚠ ' + cold + name + ' · ' + z.hazardClasses.split(',').join(', ') : cold + name
+}
+
 /**
  * Real-size cartons stacked in a grid on a footprint (metres): as many per layer as fit (turned if that fits more),
  * layers up to the height. Returns the carton boxes in local coordinates (x along the place, z across), or null when
  * not even one carton fits (then the caller draws the simple stack).
  */
 export function cartonGrid(lengthMm: number, widthMm: number, heightMm: number, count: number, footW: number, footD: number,
-  room: number, limit = MAX_CARTONS_PER_PLACE): { x: number; y: number; z: number; w: number; h: number; d: number }[] | null {
+  room: number, limit = MAX_CARTONS_PER_PLACE, maxLayers = 0): { x: number; y: number; z: number; w: number; h: number; d: number }[] | null {
   const l = lengthMm * M
   const w = widthMm * M
   const h = heightMm * M
@@ -48,7 +55,8 @@ export function cartonGrid(lengthMm: number, widthMm: number, heightMm: number, 
   const turned = fit(w, l)
   const best = turned.nx * turned.nz > asIs.nx * asIs.nz ? turned : asIs
   const perLayer = best.nx * best.nz
-  const layers = Math.floor((room + 1e-6) / h)
+  const fitHigh = Math.floor((room + 1e-6) / h)
+  const layers = maxLayers > 0 ? Math.min(fitHigh, maxLayers) : fitHigh // the product's stack limit (v2.1)
   if (perLayer === 0 || layers === 0 || count <= 0) return null
   const n = Math.min(count, perLayer * layers, limit)
   const out = []
@@ -215,7 +223,7 @@ export function buildInstances(scene: Scene): SceneParts {
       const room = Math.max(0.1, binH - base - 0.02)
       const share = fill <= 1 ? 0.4 : Math.min(1, Math.max(0.2, fill / 100)) // 1 % = goods of unknown size: show a modest stack
       const real = scene.cartons?.[i]
-      const grid = real && drawn < MAX_CARTONS ? cartonGrid(real[0]!, real[1]!, real[2]!, real[3]!, pw, pd, room) : null
+      const grid = real && drawn < MAX_CARTONS ? cartonGrid(real[0]!, real[1]!, real[2]!, real[3]!, pw, pd, room, MAX_CARTONS_PER_PLACE, real[4] ?? 0) : null
       if (grid) { // real-size cartons, turned with the rack
         const a = (r.rotation * Math.PI) / 180
         for (const c of grid) {

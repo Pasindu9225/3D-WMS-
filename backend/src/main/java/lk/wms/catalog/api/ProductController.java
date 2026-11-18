@@ -72,13 +72,14 @@ public class ProductController {
             @Min(10) @Max(5000) Integer cartonWidthMm,
             @Min(10) @Max(5000) Integer cartonHeightMm,
             @Min(1) @Max(100_000) Integer unitsPerCarton,
+            @Valid ProductService.Handling handling, // v2.1: null = ambient, not dangerous, no stack limit
             @NotNull @Size(max = 10) List<@NotNull @Valid UnitRequest> units,
             @Min(0) Integer version) { // required on update
 
         ProductSpec spec() {
             return new ProductSpec(name, barcode, baseUom, weightG, volumeCm3, trackBatch, trackExpiry, costMinor, reorderPoint, category,
                     units.stream().map(u -> new UnitSpec(u.uom(), u.factor(), u.barcode())).toList(),
-                    cartonLengthMm, cartonWidthMm, cartonHeightMm, unitsPerCarton);
+                    cartonLengthMm, cartonWidthMm, cartonHeightMm, unitsPerCarton, handling);
         }
     }
 
@@ -87,7 +88,8 @@ public class ProductController {
             java.util.regex.Pattern.compile("^\\s*([A-Za-z]+)\\s*=\\s*(\\d{1,7})\\s*(?::\\s*(\\S+))?\\s*$");
 
     static final List<String> COLUMNS = List.of("sku", "name", "barcode", "base_uom", "weight_kg", "volume_l", "cost",
-            "track_batch", "track_expiry", "units", "reorder_point", "category", "carton_cm", "units_per_carton");
+            "track_batch", "track_expiry", "units", "reorder_point", "category", "carton_cm", "units_per_carton",
+            "hs_code", "storage_temp", "hazard_class", "stack_max", "fragile");
 
     private final ProductService products;
     private final jakarta.validation.Validator validator;
@@ -125,7 +127,11 @@ public class ProductController {
                 Map.entry("cartonLengthMm", "carton_cm"),
                 Map.entry("cartonWidthMm", "carton_cm"),
                 Map.entry("cartonHeightMm", "carton_cm"),
-                Map.entry("unitsPerCarton", "units_per_carton"));
+                Map.entry("unitsPerCarton", "units_per_carton"),
+                Map.entry("handling.hsCode", "hs_code"),
+                Map.entry("handling.storageTemp", "storage_temp"),
+                Map.entry("handling.hazardClass", "hazard_class"),
+                Map.entry("handling.stackMax", "stack_max"));
         for (int i = 0; i < csv.size(); i++) {
             int errorsBefore = csv.errors.size();
             Long weight = csv.scaled(i, "weight_kg", 1000);
@@ -137,7 +143,9 @@ public class ProductController {
                     csv.upper(i, "base_uom"), toInt(weight), toInt(volume), csv.yesNo(i, "track_batch"),
                     csv.yesNo(i, "track_expiry"), cost, reorder == null ? null : java.math.BigDecimal.valueOf(reorder, 3),
                     csv.text(i, "category"), carton(csv.text(i, "carton_cm"), 0), carton(csv.text(i, "carton_cm"), 1),
-                    carton(csv.text(i, "carton_cm"), 2), toInt(csv.scaled(i, "units_per_carton", 1)), units, null);
+                    carton(csv.text(i, "carton_cm"), 2), toInt(csv.scaled(i, "units_per_carton", 1)),
+                    new ProductService.Handling(hsCode(csv.text(i, "hs_code")), csv.upper(i, "storage_temp"), csv.text(i, "hazard_class"),
+                            toInt(csv.scaled(i, "stack_max", 1)), csv.yesNo(i, "fragile")), units, null);
             if (r.sku() == null) {
                 csv.error(i, "sku", "SKU is required");
             } else if (csv.valid(validator, i, r, columnOf) && csv.errors.size() == errorsBefore) {
@@ -156,6 +164,11 @@ public class ProductController {
                         "no", "yes", "CASE=12:14791234000018;PAL=480"))
                 + lk.wms.common.Csv.line(List.of("RICE-5KG", "Samba rice 5kg", "", "BAG", "5", "6.5", "1250", "yes", "no", ""));
         return CsvRows.csvFile("products-template.csv", csv);
+    }
+
+    /** An HS code as people write it ("0902.30", "0902 30 10") to digits only; null when blank. */
+    static String hsCode(String text) {
+        return text == null ? null : text.replaceAll("[.\\s]", "");
     }
 
     /** "CASE=12:barcode;PAL=480" into unit requests; a malformed part is a row error. */

@@ -38,9 +38,21 @@ public record LayoutDocument(
 
     public record Zone(
             @NotNull @Pattern(regexp = "[A-Z0-9]{1,10}") String code,
-            @NotNull @Pattern(regexp = "RECEIVING|STORAGE|PICKING|DISPATCH|QUARANTINE|COLD") String type,
+            @NotNull @Pattern(regexp = "RECEIVING|STORAGE|PICKING|DISPATCH|QUARANTINE|COLD|FROZEN") String type,
             @NotNull @Size(max = 60) String name,
-            @NotNull @Size(min = 3, max = 100) List<@NotNull @Valid Point> polygon) {
+            @NotNull @Size(min = 3, max = 100) List<@NotNull @Valid Point> polygon,
+            /** Main UN dangerous goods classes this zone may hold (v2.1); null or empty = none. */
+            @Size(max = 9) List<@NotNull @Pattern(regexp = "[1-9]") String> hazardClasses) {
+
+        public Zone(String code, String type, String name, List<Point> polygon) {
+            this(code, type, name, polygon, null);
+        }
+
+        /** "3,8": sorted, no repeats; null when none. */
+        public String hazardList() {
+            return hazardClasses == null || hazardClasses.isEmpty() ? null
+                    : String.join(",", new java.util.TreeSet<>(hazardClasses));
+        }
     }
 
     /**

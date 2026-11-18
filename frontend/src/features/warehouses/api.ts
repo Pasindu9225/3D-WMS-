@@ -29,13 +29,15 @@ export interface Opening {
   heightMm?: number | null
 }
 
-export type ZoneType = 'RECEIVING' | 'STORAGE' | 'PICKING' | 'DISPATCH' | 'QUARANTINE' | 'COLD'
+export type ZoneType = 'RECEIVING' | 'STORAGE' | 'PICKING' | 'DISPATCH' | 'QUARANTINE' | 'COLD' | 'FROZEN'
 
 export interface Zone {
   code: string
   type: ZoneType
   name: string
   polygon: Point[]
+  /** Main UN dangerous goods classes this zone may hold (v2.1), e.g. ['3', '8']; absent = none. */
+  hazardClasses?: string[] | null
 }
 
 export interface Rack {
