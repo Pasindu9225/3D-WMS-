@@ -1,3 +1,5 @@
+import { defaultHeight } from '@/features/layout/geometry'
+import type { Opening } from '@/features/warehouses/api'
 import type { Scene } from './api'
 
 /** One box in scene metres: centre, size, turn about the vertical axis (radians, three.js sign), optional tilt. */
@@ -269,4 +271,89 @@ export function edgeStripes(flat: number[], width: number, height = 0.012): BoxS
     out.push({ x: (ax + bx) / 2, y: height / 2 + 0.006, z: (az + bz) / 2, w: len, h: height, d: width, rotY: -Math.atan2(bz - az, bx - ax) })
   }
   return out
+}
+
+/**
+ * Outer walls with real door and dock openings (v2.1). Each wall is cut where its openings are: wall pieces between
+ * them at full height, a lintel above each opening from its height up to the wall top, and a frame (two posts and a
+ * top bar) around each opening, so a 1.2 m × 2.1 m door is a 1.2 m × 2.1 m hole. All sizes are real (plan mm in,
+ * metres out). An opening belongs to the wall it is nearest (within 0.5 m); one sticking past a corner is cut there.
+ */
+export function wallParts(flat: number[], openings: Opening[], wallHeightMm: number) {
+  const walls: BoxSpec[] = []
+  const doors: BoxSpec[] = []
+  const docks: BoxSpec[] = []
+  const H = wallHeightMm * M
+  const T = 0.2 // wall thickness, m
+  const F = 0.12 // frame width, m
+  const n = flat.length / 2
+  for (let i = 0; i < n; i++) {
+    const ax = flat[i * 2]!, ay = flat[i * 2 + 1]!
+    const bx = flat[((i + 1) % n) * 2]!, by = flat[((i + 1) % n) * 2 + 1]!
+    const len = Math.hypot(bx - ax, by - ay)
+    if (len < 10) continue
+    const ux = (bx - ax) / len, uy = (by - ay) / len
+    const rotY = -Math.atan2(by - ay, bx - ax)
+    // a box along this wall from s0 to s1 (mm from corner a), between heights y0 and y1 (m)
+    const piece = (s0: number, s1: number, y0: number, y1: number, thick = T): BoxSpec => {
+      const mid = (s0 + s1) / 2
+      return { x: (ax + ux * mid) * M, y: (y0 + y1) / 2, z: (ay + uy * mid) * M, w: (s1 - s0) * M, h: y1 - y0, d: thick, rotY }
+    }
+    const holes = openings
+      .map((o) => ({ o, t: (o.x - ax) * ux + (o.y - ay) * uy, off: Math.abs((o.x - ax) * uy - (o.y - ay) * ux) }))
+      .filter((h) => h.off <= 500 && h.t >= -h.o.widthMm / 2 && h.t <= len + h.o.widthMm / 2)
+      .filter((h) => nearestEdge(flat, h.o) === i)
+      .map((h) => ({ ...h, s0: Math.max(0, h.t - h.o.widthMm / 2), s1: Math.min(len, h.t + h.o.widthMm / 2) }))
+      .sort((p, q) => p.s0 - q.s0)
+    let at = 0
+    for (const h of holes) {
+      if (h.s0 > at) walls.push(piece(at, h.s0, 0, H))
+      const top = (h.o.heightMm ?? defaultHeight(h.o.kind)) * M
+      if (top < H) walls.push(piece(h.s0, h.s1, top, H)) // lintel
+      const frame = h.o.kind === 'DOCK' ? docks : doors
+      const fw = F / M
+      frame.push(piece(h.s0, Math.min(h.s1, h.s0 + fw), 0, top, T + 0.04))
+      frame.push(piece(Math.max(h.s0, h.s1 - fw), h.s1, 0, top, T + 0.04))
+      frame.push(piece(h.s0, h.s1, Math.max(0, top - F), top, T + 0.04))
+      at = Math.max(at, h.s1)
+    }
+    if (at < len) walls.push(piece(at, len, 0, H))
+  }
+  return { walls, doors, docks }
+}
+
+/** Index of the wall edge an opening is nearest to. */
+function nearestEdge(flat: number[], p: { x: number; y: number }): number {
+  const n = flat.length / 2
+  let best = 0
+  let bestD = Infinity
+  for (let i = 0; i < n; i++) {
+    const ax = flat[i * 2]!, ay = flat[i * 2 + 1]!
+    const bx = flat[((i + 1) % n) * 2]!, by = flat[((i + 1) % n) * 2 + 1]!
+    const lx = bx - ax, ly = by - ay
+    const t = Math.max(0, Math.min(1, ((p.x - ax) * lx + (p.y - ay) * ly) / (lx * lx + ly * ly || 1)))
+    const d = Math.hypot(p.x - (ax + lx * t), p.y - (ay + ly * t))
+    if (d < bestD) { bestD = d; best = i }
+  }
+  return best
+}
+
+/**
+ * Where the start view looks (metres): around the racks, not the whole floor, so a small block of racks in a big
+ * building fills the screen. Falls back to the floor when there are no racks.
+ */
+export function contentBox(scene: Pick<Scene, 'floor' | 'racks'>) {
+  if (scene.racks.length === 0) return floorBox(scene.floor)
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const r of scene.racks) {
+    const reach = Math.hypot(r.widthMm, r.depthMm) / 2 // covers any turn
+    minX = Math.min(minX, r.x - reach); maxX = Math.max(maxX, r.x + reach)
+    minY = Math.min(minY, r.y - reach); maxY = Math.max(maxY, r.y + reach)
+  }
+  const tallest = Math.max(...scene.racks.map((r) => r.heightMm))
+  return {
+    cx: ((minX + maxX) / 2) * M,
+    cz: ((minY + maxY) / 2) * M,
+    size: Math.max(maxX - minX, maxY - minY, tallest, 10_000) * M,
+  }
 }

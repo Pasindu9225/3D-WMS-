@@ -218,7 +218,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
                   const placed = useEditor.getState().doc?.openings[i]
                   if (placed) e.target.position({ x: placed.x, y: placed.y })
                 }}>
-                <OpeningMark kind={o.kind} widthMm={o.widthMm} px={px} selected={selected} />
+                <OpeningMark kind={o.kind} widthMm={o.widthMm} px={px} selected={selected} angle={wall.angle} />
               </Group>
             )
           })}
@@ -274,18 +274,30 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
 }
 
 /**
- * A door or dock on its wall (the group is turned along the wall). Never smaller than about 28 × 12 screen pixels,
- * so it can be seen and grabbed on a big floor zoomed out.
+ * A door or dock on its wall, at its real width (the group is turned along the wall). When that is too small to see
+ * (zoomed out on a big floor), a round pin marks it, clearly a symbol and not a size, and is the handle to grab.
  */
-function OpeningMark({ kind, widthMm, px, selected, ghost }: {
+function OpeningMark({ kind, widthMm, px, selected, ghost, angle = 0 }: {
   kind: Opening['kind']; widthMm: number; px: number; selected: boolean; ghost?: boolean
+  /** The wall's angle, so the pin's letter stays upright. */
+  angle?: number
 }) {
-  const w = Math.max(widthMm, 28 * px)
-  const d = Math.max(600, 12 * px)
+  const fill = kind === 'DOCK' ? '#f59e0b' : '#3b82f6'
+  const d = 400 // drawn 0.4 m deep, across the wall line
+  const tiny = widthMm < 14 * px
   return (
-    <Rect x={-w / 2} y={-d / 2} width={w} height={d} fill={kind === 'DOCK' ? '#f59e0b' : '#3b82f6'}
-      opacity={ghost ? 0.5 : 0.9} cornerRadius={2 * px} stroke={selected ? '#0f172a' : '#ffffff'}
-      strokeWidth={selected ? 3 : 1} strokeScaleEnabled={false} hitStrokeWidth={10} />
+    <>
+      <Rect x={-widthMm / 2} y={-d / 2} width={widthMm} height={d} fill={fill} opacity={ghost ? 0.5 : 0.95}
+        stroke={selected ? '#0f172a' : undefined} strokeWidth={selected ? 2 : 0} strokeScaleEnabled={false} hitStrokeWidth={12} />
+      {tiny && (
+        <Group rotation={-angle}>
+          <Circle radius={9 * px} fill={fill} opacity={ghost ? 0.5 : 0.95} stroke={selected ? '#0f172a' : '#ffffff'}
+            strokeWidth={selected ? 3 : 1.5} strokeScaleEnabled={false} />
+          <Text text={kind === 'DOCK' ? 'K' : 'D'} fontSize={11 * px} fontStyle="bold" fill="#ffffff" width={18 * px} height={18 * px}
+            offsetX={9 * px} offsetY={9 * px} align="center" verticalAlign="middle" listening={false} />
+        </Group>
+      )}
+    </>
   )
 }
 
@@ -297,7 +309,7 @@ function Ghost({ placing, at, px }: { placing: Placing; at: { x: number; y: numb
     const wall = nearestOnOutline(doc.floor, at)
     return (
       <Group x={wall.x} y={wall.y} rotation={wall.angle}>
-        <OpeningMark kind={placing.kind} widthMm={placing.kind === 'DOCK' ? 3000 : 1200} px={px} selected={false} ghost />
+        <OpeningMark kind={placing.kind} widthMm={placing.kind === 'DOCK' ? 3000 : 1200} px={px} selected={false} ghost angle={wall.angle} />
       </Group>
     )
   }

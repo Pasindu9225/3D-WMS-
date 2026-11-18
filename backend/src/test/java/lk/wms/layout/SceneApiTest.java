@@ -52,6 +52,7 @@ class SceneApiTest extends ApiTest {
 
         String body = send(admin, get("/api/v1/warehouses/" + warehouse + "/scene")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.floor.length()").value(8))
+                .andExpect(jsonPath("$.wallHeightMm").value(8000))
                 .andExpect(jsonPath("$.openings[0].label").value("Front"))
                 .andExpect(jsonPath("$.zones[0].code").value("A"))
                 .andExpect(jsonPath("$.zones[0].polygon[2]").value(40000))

@@ -1,6 +1,7 @@
 package lk.wms.layout.service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -55,17 +56,17 @@ public class LayoutService {
     @Transactional(readOnly = true)
     public LayoutView get(CurrentUser cu, String warehouseId) {
         WarehouseService.WarehouseRef ref = warehouseAccess.requireAccess(cu, warehouseId);
+        Warehouse w = warehouses.findByPublicId(warehouseId).orElseThrow();
         LayoutVersion draft = versions.findFirstByWarehouseIdAndStatus(ref.id(), LayoutVersion.Status.DRAFT).orElse(null);
         if (draft != null) {
-            return view("DRAFT", draft.getRevision(), parse(draft.getLayout()), draft.getUpdatedAt());
+            return view(w, "DRAFT", draft.getRevision(), parse(draft.getLayout()), draft.getUpdatedAt());
         }
         LayoutVersion published = versions.findFirstByWarehouseIdAndStatusOrderByPublishedAtDesc(ref.id(),
                 LayoutVersion.Status.PUBLISHED).orElse(null);
         if (published != null) {
-            return view("PUBLISHED", 0, parse(published.getLayout()), published.getUpdatedAt());
+            return view(w, "PUBLISHED", 0, parse(published.getLayout()), published.getUpdatedAt());
         }
-        Warehouse w = warehouses.findByPublicId(warehouseId).orElseThrow();
-        return view("NEW", 0, blank(w), w.getCreatedAt());
+        return view(w, "NEW", 0, blank(w), w.getCreatedAt());
     }
 
     /**
@@ -83,8 +84,7 @@ public class LayoutService {
             throw new ApiException(HttpStatus.CONFLICT, "LAYOUT_CHANGED",
                     "Someone else saved this layout. Reload to see their changes.");
         }
-        List<Issue> issues = LayoutValidator.validate(doc,
-                templates.footprints(doc.racks().stream().map(LayoutDocument.Rack::templateId).distinct().toList()));
+        List<Issue> issues = check(w, doc);
         List<Issue> errors = issues.stream().filter(i -> i.severity() == Severity.ERROR).toList();
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "LAYOUT_INVALID",
@@ -102,10 +102,28 @@ public class LayoutService {
         return new LayoutView("DRAFT", draft.getRevision(), doc, templateViews(doc), issues, draft.getUpdatedAt());
     }
 
-    private LayoutView view(String status, int revision, LayoutDocument doc, Instant updatedAt) {
-        List<Issue> warnings = LayoutValidator.validate(doc,
-                templates.footprints(doc.racks().stream().map(LayoutDocument.Rack::templateId).distinct().toList()));
-        return new LayoutView(status, revision, doc, templateViews(doc), warnings, updatedAt);
+    private LayoutView view(Warehouse w, String status, int revision, LayoutDocument doc, Instant updatedAt) {
+        return new LayoutView(status, revision, doc, templateViews(doc), check(w, doc), updatedAt);
+    }
+
+    /** The validator's issues plus a warning for each rack taller than this building's walls. */
+    private List<Issue> check(Warehouse w, LayoutDocument doc) {
+        List<Issue> issues = new ArrayList<>(LayoutValidator.validate(doc,
+                templates.footprints(doc.racks().stream().map(LayoutDocument.Rack::templateId).distinct().toList())));
+        Map<String, TemplateView> types = templateViews(doc);
+        for (LayoutDocument.Rack r : doc.racks()) {
+            TemplateView type = types.get(r.templateId());
+            Integer height = r.heightMm() != null ? r.heightMm() : type == null ? null : type.heightMm();
+            if (height != null && height > w.getWallHeightMm()) {
+                issues.add(new Issue(Severity.WARNING, "RACK_TALLER_THAN_WALLS", "Rack " + r.code() + " is "
+                        + metres(height) + " tall but the walls are " + metres(w.getWallHeightMm()), r.code()));
+            }
+        }
+        return issues;
+    }
+
+    private static String metres(int mm) {
+        return java.math.BigDecimal.valueOf(mm, 3).stripTrailingZeros().toPlainString() + " m";
     }
 
     private Map<String, TemplateView> templateViews(LayoutDocument doc) {

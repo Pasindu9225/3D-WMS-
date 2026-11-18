@@ -1,6 +1,6 @@
-import { expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { Scene } from './api'
-import { buildInstances, centreOf } from './sceneLayout'
+import { buildInstances, centreOf, contentBox, wallParts } from './sceneLayout'
 
 const rack = (rotation: number): Scene['racks'][number] => ({
   code: 'R01', zone: 'A', x: 10_000, y: 5000, rotation, widthMm: 3000, depthMm: 1000, heightMm: 4000,
@@ -122,4 +122,39 @@ it('a place whose product has a carton size shows real cartons; others keep the 
   expect(p.cartons.filter((c) => c.bin === 0)).toHaveLength(0)
   expect(p.cartons.filter((c) => c.bin === 1)).toHaveLength(1) // simple stack
   expect(p.boxes.find((c) => c.bin === 0)!.w).toBeCloseTo(0.588) // 600 mm less the hairline gap
+})
+
+describe('walls with real door openings (v2.1)', () => {
+  // 20 m × 10 m floor, 8 m walls; one 1.2 m door in the middle of the top wall (y = 0)
+  const floor = [0, 0, 20_000, 0, 20_000, 10_000, 0, 10_000]
+  const door = { kind: 'DOOR' as const, label: 'Door 1', x: 10_000, y: 0, widthMm: 1200, heightMm: null }
+
+  it('cuts the wall around the door: two pieces, a lintel, and a frame of real size', () => {
+    const { walls, doors, docks } = wallParts(floor, [door], 8000)
+    const top = walls.filter((w) => Math.abs(w.z) < 1e-9) // pieces along the top wall
+    expect(top.map((w) => +w.w.toFixed(3)).sort()).toEqual([1.2, 9.4, 9.4]) // left, lintel, right
+    const lintel = top.find((w) => Math.abs(w.w - 1.2) < 1e-9)!
+    expect(lintel.y - lintel.h / 2).toBeCloseTo(2.1) // door height by default, up to the wall top
+    expect(lintel.y + lintel.h / 2).toBeCloseTo(8)
+    expect(walls).toHaveLength(3 + 3) // and the other three walls whole
+    expect(doors).toHaveLength(3) // two posts and a top bar
+    expect(Math.max(...doors.map((f) => f.y + f.h / 2))).toBeCloseTo(2.1)
+    expect(docks).toHaveLength(0)
+  })
+
+  it('uses the typed height, and a door at a corner never makes a negative piece', () => {
+    const dock = { kind: 'DOCK' as const, label: 'Dock 1', x: 200, y: 0, widthMm: 3000, heightMm: 4500 }
+    const { walls, docks } = wallParts(floor, [dock], 8000)
+    expect(walls.every((w) => w.w > 0 && w.h > 0)).toBe(true)
+    expect(Math.max(...docks.map((f) => f.y + f.h / 2))).toBeCloseTo(4.5)
+  })
+
+  it('starts the camera on the racks, not the whole floor', () => {
+    const big = [0, 0, 400_000, 0, 400_000, 400_000, 0, 400_000]
+    const rack = { code: 'R01', zone: 'A', x: 10_000, y: 10_000, rotation: 0, widthMm: 2700, depthMm: 1100, heightMm: 6000 }
+    const box = contentBox({ floor: big, racks: [rack] as never })
+    expect(box.cx).toBeCloseTo(10)
+    expect(box.size).toBeLessThan(20)
+    expect(contentBox({ floor: big, racks: [] }).size).toBeCloseTo(400)
+  })
 })

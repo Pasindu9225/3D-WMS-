@@ -8,8 +8,8 @@ import type { Scene } from './api'
 import type { CameraApi } from './camera'
 import { slowFromFrameTimes } from './perf'
 import { ZONE_COLOR } from './colors'
-import { buildInstances, centreOf, edgeStripes, floorBox, type BoxSpec } from './sceneLayout'
-import { boxTexture, cartonTexture, labelTexture, palletTexture } from './textures'
+import { buildInstances, centreOf, contentBox, edgeStripes, floorBox, wallParts, type BoxSpec } from './sceneLayout'
+import { boxTexture, cartonTexture, labelTexture, palletTexture, tagTexture } from './textures'
 import { routePoints, type PickRoute } from './route'
 
 const M = 1 / 1000
@@ -32,7 +32,7 @@ const unitBox = new THREE.BoxGeometry(1, 1, 1)
  * one colour per instance (it tints the texture, if any); otherwise the material colour is used. pickOnly draws
  * nothing but still catches clicks; ghost draws faint see-through boxes.
  */
-function Boxes({ specs, color, colors, onPick, map, ghost, pickOnly }: {
+function Boxes({ specs, color, colors, onPick, map, ghost, pickOnly, opacity }: {
   specs: BoxSpec[]
   color: string
   colors?: THREE.Color[]
@@ -41,6 +41,8 @@ function Boxes({ specs, color, colors, onPick, map, ghost, pickOnly }: {
   map?: THREE.Texture | null
   ghost?: boolean
   pickOnly?: boolean
+  /** See-through (walls): below 1, drawn transparent so what is behind stays visible. */
+  opacity?: number
 }) {
   const mesh = useRef<THREE.InstancedMesh>(null)
   useLayoutEffect(() => {
@@ -70,8 +72,25 @@ function Boxes({ specs, color, colors, onPick, map, ghost, pickOnly }: {
       })}>
       {pickOnly ? <meshBasicMaterial visible={false} />
         : ghost ? <meshBasicMaterial color={colors ? '#ffffff' : color} transparent opacity={0.28} depthWrite={false} />
-          : <meshStandardMaterial color={colors ? '#ffffff' : color} map={map ?? null} roughness={0.85} />}
+          : <meshStandardMaterial color={colors ? '#ffffff' : color} map={map ?? null} roughness={0.85}
+            transparent={opacity !== undefined} opacity={opacity ?? 1} depthWrite={opacity === undefined} />}
     </instancedMesh>
+  )
+}
+
+/**
+ * A name that keeps the same size on screen however far away it is (a sprite without size attenuation), drawn over
+ * everything, so zone and door names stay readable on a big floor.
+ */
+function NameTag({ text, at }: { text: string; at: [number, number, number] }) {
+  const tag = useMemo(() => tagTexture(text), [text])
+  useEffect(() => () => tag?.texture.dispose(), [tag])
+  if (!tag) return null
+  const h = 0.035
+  return (
+    <sprite position={at} scale={[h * tag.aspect, h, 1]} renderOrder={10}>
+      <spriteMaterial map={tag.texture} sizeAttenuation={false} depthTest={false} transparent />
+    </sprite>
   )
 }
 
@@ -125,6 +144,10 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
   const zones = useMemo(() => scene.zones.map((z) => ({ ...z, geometry: new THREE.ShapeGeometry(shapeOf(z.polygon)) })),
     [scene.zones])
   const box = useMemo(() => floorBox(scene.floor), [scene.floor])
+  const start = useMemo(() => contentBox(scene), [scene])
+  // Outer walls with real-size door and dock openings, when the server sends the wall height.
+  const walls = useMemo(() => (scene.wallHeightMm ? wallParts(scene.floor, scene.openings, scene.wallHeightMm) : null),
+    [scene.floor, scene.openings, scene.wallHeightMm])
   const binColors = useMemo(() => {
     const cache = new Map<string, THREE.Color>() // a few distinct colours, shared by thousands of bins
     return colors.map((c) => {
@@ -163,7 +186,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
 
   return (
     <Canvas frameloop="demand" dpr={[1, 1.5]} data-testid="scene-canvas"
-      camera={{ position: [box.cx + box.size * 0.6, box.size * 0.7, box.cz + box.size * 0.9], fov: 45, near: 0.1, far: box.size * 10 }}
+      camera={{ position: [box.cx + box.size * 0.6, box.size * 0.7, box.cz + box.size * 0.9], fov: 45, near: 0.3, far: box.size * 10 }}
       gl={{ antialias: true, powerPreference: 'low-power' }}
       // Dev builds only: lets the browser checks read draw calls and frame times (renderer.info).
       onCreated={({ gl }) => { if (import.meta.env.DEV) (window as unknown as { __wmsRenderer?: THREE.WebGLRenderer }).__wmsRenderer = gl }}>
@@ -177,7 +200,8 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
         </mesh>
         {zones.map((z) => (
           <mesh key={z.code} geometry={z.geometry} position={[0, 0, -0.005]}>
-            <meshStandardMaterial color={ZONE_COLOR[z.type]} transparent opacity={0.45} side={THREE.DoubleSide} depthWrite={false} />
+            <meshStandardMaterial color={ZONE_COLOR[z.type]} transparent opacity={0.45} side={THREE.DoubleSide} depthWrite={false}
+              polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-4} />{/* drawn just above the floor: no stripes at low angles on big floors */}
           </mesh>
         ))}
       </group>
@@ -196,9 +220,22 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       {ghosts && <Boxes specs={parts.empties} color="#cbd5e1" colors={emptyColors} ghost />}
       <Boxes specs={parts.bins} color="#ffffff" pickOnly onPick={onSelect} />
       {selected !== null && parts.bins[selected] && <Highlight spec={parts.bins[selected]!} />}
-      <Boxes specs={doors} color="#facc15" />
+      {walls ? (
+        <>
+          <Boxes specs={walls.walls} color="#cbd5e1" opacity={0.32} />
+          <Boxes specs={walls.doors} color="#3b82f6" />
+          <Boxes specs={walls.docks} color="#f59e0b" />
+        </>
+      ) : <Boxes specs={doors} color="#facc15" />}
+      {scene.zones.map((z) => {
+        const c = centreOf(z.polygon)
+        return <NameTag key={'zt' + z.code} text={`${z.code} · ${z.name}`} at={[c.x * M, 1, c.y * M]} />
+      })}
+      {scene.openings.map((o, i) => (
+        <NameTag key={'ot' + i} text={o.label} at={[o.x * M, ((o.heightMm ?? defaultHeight(o.kind)) + 600) * M, o.y * M]} />
+      ))}
       {route && route.stops.length > 0 && <RouteLine route={route} />}
-      <Rig box={box} onCamera={onCamera} />
+      <Rig box={box} start={start} onCamera={onCamera} />
       {drone && <Drone {...drone} />}
       {onSlow && <FpsWatch onSlow={onSlow} />}
       {onFrame && <Spin onFrame={onFrame} />}
@@ -207,12 +244,16 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
 }
 
 /** Camera with smooth moves; hands the page a small API for its buttons and keyboard shortcuts. */
-function Rig({ box, onCamera }: { box: { cx: number; cz: number; size: number }; onCamera?: (api: CameraApi) => void }) {
+function Rig({ box, start, onCamera }: {
+  box: { cx: number; cz: number; size: number }
+  /** Where the first view looks: the racks (contentBox), so a small block in a big building is not a speck. */
+  start: { cx: number; cz: number; size: number }
+  onCamera?: (api: CameraApi) => void
+}) {
   const controls = useRef<CameraControls>(null)
-  // Start looking at the middle of the floor (the controls would otherwise aim at the plan origin).
   useEffect(() => {
-    void controls.current?.setLookAt(box.cx + box.size * 0.6, box.size * 0.7, box.cz + box.size * 0.9, box.cx, 0, box.cz, false)
-  }, [box])
+    void controls.current?.setLookAt(start.cx + start.size * 0.6, start.size * 0.7, start.cz + start.size * 0.9, start.cx, 0, start.cz, false)
+  }, [start])
   useEffect(() => {
     const c = controls.current
     if (!c || !onCamera) return

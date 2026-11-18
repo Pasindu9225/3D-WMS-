@@ -7,6 +7,8 @@ export interface Scene {
   publishedAt: string
   /** x0, y0, x1, y1 … of the floor outline. */
   floor: number[]
+  /** Height of the outer walls (mm); older servers and the stress page leave it out (no walls drawn). */
+  wallHeightMm?: number
   openings: Opening[]
   zones: { code: string; type: ZoneType; name: string; polygon: number[] }[]
   racks: {

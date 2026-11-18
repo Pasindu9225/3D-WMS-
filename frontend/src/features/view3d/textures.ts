@@ -70,6 +70,33 @@ export function palletTexture(): THREE.CanvasTexture | null {
   return pallet
 }
 
+/**
+ * A name tag: white text on a dark rounded pill, for labels that keep the same size on screen at any distance.
+ * Returns the texture and its width/height ratio.
+ */
+export function tagTexture(text: string): { texture: THREE.CanvasTexture; aspect: number } | null {
+  const label = text.slice(0, 28)
+  const width = Math.max(96, Math.round(label.length * 15 + 28))
+  if (typeof document === 'undefined') return null
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = 40
+  const g = canvas.getContext('2d')
+  if (!g) return null
+  g.fillStyle = 'rgba(15,23,42,0.85)'
+  g.beginPath()
+  g.roundRect(1, 1, width - 2, 38, 10)
+  g.fill()
+  g.fillStyle = '#ffffff'
+  g.font = 'bold 22px system-ui, sans-serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText(label, width / 2, 21)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return { texture, aspect: width / 40 }
+}
+
 /** A zone's code and name painted on the floor (white text on a clear background). */
 export function labelTexture(title: string, subtitle: string): THREE.CanvasTexture | null {
   return draw(256, (g, s) => {

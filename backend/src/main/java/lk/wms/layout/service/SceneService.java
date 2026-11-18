@@ -49,7 +49,8 @@ public class SceneService {
     public record BinArrays(String[] ids, String[] codes, int[] rack, int[] level, int[] pos) {
     }
 
-    public record SceneView(String publishedAt, int[] floor, List<LayoutDocument.Opening> openings, List<ZoneView> zones,
+    /** wallHeightMm: the building's wall height, so the 3D view can raise walls with real door openings. */
+    public record SceneView(String publishedAt, int[] floor, int wallHeightMm, List<LayoutDocument.Opening> openings, List<ZoneView> zones,
             List<RackView> racks, BinArrays bins, String flags, int[] fill, Integer[] expiryDays, int[] picks, int[][] cartons) {
     }
 
@@ -130,7 +131,7 @@ public class SceneService {
                     r.getRotationDeg(), r.getWidthMm(), r.getDepthMm(), r.getHeightMm(), binsPerLevel[i], heights,
                     look(looks, r).getStyle().name(), look(looks, r).getUprightColor(), look(looks, r).getBeamColor()));
         }
-        return new SceneView(published.getPublishedAt().toString(), flat(doc.floor()), doc.openings(), zoneViews,
+        return new SceneView(published.getPublishedAt().toString(), flat(doc.floor()), warehouses.wallHeightMm(w.publicId()), doc.openings(), zoneViews,
                 rackViews, arrays, flags(binRows), fill(w.id(), binRows), expiryDays(w.id(), binRows),
                 picks(w.id(), binRows), cartons(w.id(), binRows));
     }

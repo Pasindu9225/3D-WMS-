@@ -119,6 +119,19 @@ class LayoutApiTest extends IntegrationTest {
     }
 
     @Test
+    void warnsWhenARackIsTallerThanTheWalls() throws Exception {
+        String tall = rack("R2", 15000, 5000).replace("\"rotation\":0}", "\"rotation\":0,\"heightMm\":9000}");
+        String body = save(admin, 0, racks(rack("R1", 5000, 5000), tall)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<String> codes = JsonPath.read(body, "$.warnings[*].code");
+        List<String> refs = JsonPath.read(body, "$.warnings[?(@.code == 'RACK_TALLER_THAN_WALLS')].ref");
+        assertThat(codes).containsOnlyOnce("RACK_TALLER_THAN_WALLS"); // R1 is the type's height, under the 8 m walls
+        assertThat(refs).containsExactly("R2");
+        send(admin, get("/api/v1/warehouses/" + warehouse + "/layout"))
+                .andExpect(jsonPath("$.warnings[?(@.code == 'RACK_TALLER_THAN_WALLS')].message").value("Rack R2 is 9 m tall but the walls are 8 m"));
+    }
+
+    @Test
     void doorsAndDocksKeepTheirHeight() throws Exception {
         // Layouts without a height (saved before v2.1) still load: layoutJson sends none.
         save(admin, 0, racks()).andExpect(status().isOk());

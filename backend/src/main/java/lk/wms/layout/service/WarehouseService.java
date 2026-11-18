@@ -79,6 +79,12 @@ public class WarehouseService {
         return new WarehouseRef(w.getId(), w.getPublicId(), w.getCode());
     }
 
+    /** Wall height of a warehouse the caller already has access to (the 3D view raises walls this high). */
+    @Transactional(readOnly = true)
+    public int wallHeightMm(String publicId) {
+        return warehouses.findByPublicId(publicId).orElseThrow().getWallHeightMm();
+    }
+
     /** Same, by warehouse code (CSV imports name warehouses by code). */
     @Transactional(readOnly = true)
     public WarehouseRef requireAccessByCode(CurrentUser cu, String code) {
