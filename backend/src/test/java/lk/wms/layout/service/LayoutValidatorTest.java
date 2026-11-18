@@ -118,8 +118,8 @@ class LayoutValidatorTest {
         List<Point> bowTie = List.of(new Point(0, 0), new Point(10_000, 10_000), new Point(10_000, 0), new Point(0, 10_000));
         assertThat(LayoutValidator.validate(doc(bowTie, List.of(), List.of(), List.of()), TEMPLATES))
                 .extracting(Issue::code).containsExactly("FLOOR_SELF_INTERSECTS");
-        List<Opening> doors = List.of(new Opening("DOCK", "Dock 1", 10_000, 20_000, 3000),
-                new Opening("DOOR", "Middle", 10_000, 10_000, 1000));
+        List<Opening> doors = List.of(new Opening("DOCK", "Dock 1", 10_000, 20_000, 3000, 3000),
+                new Opening("DOOR", "Middle", 10_000, 10_000, 1000, null));
         assertThat(LayoutValidator.validate(doc(FLOOR, List.of(), List.of(), doors), TEMPLATES))
                 .extracting(Issue::ref).containsExactly("Middle");
     }

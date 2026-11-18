@@ -293,3 +293,6 @@ export function nextCode(prefix: string, used: string[], pad = 1): string {
     if (!taken.has(code)) return code
   }
 }
+
+/** Default opening heights (mm) when none is set: a person door and a truck dock. */
+export const defaultHeight = (kind: 'DOOR' | 'DOCK') => (kind === 'DOCK' ? 3000 : 2100)

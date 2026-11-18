@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { LayoutView } from '@/features/warehouses/api'
 import { useEditor } from './editorStore'
+import { nearestOnOutline } from './geometry'
 
 const view: LayoutView = {
   status: 'DRAFT',
@@ -33,6 +34,31 @@ describe('editor store', () => {
     useEditor.getState().moveFloorPoint(1, { x: 25_049, y: -30 })
     expect(useEditor.getState().doc?.floor[1]).toEqual({ x: 25_000, y: 0 })
     expect(useEditor.getState().dirty).toBe(true)
+  })
+
+  it('keeps doors on the walls when corners move, are added or removed', () => {
+    useEditor.getState().addOpening('DOOR') // top wall, middle (10 m, 0)
+    useEditor.getState().moveFloorPoint(0, { x: 0, y: 4000 }) // the top wall now slopes
+    const on = () => {
+      const { floor, openings } = useEditor.getState().doc!
+      return openings.every((o) => nearestOnOutline(floor, o).distance < 1)
+    }
+    expect(on()).toBe(true)
+    useEditor.getState().insertFloorPoint({ x: 20_000, y: 5000 })
+    useEditor.getState().removeFloorPoint(0)
+    expect(on()).toBe(true)
+  })
+
+  it('click-to-place: a door goes on the nearest wall with its default height, and placing stays on', () => {
+    useEditor.getState().startPlacing({ kind: 'DOCK' })
+    useEditor.getState().place({ x: 19_000, y: 4000 }) // near the right wall
+    useEditor.getState().place({ x: 5000, y: 9500 }) // near the bottom wall
+    const [a, b] = useEditor.getState().doc!.openings
+    expect(a).toMatchObject({ kind: 'DOCK', x: 20_000, y: 4000, heightMm: 3000 })
+    expect(b).toMatchObject({ label: 'Dock 2', x: 5000, y: 10_000 })
+    expect(useEditor.getState().placing).toEqual({ kind: 'DOCK' })
+    useEditor.getState().cancelPlacing()
+    expect(useEditor.getState().placing).toBeNull()
   })
 
   it('keeps at least three corners', () => {
@@ -128,6 +154,17 @@ describe('zones and racks in the editor', () => {
 
     useEditor.getState().updateZone(0, { code: 'A' })
     expect(useEditor.getState().doc!.racks[0]!.zone).toBe('A')
+  })
+
+  it('click-to-place: a rack goes where clicked, in the zone under it; outside every zone it is refused', () => {
+    drawZone([{ x: 0, y: 0 }, { x: 10_000, y: 0 }, { x: 10_000, y: 10_000 }, { x: 0, y: 10_000 }])
+    useEditor.getState().startPlacing({ kind: 'RACK', type })
+    useEditor.getState().place({ x: 3_049, y: 7_020 })
+    expect(useEditor.getState().doc!.racks[0]).toMatchObject({ zone: 'Z1', x: 3000, y: 7000 })
+    expect(useEditor.getState().placeMissed).toBe(false)
+    useEditor.getState().place({ x: 15_000, y: 5000 }) // no zone there
+    expect(useEditor.getState().doc!.racks).toHaveLength(1)
+    expect(useEditor.getState().placeMissed).toBe(true)
   })
 
   it('builds a row by repeating a rack along its length, turned racks along y', () => {

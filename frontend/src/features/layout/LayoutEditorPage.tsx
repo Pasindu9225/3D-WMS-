@@ -11,10 +11,10 @@ import { Dialog } from '@/components/ui/dialog'
 import { ApiError, type Issue } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { t } from '@/lib/i18n'
-import { useEditor } from './editorStore'
+import { useEditor, type Selection } from './editorStore'
 import { CornerTable, DrawingPanel, ShapeDialog } from './FloorPanels'
 import { LengthInput } from './LengthInput'
-import { areaM2, rackStatuses } from './geometry'
+import { areaM2, defaultHeight, rackStatuses } from './geometry'
 import { formatArea, UNITS, type Unit } from './units'
 import { RackPanel, ZonePanel } from './ZoneRackPanels'
 
@@ -36,7 +36,9 @@ export function LayoutEditorPage() {
   const selection = useEditor((s) => s.selection)
   const drawing = useEditor((s) => s.drawing)
   const drawTarget = useEditor((s) => s.drawTarget)
-  const { load, addOpening, updateOpening, removeOpening, setUnit, startDrawing, finishDrawing, cancelDrawing, addRack,
+  const placing = useEditor((s) => s.placing)
+  const placeMissed = useEditor((s) => s.placeMissed)
+  const { load, startPlacing, cancelPlacing, updateOpening, removeOpening, setUnit, startDrawing, finishDrawing, cancelDrawing,
     rotateRack, removeSelected } = useEditor.getState()
   const [fitSignal, setFitSignal] = useState(0)
   const [shaping, setShaping] = useState(false)
@@ -85,6 +87,14 @@ export function LayoutEditorPage() {
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [])
+
+  // Esc stops click-to-place.
+  useEffect(() => {
+    if (!placing) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && cancelPlacing()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [placing, cancelPlacing])
 
   // Keyboard while drawing an outline: Enter finishes, Esc cancels.
   useEffect(() => {
@@ -140,20 +150,32 @@ export function LayoutEditorPage() {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={!doc || !!drawing || doc.zones.length === 0}
-                  title={doc && doc.zones.length === 0 ? t('layout.rack.needZone') : undefined}><Box /> {t('layout.addRack')}</Button>
+                <Button variant="outline" size="sm" disabled={!doc || !!drawing}
+                  aria-pressed={placing?.kind === 'RACK'}><Box /> {t('layout.addRack')}</Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                {(rackTypes.data?.items ?? []).length === 0 && (
-                  <DropdownMenuItem disabled>{t('layout.rack.noTypes')}</DropdownMenuItem>
+                {doc && doc.zones.length === 0 ? (
+                  <>
+                    {/* Racks stand inside zones: say so instead of a greyed-out button nobody can explain. */}
+                    <DropdownMenuItem disabled className="max-w-64 whitespace-normal">{t('layout.rack.needZone')}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => startDrawing('zone')}><SquareDashed /> {t('layout.drawZone')}</DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    {(rackTypes.data?.items ?? []).length === 0 && (
+                      <DropdownMenuItem disabled>{t('layout.rack.noTypes')}</DropdownMenuItem>
+                    )}
+                    {(rackTypes.data?.items ?? []).map((rt) => (
+                      <DropdownMenuItem key={rt.id} onSelect={() => startPlacing({ kind: 'RACK', type: rt })}>{rt.code} · {rt.name}</DropdownMenuItem>
+                    ))}
+                  </>
                 )}
-                {(rackTypes.data?.items ?? []).map((rt) => (
-                  <DropdownMenuItem key={rt.id} onSelect={() => addRack(rt)}>{rt.code} · {rt.name}</DropdownMenuItem>
-                ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="outline" size="sm" onClick={() => addOpening('DOOR')} disabled={!doc}><DoorOpen /> {t('layout.addDoor')}</Button>
-            <Button variant="outline" size="sm" onClick={() => addOpening('DOCK')} disabled={!doc}><Truck /> {t('layout.addDock')}</Button>
+            <Button variant="outline" size="sm" onClick={() => startPlacing({ kind: 'DOOR' })} disabled={!doc || !!drawing}
+              aria-pressed={placing?.kind === 'DOOR'}><DoorOpen /> {t('layout.addDoor')}</Button>
+            <Button variant="outline" size="sm" onClick={() => startPlacing({ kind: 'DOCK' })} disabled={!doc || !!drawing}
+              aria-pressed={placing?.kind === 'DOCK'}><Truck /> {t('layout.addDock')}</Button>
           </>
         )}
         <Button variant="outline" size="sm" onClick={() => setFitSignal((n) => n + 1)}><Maximize /> {t('layout.fit')}</Button>
@@ -181,7 +203,15 @@ export function LayoutEditorPage() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <div className="min-h-[50vh] flex-1">
+        <div className="relative min-h-[50vh] flex-1">
+          {placing && (
+            <div role="status" className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-md border bg-card px-3 py-1.5 text-sm shadow">
+              <span className={placeMissed ? 'text-destructive' : undefined}>
+                {placeMissed ? t('layout.place.missed') : t(`layout.place.${placing.kind}`)}
+              </span>
+              <Button size="sm" variant="ghost" onClick={cancelPlacing}>{t('layout.place.done')}</Button>
+            </div>
+          )}
           <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">{t('app.loading')}</p>}>
             <FloorCanvas templates={templates} statuses={statuses} editable={editable} fitSignal={fitSignal} />
           </Suspense>
@@ -213,6 +243,10 @@ export function LayoutEditorPage() {
               <label className="grid gap-1.5 text-sm font-medium">{t('layout.widthIn', { unit })}
                 <LengthInput label={t('layout.widthIn', { unit })} mm={opening.widthMm} min={500} className="h-10 w-full"
                   onCommit={(mm) => updateOpening(selection.index, { widthMm: Math.min(20_000, mm) })} />
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium">{t('layout.heightIn', { unit })}
+                <LengthInput label={t('layout.heightIn', { unit })} mm={opening.heightMm ?? defaultHeight(opening.kind)} min={1500}
+                  className="h-10 w-full" onCommit={(mm) => updateOpening(selection.index, { heightMm: Math.min(15_000, mm) })} />
               </label>
               <Button variant="outline" size="sm" className="text-destructive" onClick={() => removeOpening(selection.index)}>
                 <Trash2 /> {t('layout.remove')}
@@ -267,13 +301,29 @@ export function LayoutEditorPage() {
 }
 
 function IssueList({ title, issues, tone }: { title: string; issues: Issue[]; tone: 'bad' | 'warn' }) {
+  const doc = useEditor((s) => s.doc)
   if (issues.length === 0) return null
+  // Clicking a problem selects the door, zone or rack it is about, so it can be moved or removed.
+  const target = (ref: string): Selection => {
+    if (!doc) return null
+    const o = doc.openings.findIndex((x) => x.label === ref)
+    if (o >= 0) return { kind: 'opening', index: o }
+    const r = doc.racks.findIndex((x) => x.code === ref)
+    if (r >= 0) return { kind: 'rack', index: r }
+    const z = doc.zones.findIndex((x) => x.code === ref)
+    return z >= 0 ? { kind: 'zone', index: z } : null
+  }
   return (
     <section className="space-y-2">
       <h2 className="flex items-center gap-2 text-sm font-semibold">{title} <Badge tone={tone}>{issues.length}</Badge></h2>
       <ul className="space-y-1.5 text-sm">
         {issues.map((i, n) => (
-          <li key={n} className="rounded-md bg-secondary/60 px-2 py-1.5">{i.message}</li>
+          <li key={n}>
+            {target(i.ref) ? (
+              <button type="button" className="w-full rounded-md bg-secondary/60 px-2 py-1.5 text-left hover:bg-secondary"
+                onClick={() => useEditor.getState().select(target(i.ref))}>{i.message}</button>
+            ) : <p className="rounded-md bg-secondary/60 px-2 py-1.5">{i.message}</p>}
+          </li>
         ))}
       </ul>
     </section>

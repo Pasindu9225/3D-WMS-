@@ -3,7 +3,7 @@ import { DRONE_SPEED, type Keyframe } from './drone'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { nearestOnOutline } from '@/features/layout/geometry'
+import { defaultHeight, nearestOnOutline } from '@/features/layout/geometry'
 import type { Scene } from './api'
 import type { CameraApi } from './camera'
 import { slowFromFrameTimes } from './perf'
@@ -156,7 +156,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
     for (let i = 0; i < scene.floor.length; i += 2) outline.push({ x: scene.floor[i]!, y: scene.floor[i + 1]! })
     return scene.openings.map((o) => {
       const wall = nearestOnOutline(outline, o) // doors lie along their wall
-      const tall = o.kind === 'DOCK' ? 3 : 2.1
+      const tall = (o.heightMm ?? defaultHeight(o.kind)) / 1000
       return { x: o.x * M, y: tall / 2, z: o.y * M, w: o.widthMm * M, h: tall, d: 0.15, rotY: (-wall.angle * Math.PI) / 180 }
     })
   }, [scene.openings, scene.floor])

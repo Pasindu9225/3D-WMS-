@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { LayoutDocument, LayoutView, Opening, Point, Rack, RackType, Zone } from '@/features/warehouses/api'
 import {
-  bounds, floorPreset, insertOnEdge, nearestOnOutline, nextCode, pointInPolygon, selfIntersects, snap,
+  bounds, defaultHeight, floorPreset, insertOnEdge, nearestOnOutline, nextCode, pointInPolygon, selfIntersects, snap,
   type FloorShape,
 } from './geometry'
 import { UNITS, type Unit } from './units'
@@ -25,6 +25,9 @@ export type Selection =
 
 type Footprint = Pick<RackType, 'widthMm' | 'depthMm'>
 
+/** What a click on the floor puts down while placing (click-to-place). */
+export type Placing = { kind: 'DOOR' | 'DOCK' } | { kind: 'RACK'; type: RackType }
+
 interface EditorState {
   doc: LayoutDocument | null
   /** Revision the editor started from; sent with the save so a newer save by someone else is detected. */
@@ -38,6 +41,14 @@ interface EditorState {
   drawError: 'CROSSING' | 'TOO_FEW' | 'OUTSIDE' | null
   /** Where the pointer is while drawing (snapped); gives the direction for a typed length. */
   cursor: Point | null
+  /** Click-to-place mode: the item follows the pointer and a click puts it down; null when off. */
+  placing: Placing | null
+  /** The last click while placing a rack missed every zone. */
+  placeMissed: boolean
+  startPlacing: (p: Placing) => void
+  cancelPlacing: () => void
+  /** Puts the item being placed at p (doors snap to the nearest wall; racks must be inside a zone). */
+  place: (p: Point) => void
   unit: Unit
   setUnit: (unit: Unit) => void
   setCursor: (p: Point | null) => void
@@ -56,9 +67,9 @@ interface EditorState {
   addDrawPoint: (p: Point) => void
   finishDrawing: () => void
   cancelDrawing: () => void
-  addOpening: (kind: Opening['kind']) => void
+  addOpening: (kind: Opening['kind'], at?: Point) => void
   moveOpening: (index: number, p: Point) => void
-  updateOpening: (index: number, patch: Partial<Pick<Opening, 'label' | 'widthMm' | 'kind'>>) => void
+  updateOpening: (index: number, patch: Partial<Pick<Opening, 'label' | 'widthMm' | 'heightMm' | 'kind'>>) => void
   removeOpening: (index: number) => void
   updateZone: (index: number, patch: Partial<Pick<Zone, 'code' | 'name' | 'type'>>) => void
   moveZonePoint: (zone: number, point: number, p: Point) => void
@@ -75,7 +86,8 @@ interface EditorState {
   pasteCount: number
   copySelection: () => void
   paste: () => void
-  addRack: (type: RackType) => void
+  /** at: where it goes (must be inside a zone); without it, the middle of the selected or first zone. */
+  addRack: (type: RackType, at?: Point) => boolean
   /** exact: a typed centre, kept to the mm instead of the 0.1 m grid. */
   moveRack: (index: number, p: Point, exact?: boolean) => void
   /** Turns clockwise by step degrees (default 90). */
@@ -99,15 +111,15 @@ export const useEditor = create<EditorState>((set, get) => {
     if (doc) set({ doc: fn(doc), dirty: true })
   }
   /** New outline: doors and docks move to the nearest point of the new walls. */
-  const setFloor = (floor: Point[]) =>
-    change((d) => ({
-      ...d,
-      floor,
-      openings: d.openings.map((o) => {
-        const at = nearestOnOutline(floor, o)
-        return { ...o, x: at.x, y: at.y }
-      }),
-    }))
+  const withFloor = (d: LayoutDocument, floor: Point[]): LayoutDocument => ({
+    ...d,
+    floor,
+    openings: d.openings.map((o) => {
+      const at = nearestOnOutline(floor, o)
+      return { ...o, x: at.x, y: at.y }
+    }),
+  })
+  const setFloor = (floor: Point[]) => change((d) => withFloor(d, floor))
   const addZone = (polygon: Point[]) =>
     change((d) => {
       const code = nextCode('Z', d.zones.map((z) => z.code))
@@ -145,6 +157,16 @@ export const useEditor = create<EditorState>((set, get) => {
     drawTarget: 'floor',
     drawError: null,
     cursor: null,
+    placing: null,
+    placeMissed: false,
+    startPlacing: (p) => set({ placing: p, placeMissed: false, drawing: null, selection: null }),
+    cancelPlacing: () => set({ placing: null, placeMissed: false }),
+    place: (p) => {
+      const placing = get().placing
+      if (!placing) return
+      if (placing.kind === 'RACK') set({ placeMissed: !get().addRack(placing.type, p) })
+      else get().addOpening(placing.kind, p)
+    },
     unit: savedUnit(),
     setUnit: (unit) => {
       try {
@@ -181,21 +203,19 @@ export const useEditor = create<EditorState>((set, get) => {
       else addZone(polygon)
     },
     load: (view) =>
-      set({ doc: view.layout, baseRevision: view.revision, dirty: false, selection: null, drawing: null, drawError: null }),
+      set({ doc: view.layout, baseRevision: view.revision, dirty: false, selection: null, drawing: null, drawError: null, placing: null }),
     moveFloorPoint: (index, p, exact) =>
-      change((d) => ({
-        ...d,
-        floor: d.floor.map((pt, i) => (i !== index ? pt : exact ? { x: Math.round(p.x), y: Math.round(p.y) } : { x: snap(p.x), y: snap(p.y) })),
-      })),
-    insertFloorPoint: (p) => change((d) => ({ ...d, floor: insertOnEdge(d.floor, p) })),
+      change((d) => withFloor(d,
+        d.floor.map((pt, i) => (i !== index ? pt : exact ? { x: Math.round(p.x), y: Math.round(p.y) } : { x: snap(p.x), y: snap(p.y) })))),
+    insertFloorPoint: (p) => change((d) => withFloor(d, insertOnEdge(d.floor, p))),
     removeFloorPoint: (index) =>
-      change((d) => (d.floor.length <= 3 ? d : { ...d, floor: d.floor.filter((_, i) => i !== index) })),
+      change((d) => (d.floor.length <= 3 ? d : withFloor(d, d.floor.filter((_, i) => i !== index)))),
     insertCornerAfter: (index) =>
       change((d) => {
         const a = d.floor[index]!
         const b = d.floor[(index + 1) % d.floor.length]!
         const mid = { x: snap((a.x + b.x) / 2), y: snap((a.y + b.y) / 2) }
-        return { ...d, floor: [...d.floor.slice(0, index + 1), mid, ...d.floor.slice(index + 1)] }
+        return withFloor(d, [...d.floor.slice(0, index + 1), mid, ...d.floor.slice(index + 1)])
       }),
     applyShape: (shape) => {
       const doc = get().doc
@@ -203,7 +223,7 @@ export const useEditor = create<EditorState>((set, get) => {
       const b = bounds(doc.floor) // same overall size as now, new outline
       setFloor(floorPreset(shape, b.maxX - b.minX, b.maxY - b.minY).map((p) => ({ x: p.x + b.minX, y: p.y + b.minY })))
     },
-    startDrawing: (target = 'floor') => set({ drawing: [], drawTarget: target, drawError: null, selection: null }),
+    startDrawing: (target = 'floor') => set({ drawing: [], drawTarget: target, drawError: null, selection: null, placing: null }),
     addDrawPoint: (p) => {
       const drawing = get().drawing
       if (!drawing) return
@@ -228,18 +248,21 @@ export const useEditor = create<EditorState>((set, get) => {
       set({ drawing: null, drawError: null })
     },
     cancelDrawing: () => set({ drawing: null, drawError: null }),
-    addOpening: (kind) =>
+    addOpening: (kind, where) =>
       change((d) => {
-        const n = d.openings.filter((o) => o.kind === kind).length + 1
+        const name = kind === 'DOCK' ? 'Dock' : 'Door'
+        let n = d.openings.filter((o) => o.kind === kind).length + 1
+        while (d.openings.some((o) => o.label === name + ' ' + n)) n++ // labels stay unique: problems name them
         const first = d.floor[0]!
         const second = d.floor[1]!
-        const at = nearestOnOutline(d.floor, { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 })
+        const at = nearestOnOutline(d.floor, where ?? { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 })
         const opening: Opening = {
           kind,
-          label: `${kind === 'DOCK' ? 'Dock' : 'Door'} ${n}`,
+          label: `${name} ${n}`,
           x: at.x,
           y: at.y,
           widthMm: kind === 'DOCK' ? 3000 : 1200,
+          heightMm: defaultHeight(kind),
         }
         set({ selection: { kind: 'opening', index: d.openings.length } })
         return { ...d, openings: [...d.openings, opening] }
@@ -341,23 +364,29 @@ export const useEditor = create<EditorState>((set, get) => {
       })
       set({ selection: null })
     },
-    addRack: (type) =>
+    addRack: (type, where) => {
+      let added = false
       change((d) => {
         const sel = get().selection
-        const zone = sel?.kind === 'zone' ? d.zones[sel.index] : d.zones[0]
+        const at = where && { x: snap(where.x), y: snap(where.y) }
+        const zone = at ? d.zones.find((z) => pointInPolygon(at, z.polygon))
+          : sel?.kind === 'zone' ? d.zones[sel.index] : d.zones[0]
         if (!zone) return d
         const b = bounds(zone.polygon)
         const rack: Rack = {
           code: nextCode('R', d.racks.map((r) => r.code), 2),
           templateId: type.id,
           zone: zone.code,
-          x: snap((b.minX + b.maxX) / 2),
-          y: snap((b.minY + b.maxY) / 2),
+          x: at?.x ?? snap((b.minX + b.maxX) / 2),
+          y: at?.y ?? snap((b.minY + b.maxY) / 2),
           rotation: 0,
         }
+        added = true
         set({ selection: { kind: 'rack', index: d.racks.length } })
         return { ...d, racks: [...d.racks, rack] }
-      }),
+      })
+      return added
+    },
     moveRack: (index, p, exact) =>
       change((d) => {
         const at = exact

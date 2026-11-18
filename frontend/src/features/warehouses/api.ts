@@ -25,6 +25,8 @@ export interface Opening {
   x: number
   y: number
   widthMm: number
+  /** Opening height (v2.1); null on layouts saved before heights existed (door 2.1 m, dock 3 m). */
+  heightMm?: number | null
 }
 
 export type ZoneType = 'RECEIVING' | 'STORAGE' | 'PICKING' | 'DISPATCH' | 'QUARANTINE' | 'COLD'

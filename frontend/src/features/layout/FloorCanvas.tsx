@@ -1,9 +1,9 @@
 import type Konva from 'konva'
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Circle, Group, Label, Layer, Line, Rect, Shape, Stage, Tag, Text, Transformer } from 'react-konva'
-import type { Rack, RackType, ZoneType } from '@/features/warehouses/api'
-import { useEditor } from './editorStore'
-import { bounds, nearestOnOutline, rackSize, type RackStatus } from './geometry'
+import type { Opening, Rack, RackType, ZoneType } from '@/features/warehouses/api'
+import { useEditor, type Placing } from './editorStore'
+import { bounds, nearestOnOutline, pointInPolygon, rackSize, snap, type RackStatus } from './geometry'
 import { formatWith, UNITS, type Unit } from './units'
 
 /** Zone fills: soft, distinct, readable in light and dark mode (semi-transparent over the floor). */
@@ -41,8 +41,10 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
   const drawing = useEditor((s) => s.drawing)
   const cursor = useEditor((s) => s.cursor)
   const unit = useEditor((s) => s.unit)
+  const placing = useEditor((s) => s.placing)
+  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null)
   const { moveFloorPoint, insertFloorPoint, removeFloorPoint, moveOpening, select, addDrawPoint, finishDrawing,
-    moveZonePoint, setCursor, moveZone } = useEditor.getState()
+    moveZonePoint, setCursor, moveZone, place, cancelPlacing } = useEditor.getState()
   const rackNodes = useRef(new Map<number, Konva.Group>())
   const zoneDrag = useRef<{ start: { x: number; y: number }; applied: { x: number; y: number } } | null>(null)
   const transformer = useRef<Konva.Transformer>(null)
@@ -92,7 +94,8 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
   const floorFlat = doc.floor.flatMap((p) => [p.x, p.y])
 
   return (
-    <div ref={box} className="relative h-full w-full overflow-hidden bg-muted/40" data-testid="floor-canvas">
+    <div ref={box} className={'relative h-full w-full overflow-hidden bg-muted/40' + (placing ? ' cursor-crosshair' : '')}
+      data-testid="floor-canvas" onMouseLeave={() => setGhost(null)}>
       <Stage
         width={size.width}
         height={size.height}
@@ -105,15 +108,25 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
         onDragEnd={(e) => e.target === e.target.getStage() && setView((v) => ({ ...v, x: e.target.x(), y: e.target.y() }))}
         onMouseDown={(e) => !drawing && e.target === e.target.getStage() && select(null)}
         onClick={(e) => {
-          if (!drawing || e.evt.button !== 0) return
+          if ((!drawing && !placing) || e.evt.button !== 0) return
           const p = e.target.getStage()?.getRelativePointerPosition()
-          if (p) addDrawPoint(p)
+          if (!p) return
+          if (placing) place(p)
+          else addDrawPoint(p)
+        }}
+        onContextMenu={(e) => {
+          if (!placing) return
+          e.evt.preventDefault() // right-click stops placing
+          cancelPlacing()
+          setGhost(null)
         }}
         onDblClick={() => drawing && finishDrawing()}
         onMouseMove={(e) => {
-          if (!drawing) return
+          if (!drawing && !placing) return
           const p = e.target.getStage()?.getRelativePointerPosition()
-          if (p) setCursor({ x: Math.round(p.x / 100) * 100, y: Math.round(p.y / 100) * 100 })
+          if (!p) return
+          if (placing) setGhost(p)
+          else setCursor({ x: Math.round(p.x / 100) * 100, y: Math.round(p.y / 100) * 100 })
         }}
       >
         <Layer listening={false}>
@@ -132,8 +145,8 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
             }
           }} />
         </Layer>
-        {/* While drawing, clicks must reach the stage, not select doors or add corners to the old outline. */}
-        <Layer listening={!drawing}>
+        {/* While drawing or placing, clicks must reach the stage, not select doors or add corners to the old outline. */}
+        <Layer listening={!drawing && !placing}>
           <Line points={floorFlat} closed fill="rgba(255,255,255,0.65)" stroke="#334155" strokeWidth={2}
             strokeScaleEnabled={false} hitStrokeWidth={12}
             onDblClick={(e) => {
@@ -205,9 +218,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
                   const placed = useEditor.getState().doc?.openings[i]
                   if (placed) e.target.position({ x: placed.x, y: placed.y })
                 }}>
-                <Rect x={-o.widthMm / 2} y={-300} width={o.widthMm} height={600}
-                  fill={o.kind === 'DOCK' ? '#f59e0b' : '#3b82f6'} opacity={0.85}
-                  stroke={selected ? '#0f172a' : undefined} strokeWidth={selected ? 2 : 0} strokeScaleEnabled={false} />
+                <OpeningMark kind={o.kind} widthMm={o.widthMm} px={px} selected={selected} />
               </Group>
             )
           })}
@@ -216,9 +227,9 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
             const c = centroid(doc.floor)
             const len = Math.hypot(c.x - o.x, c.y - o.y) || 1
             return (
-              <Text key={'label' + i} x={o.x + ((c.x - o.x) / len) * 700} y={o.y + ((c.y - o.y) / len) * 700}
-                text={o.label} fontSize={11 * px} fill="#0f172a" wrap="none" listening={false}
-                offsetX={labelOffset(o.label, 11 * px, (c.x - o.x) / len)} offsetY={6 * px} />
+              <Text key={'label' + i} x={o.x + ((c.x - o.x) / len) * Math.max(700, 22 * px)} y={o.y + ((c.y - o.y) / len) * Math.max(700, 22 * px)}
+                text={o.label} fontSize={12 * px} fill="#0f172a" wrap="none" listening={false}
+                offsetX={labelOffset(o.label, 12 * px, (c.x - o.x) / len)} offsetY={6 * px} />
             )
           })}
           {editable && !drawing && doc.floor.map((p, i) => (
@@ -239,6 +250,11 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
               onDragEnd={(e) => e.target.position(useEditor.getState().doc?.zones[selection.index]?.polygon[j] ?? p)} />
           ))}
         </Layer>
+        {placing && ghost && (
+          <Layer listening={false}>
+            <Ghost placing={placing} at={ghost} px={px} />
+          </Layer>
+        )}
         {drawing && (
           <Layer listening={false}>
             <Line points={[...drawing.flatMap((p) => [p.x, p.y]), ...(cursor ? [cursor.x, cursor.y] : [])]}
@@ -254,6 +270,43 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
       </Stage>
       <ScaleBar scale={view.scale} unit={unit} />
     </div>
+  )
+}
+
+/**
+ * A door or dock on its wall (the group is turned along the wall). Never smaller than about 28 × 12 screen pixels,
+ * so it can be seen and grabbed on a big floor zoomed out.
+ */
+function OpeningMark({ kind, widthMm, px, selected, ghost }: {
+  kind: Opening['kind']; widthMm: number; px: number; selected: boolean; ghost?: boolean
+}) {
+  const w = Math.max(widthMm, 28 * px)
+  const d = Math.max(600, 12 * px)
+  return (
+    <Rect x={-w / 2} y={-d / 2} width={w} height={d} fill={kind === 'DOCK' ? '#f59e0b' : '#3b82f6'}
+      opacity={ghost ? 0.5 : 0.9} cornerRadius={2 * px} stroke={selected ? '#0f172a' : '#ffffff'}
+      strokeWidth={selected ? 3 : 1} strokeScaleEnabled={false} hitStrokeWidth={10} />
+  )
+}
+
+/** What will be put down where the pointer is: a door snapped onto the nearest wall, or a rack (red outside a zone). */
+function Ghost({ placing, at, px }: { placing: Placing; at: { x: number; y: number }; px: number }) {
+  const doc = useEditor.getState().doc
+  if (!doc) return null
+  if (placing.kind !== 'RACK') {
+    const wall = nearestOnOutline(doc.floor, at)
+    return (
+      <Group x={wall.x} y={wall.y} rotation={wall.angle}>
+        <OpeningMark kind={placing.kind} widthMm={placing.kind === 'DOCK' ? 3000 : 1200} px={px} selected={false} ghost />
+      </Group>
+    )
+  }
+  const p = { x: snap(at.x), y: snap(at.y) }
+  const inside = doc.zones.some((z) => pointInPolygon(p, z.polygon))
+  const { widthMm: w, depthMm: d } = placing.type
+  return (
+    <Rect x={p.x - w / 2} y={p.y - d / 2} width={w} height={d} fill={inside ? '#93c5fd' : '#fca5a5'} opacity={0.6}
+      stroke={inside ? '#2563eb' : '#dc2626'} strokeWidth={2} strokeScaleEnabled={false} dash={[6, 4]} />
   )
 }
 

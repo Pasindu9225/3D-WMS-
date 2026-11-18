@@ -31,7 +31,9 @@ public record LayoutDocument(
             @NotNull @Size(min = 1, max = 40) String label,
             @Min(0) @Max(MAX_MM) int x,
             @Min(0) @Max(MAX_MM) int y,
-            @Min(500) @Max(20_000) int widthMm) {
+            @Min(500) @Max(20_000) int widthMm,
+            /** Height in mm (v2.1); null on layouts saved before heights existed. */
+            @Min(1_500) @Max(15_000) Integer heightMm) {
     }
 
     public record Zone(

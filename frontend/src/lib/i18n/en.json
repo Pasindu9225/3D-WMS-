@@ -191,7 +191,7 @@
   "layout.remove": "Remove",
   "layout.errors": "Fix these first",
   "layout.warnings": "Warnings",
-  "layout.help": "Drag the blue corners to shape the floor. Double-click a wall to add a corner, right-click a corner to remove it. Draw zones, then place racks inside them: drag to move (snaps to 0.1 m), R turns the selected rack, Delete removes it. Red racks overlap or stick out of their zone; amber ones face a too-narrow aisle. Scroll to zoom, drag the background to move.",
+  "layout.help": "Drag the blue corners to shape the floor (doors move with their walls). Double-click a wall to add a corner, right-click a corner to remove it. Door, Dock and Place rack follow the mouse: click to put them down. Draw zones first, then place racks inside them: drag to move (snaps to 0.1 m), R turns the selected rack, Delete removes it. Drag a door or dock along its wall. Red racks overlap or stick out of their zone; amber ones face a too-narrow aisle. Scroll to zoom, drag the background to move.",
   "layout.leaveConfirm": "You have unsaved changes to this layout. Leave without saving?",
   "layout.stay": "Stay",
   "layout.leave": "Leave without saving",
@@ -1415,5 +1415,11 @@
   "products.cartonRule": "Like 40x30x25 (each side 1 to 500 cm)",
   "products.unitsPerCartonField": "Units per carton",
   "products.unitsPerCartonRule": "A whole number, 1 or more",
-  "error.CARTON_SIZE": "Give the carton’s length, width and height, or leave the carton size empty."
+  "error.CARTON_SIZE": "Give the carton’s length, width and height, or leave the carton size empty.",
+  "layout.heightIn": "Height ({unit})",
+  "layout.place.DOOR": "Click on a wall to place a door. Esc or right-click to stop.",
+  "layout.place.DOCK": "Click on a wall to place a loading dock. Esc or right-click to stop.",
+  "layout.place.RACK": "Click inside a zone to place the rack. Esc or right-click to stop.",
+  "layout.place.missed": "Racks stand inside zones: click inside a zone.",
+  "layout.place.done": "Done"
 }

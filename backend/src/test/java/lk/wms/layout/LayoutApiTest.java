@@ -119,6 +119,18 @@ class LayoutApiTest extends IntegrationTest {
     }
 
     @Test
+    void doorsAndDocksKeepTheirHeight() throws Exception {
+        // Layouts without a height (saved before v2.1) still load: layoutJson sends none.
+        save(admin, 0, racks()).andExpect(status().isOk());
+        save(admin, 1, racks().replace("\"widthMm\":3000}", "\"widthMm\":3000,\"heightMm\":4500}"))
+                .andExpect(status().isOk());
+        send(admin, get("/api/v1/warehouses/" + warehouse + "/layout"))
+                .andExpect(jsonPath("$.layout.openings[0].heightMm").value(4500));
+        save(admin, 2, racks().replace("\"widthMm\":3000}", "\"widthMm\":3000,\"heightMm\":900}"))
+                .andExpect(status().isBadRequest()); // lower than any doorway
+    }
+
+    @Test
     void invalidLayoutIsRefusedWithEveryProblemListedAndTheDraftKept() throws Exception {
         save(admin, 0, racks(rack("R1", 5000, 5000))).andExpect(status().isOk());
         String body = save(admin, 1, racks(rack("R1", 5000, 5000), rack("R2", 6000, 5000), rack("R3", 39500, 5000)))
