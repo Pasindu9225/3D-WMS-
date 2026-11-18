@@ -50,12 +50,12 @@ public class SceneService {
     }
 
     public record SceneView(String publishedAt, int[] floor, List<LayoutDocument.Opening> openings, List<ZoneView> zones,
-            List<RackView> racks, BinArrays bins, String flags, int[] fill, Integer[] expiryDays, int[] picks) {
+            List<RackView> racks, BinArrays bins, String flags, int[] fill, Integer[] expiryDays, int[] picks, int[][] cartons) {
     }
 
     /** flags as in the scene; fill = how full each bin is, 0 to 100 (1 at least when it holds anything); expiryDays = days
      * until the earliest expiry in each bin (negative = expired), null when it holds nothing dated. */
-    public record StatusView(String publishedAt, String flags, int[] fill, Integer[] expiryDays, int[] picks) {
+    public record StatusView(String publishedAt, String flags, int[] fill, Integer[] expiryDays, int[] picks, int[][] cartons) {
     }
 
     private final WarehouseService warehouses;
@@ -132,7 +132,7 @@ public class SceneService {
         }
         return new SceneView(published.getPublishedAt().toString(), flat(doc.floor()), doc.openings(), zoneViews,
                 rackViews, arrays, flags(binRows), fill(w.id(), binRows), expiryDays(w.id(), binRows),
-                picks(w.id(), binRows));
+                picks(w.id(), binRows), cartons(w.id(), binRows));
     }
 
     /** Status only, in the same bin order as the scene; the viewer refetches the scene when publishedAt changes. */
@@ -141,7 +141,7 @@ public class SceneService {
         WarehouseRef w = warehouses.requireAccess(cu, warehouseId);
         List<SceneBin> rows = bins.findByWarehouseIdOrderById(w.id());
         return new StatusView(published(w).getPublishedAt().toString(), flags(rows), fill(w.id(), rows), expiryDays(w.id(), rows),
-                picks(w.id(), rows));
+                picks(w.id(), rows), cartons(w.id(), rows));
     }
 
     private LayoutVersion published(WarehouseRef w) {
@@ -158,6 +158,16 @@ public class SceneService {
         for (int i = 0; i < rows.size(); i++) {
             java.time.LocalDate d = earliest.get(rows.get(i).getId());
             out[i] = d == null ? null : (int) java.time.temporal.ChronoUnit.DAYS.between(today, d);
+        }
+        return out;
+    }
+
+/** Each bin's real cartons [length, width, height mm, count] (v2.1), null when its main product has no carton size. */
+    private int[][] cartons(long warehouseId, List<SceneBin> rows) {
+        Map<Long, int[]> byBin = stock.binCartons(warehouseId);
+        int[][] out = new int[rows.size()][];
+        for (int i = 0; i < rows.size(); i++) {
+            out[i] = byBin.get(rows.get(i).getId());
         }
         return out;
     }

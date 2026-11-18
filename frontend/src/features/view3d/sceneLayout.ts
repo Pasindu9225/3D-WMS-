@@ -26,6 +26,40 @@ const BEAM_D = 0.05 // step beam depth
 const GAP = 0.06 // space around a bin inside its slot
 const PALLET_H = 0.144 // a Euro pallet is 144 mm high
 const LABEL = { w: 0.16, h: 0.05, d: 0.006 }
+/** Real cartons (v2.1): at most this many drawn per place and in the whole view; beyond that a place is one block. */
+export const MAX_CARTONS_PER_PLACE = 48
+export const MAX_CARTONS = 60_000
+const CARTON_GAP = 0.012 // a hairline between cartons so sizes read
+
+/**
+ * Real-size cartons stacked in a grid on a footprint (metres): as many per layer as fit (turned if that fits more),
+ * layers up to the height. Returns the carton boxes in local coordinates (x along the place, z across), or null when
+ * not even one carton fits (then the caller draws the simple stack).
+ */
+export function cartonGrid(lengthMm: number, widthMm: number, heightMm: number, count: number, footW: number, footD: number,
+  room: number, limit = MAX_CARTONS_PER_PLACE): { x: number; y: number; z: number; w: number; h: number; d: number }[] | null {
+  const l = lengthMm * M
+  const w = widthMm * M
+  const h = heightMm * M
+  const fit = (a: number, b: number) => ({ nx: Math.floor((footW + 1e-6) / a), nz: Math.floor((footD + 1e-6) / b), a, b })
+  const asIs = fit(l, w)
+  const turned = fit(w, l)
+  const best = turned.nx * turned.nz > asIs.nx * asIs.nz ? turned : asIs
+  const perLayer = best.nx * best.nz
+  const layers = Math.floor((room + 1e-6) / h)
+  if (perLayer === 0 || layers === 0 || count <= 0) return null
+  const n = Math.min(count, perLayer * layers, limit)
+  const out = []
+  const x0 = -(best.nx * best.a) / 2 + best.a / 2
+  const z0 = -(best.nz * best.b) / 2 + best.b / 2
+  for (let k = 0; k < n; k++) {
+    const layer = Math.floor(k / perLayer)
+    const inLayer = k % perLayer
+    out.push({ x: x0 + (inLayer % best.nx) * best.a, y: layer * h + h / 2, z: z0 + Math.floor(inLayer / best.nx) * best.b,
+      w: best.a - CARTON_GAP, h: h - CARTON_GAP, d: best.b - CARTON_GAP })
+  }
+  return out
+}
 
 /**
  * Plan (x right, y down, clockwise degrees) to scene (x right, z = plan y, y up). A clockwise plan turn of θ
@@ -63,6 +97,8 @@ export interface SceneParts {
   pallets: BinBox[]
   /** The carton stack on each of those pallets; its height follows how full the bin is. */
   cartons: BinBox[]
+  /** Real-size single cartons (v2.1) where the product has a carton size. */
+  boxes: BinBox[]
   /** Bins that hold nothing: a faint box, only drawn in the colour modes. */
   empties: BinBox[]
   /** The full slot of every bin, in scene order: picking, search, fly-to and the highlight use these. */
@@ -143,9 +179,11 @@ export function buildInstances(scene: Scene): SceneParts {
   const labels: BoxSpec[] = []
   const pallets: BinBox[] = []
   const cartons: BinBox[] = []
+  const boxes: BinBox[] = []
   const empties: BinBox[] = []
   const bins: BoxSpec[] = []
   const { rack, level, pos } = scene.bins
+  let drawn = 0 // real cartons drawn so far (MAX_CARTONS guard for small PCs)
   for (let i = 0; i < rack.length; i++) {
     const r = scene.racks[rack[i]!]!
     const w = r.widthMm * M
@@ -174,13 +212,24 @@ export function buildInstances(scene: Scene): SceneParts {
       if (onPallet) pallets.push({ ...p, y: floorOf + PALLET_H / 2, w: pw, h: PALLET_H, d: pd, bin: i })
       const room = Math.max(0.1, binH - base - 0.02)
       const share = fill <= 1 ? 0.4 : Math.min(1, Math.max(0.2, fill / 100)) // 1 % = goods of unknown size: show a modest stack
-      const ch = room * share
-      cartons.push({ ...p, y: floorOf + base + ch / 2, w: pw * 0.96, h: ch, d: pd * 0.96, bin: i })
+      const real = scene.cartons?.[i]
+      const grid = real && drawn < MAX_CARTONS ? cartonGrid(real[0]!, real[1]!, real[2]!, real[3]!, pw, pd, room) : null
+      if (grid) { // real-size cartons, turned with the rack
+        const a = (r.rotation * Math.PI) / 180
+        for (const c of grid) {
+          const q = place(r, lx + c.x, c.z)
+          boxes.push({ x: q.x, z: q.z, rotY: -a, y: floorOf + base + c.y, w: c.w, h: c.h, d: c.d, bin: i })
+        }
+        drawn += grid.length
+      } else { // no carton size (or too many to draw): one stack, height from how full the place is
+        const ch = room * share
+        cartons.push({ ...p, y: floorOf + base + ch / 2, w: pw * 0.96, h: ch, d: pd * 0.96, bin: i })
+      }
     } else {
       empties.push({ ...box, bin: i })
     }
   }
-  return { posts, postColors, braces, braceColors, beams, beamColors, shelves, shelfColors, floorMarks, labels, pallets, cartons, empties, bins }
+  return { posts, postColors, braces, braceColors, beams, beamColors, shelves, shelfColors, floorMarks, labels, pallets, cartons, boxes, empties, bins }
 }
 
 /** Centre and size of the floor, for framing the camera. */

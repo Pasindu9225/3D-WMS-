@@ -9,7 +9,7 @@ import type { CameraApi } from './camera'
 import { slowFromFrameTimes } from './perf'
 import { ZONE_COLOR } from './colors'
 import { buildInstances, centreOf, edgeStripes, floorBox, type BoxSpec } from './sceneLayout'
-import { cartonTexture, labelTexture, palletTexture } from './textures'
+import { boxTexture, cartonTexture, labelTexture, palletTexture } from './textures'
 import { routePoints, type PickRoute } from './route'
 
 const M = 1 / 1000
@@ -134,6 +134,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
     })
   }, [colors])
   const cartonColors = useMemo(() => parts.cartons.map((c) => binColors[c.bin]!), [parts.cartons, binColors])
+  const boxColors = useMemo(() => parts.boxes.map((c) => binColors[c.bin]!), [parts.boxes, binColors])
   const rackColors = useMemo(() => {
     const cache = new Map<string, THREE.Color>() // a few rack colours, shared by every part
     const of = (list: string[]) => list.map((c) => { let x = cache.get(c); if (!x) cache.set(c, (x = new THREE.Color(c))); return x })
@@ -191,6 +192,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       <Boxes specs={parts.labels} color="#f8fafc" />
       <Boxes specs={parts.pallets} color="#b98a52" map={palletTexture()} />
       <Boxes specs={parts.cartons} color="#d8a86c" colors={cartonColors} map={cartonTexture()} />
+      <Boxes specs={parts.boxes} color="#d8a86c" colors={boxColors} map={boxTexture()} />
       {ghosts && <Boxes specs={parts.empties} color="#cbd5e1" colors={emptyColors} ghost />}
       <Boxes specs={parts.bins} color="#ffffff" pickOnly onPick={onSelect} />
       {selected !== null && parts.bins[selected] && <Highlight spec={parts.bins[selected]!} />}

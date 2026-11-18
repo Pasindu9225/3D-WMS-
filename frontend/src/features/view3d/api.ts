@@ -36,6 +36,8 @@ export interface Scene {
   expiryDays?: (number | null)[]
   /** Lines picked from each bin in the last 30 days (v1.2 heat map). */
   picks?: number[]
+  /** Real cartons per bin (v2.1): [length, width, height mm, count] of its main product, null without a carton size. */
+  cartons?: (number[] | null)[]
 }
 
 export const BLOCKED = 1

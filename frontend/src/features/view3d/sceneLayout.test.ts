@@ -99,3 +99,27 @@ it('floor storage: no uprights or beams, an outline per position, pallets stacke
   expect(p.labels).toHaveLength(2) // floor plates in front of the 2 ground positions only
   expect(p.labels.every((l) => l.y < 0.01)).toBe(true)
 })
+
+it('real cartons: as many per layer as fit (turned if more fit), layers up to the height, capped per place', async () => {
+  const { cartonGrid, MAX_CARTONS_PER_PLACE } = await import('./sceneLayout')
+  // 1.2 x 1.0 m pallet, 0.9 m of room: 600x400x300 cartons -> 2 x 2 per layer, 3 layers
+  expect(cartonGrid(600, 400, 300, 12, 1.2, 1.0, 0.9)).toHaveLength(12)
+  expect(cartonGrid(600, 400, 300, 99, 1.2, 1.0, 0.9)).toHaveLength(12) // no more than fit
+  expect(cartonGrid(600, 400, 300, 5, 1.2, 1.0, 0.9)![4]!.y).toBeCloseTo(0.45) // the fifth starts layer 2
+  // 300x500: as is 4 x 2 = 8 per layer, turned 2 x 3 = 6 -> as is
+  expect(cartonGrid(300, 500, 200, 8, 1.2, 1.0, 0.25)).toHaveLength(8)
+  // 1000x300 fits only turned (300 along the 1.2 m side, 1000 across the 1.0 m): 4 per layer
+  expect(cartonGrid(1000, 300, 200, 4, 1.2, 1.0, 0.25)).toHaveLength(4)
+  expect(cartonGrid(2000, 2000, 200, 1, 1.2, 1.0, 0.5)).toBeNull() // bigger than the pallet: the simple stack instead
+  expect(cartonGrid(100, 100, 100, 1000, 1.2, 1.0, 1)).toHaveLength(MAX_CARTONS_PER_PLACE)
+})
+
+it('a place whose product has a carton size shows real cartons; others keep the simple stack', () => {
+  const s = scene(0, [50, 50])
+  s.cartons = [[600, 400, 300, 3], null]
+  const p = buildInstances(s)
+  expect(p.boxes.filter((c) => c.bin === 0)).toHaveLength(3) // real cartons
+  expect(p.cartons.filter((c) => c.bin === 0)).toHaveLength(0)
+  expect(p.cartons.filter((c) => c.bin === 1)).toHaveLength(1) // simple stack
+  expect(p.boxes.find((c) => c.bin === 0)!.w).toBeCloseTo(0.588) // 600 mm less the hairline gap
+})

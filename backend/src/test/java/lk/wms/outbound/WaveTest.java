@@ -137,6 +137,21 @@ class WaveTest extends ApiTest {
         assertThat(TenantContext.callAs(tenant, () -> ledger.picksByBin(warehouseId, java.time.Instant.now().plusSeconds(1)))).isEmpty();
         assertThat(TenantContext.callAs(tenant, () -> ledger.picksByBin(warehouseId, java.time.Instant.now().minusSeconds(3600)))).hasSize(3);
 
+        // v2.1 real cartons: a carton size needs all three sides; the scene sends each place's cartons (98 units / 12 = 9)
+        send(admin, post("/api/v1/products").content("{\"sku\":\"HALF\",\"name\":\"Half\",\"baseUom\":\"EA\",\"trackBatch\":false,"
+                + "\"trackExpiry\":false,\"units\":[],\"cartonLengthMm\":400}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CARTON_SIZE"));
+        send(admin, post("/api/v1/products").content("{\"sku\":\"BOX\",\"name\":\"Box\",\"baseUom\":\"EA\",\"trackBatch\":false,"
+                + "\"trackExpiry\":false,\"units\":[{\"uom\":\"CASE\",\"factor\":6}],\"cartonLengthMm\":400,\"cartonWidthMm\":300,\"cartonHeightMm\":250}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.cartonHeightMm").value(250));
+        jdbc.update("UPDATE product SET carton_length_mm = 600, carton_width_mm = 400, carton_height_mm = 300, units_per_carton = 12 WHERE tenant_id = ? AND sku = 'P1'", tenant);
+        String withCartons = send(admin, get("/api/v1/warehouses/" + warehouse + "/scene")).andReturn().getResponse().getContentAsString();
+        List<List<Integer>> cartons = JsonPath.read(withCartons, "$.cartons");
+        assertThat(cartons.get(0)).containsExactly(600, 400, 300, 9);
+        assertThat(cartons.get(1)).isNull(); // P2 has no carton size: the simple stack
+        String status2 = send(picker, get("/api/v1/warehouses/" + warehouse + "/bin-status")).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<Integer>>read(status2, "$.cartons[0]")).containsExactly(600, 400, 300, 9);
+
         String c = releasedList(null);
         send(admin, post("/api/v1/pick-waves").content("{\"warehouseId\":\"" + warehouse + "\",\"listIds\":[\"" + a + "\",\"" + c + "\"]}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LIST_NOT_FREE"));

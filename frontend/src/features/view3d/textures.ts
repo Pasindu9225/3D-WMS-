@@ -39,6 +39,22 @@ export function cartonTexture(): THREE.CanvasTexture | null {
   return carton
 }
 
+let box: THREE.CanvasTexture | null | undefined
+/** One real carton: its edges and a strip of tape across the middle. */
+export function boxTexture(): THREE.CanvasTexture | null {
+  if (box !== undefined) return box
+  box = draw(64, (g, s) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    g.strokeStyle = 'rgba(70,45,20,0.6)'
+    g.lineWidth = 3
+    g.strokeRect(1.5, 1.5, s - 3, s - 3)
+    g.fillStyle = 'rgba(120,80,40,0.35)'
+    g.fillRect(s / 2 - 5, 0, 10, s)
+  })
+  return box
+}
+
 let pallet: THREE.CanvasTexture | null | undefined
 /** Wooden boards with gaps. */
 export function palletTexture(): THREE.CanvasTexture | null {

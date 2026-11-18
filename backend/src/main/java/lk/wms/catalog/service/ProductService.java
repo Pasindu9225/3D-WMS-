@@ -33,12 +33,14 @@ public class ProductService {
 
     public record ProductView(String id, String sku, String barcode, String name, String baseUom, Integer weightG,
             Integer volumeCm3, boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, boolean hasImage,
-            List<UnitView> units, int version, String abcClass, String category) {
+            List<UnitView> units, int version, String abcClass, String category, Integer cartonLengthMm, Integer cartonWidthMm,
+            Integer cartonHeightMm, Integer unitsPerCarton) {
     }
 
     /** Fields the user sets; the SKU is fixed once created (labels, orders and imports refer to it). */
     public record ProductSpec(String name, String barcode, String baseUom, Integer weightG, Integer volumeCm3,
-            boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, String category, List<UnitSpec> units) {
+            boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, String category, List<UnitSpec> units,
+            Integer cartonLengthMm, Integer cartonWidthMm, Integer cartonHeightMm, Integer unitsPerCarton) {
     }
 
     /** A barcode lookup (scanning): the product and how many base units one scan of it means. */
@@ -203,6 +205,28 @@ public class ProductService {
     @Transactional(readOnly = true)
     public long[] usage() {
         return new long[] {products.liveIds().size(), files.totalBytes()};
+    }
+
+/** A carton for the 3D view: sides (mm) and units per carton (the product's own number, else its largest unit, else 1). */
+    public record Carton(int lengthMm, int widthMm, int heightMm, int units) {
+    }
+
+    /** Cartons of these products (internal ids); products without a carton size are absent. */
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, Carton> cartons(java.util.Collection<Long> productIds) {
+        java.util.Map<Long, Carton> out = new java.util.HashMap<>();
+        if (productIds.isEmpty()) {
+            return out;
+        }
+        for (Product p : products.withIds(productIds)) {
+            if (p.getCartonLengthMm() == null) {
+                continue;
+            }
+            int units = p.getUnitsPerCarton() != null ? p.getUnitsPerCarton()
+                    : p.getUnits().stream().mapToInt(ProductUom::getFactor).max().orElse(1);
+            out.put(p.getId(), new Carton(p.getCartonLengthMm(), p.getCartonWidthMm(), p.getCartonHeightMm(), Math.max(1, units)));
+        }
+        return out;
     }
 
     /** What a low-stock alert says about a product (v1.2 notifications). */
@@ -428,8 +452,13 @@ public class ProductService {
         checkUnits(s);
     }
 
-    /** A larger unit appears once and never has the base unit's name. */
+    /** A larger unit appears once and never has the base unit's name; a carton size has all three sides or none. */
     private static void checkUnits(ProductSpec s) {
+        boolean any = s.cartonLengthMm() != null || s.cartonWidthMm() != null || s.cartonHeightMm() != null;
+        boolean all = s.cartonLengthMm() != null && s.cartonWidthMm() != null && s.cartonHeightMm() != null;
+        if (any && !all) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "CARTON_SIZE", "Give the carton's length, width and height, or none of them");
+        }
         Set<String> uoms = new HashSet<>();
         for (UnitSpec u : s.units()) {
             if (u.uom().equals(s.baseUom()) || !uoms.add(u.uom())) {
@@ -442,6 +471,7 @@ public class ProductService {
         p.set(s.name().trim(), s.barcode(), s.baseUom(), s.weightG(), s.volumeCm3(), s.trackBatch(), s.trackExpiry(),
                 s.costMinor(), s.reorderPoint(), s.category() == null || s.category().isBlank() ? null : s.category().trim());
         p.setUnits(s.units());
+        p.setCarton(s.cartonLengthMm(), s.cartonWidthMm(), s.cartonHeightMm(), s.unitsPerCarton());
     }
 
     private Product find(String publicId) {
@@ -458,6 +488,7 @@ public class ProductService {
         return new ProductView(p.getPublicId(), p.getSku(), p.getBarcode(), p.getName(), p.getBaseUom(), p.getWeightG(),
                 p.getVolumeCm3(), p.isTrackBatch(), p.isTrackExpiry(), p.getCostMinor(), p.getReorderPoint(), p.getImageFileId() != null,
                 p.getUnits().stream().map(u -> new UnitView(u.getUom(), u.getFactor(), u.getBarcode())).toList(),
-                p.getVersion(), p.getAbcClass(), p.getCategory());
+                p.getVersion(), p.getAbcClass(), p.getCategory(), p.getCartonLengthMm(), p.getCartonWidthMm(), p.getCartonHeightMm(),
+                p.getUnitsPerCarton());
     }
 }

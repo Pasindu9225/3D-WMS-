@@ -9,7 +9,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { Field, FormMessage, Input } from '@/components/ui/input'
 import { Pager, Table, Th, Tr } from '@/components/ui/table'
 import { can, useMe } from '@/features/auth/session'
-import { formatKg, parseMoney, parseVolume, parseWeight } from '@/features/layout/units'
+import { formatKg, parseMoney, parseCarton, parseVolume, parseWeight } from '@/features/layout/units'
 import { errorMessage, fieldErrors } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
@@ -146,6 +146,8 @@ const schema = z.object({
   cost: optional((v) => parseMoney(v) !== null, t('products.costRule')),
   reorder: optional((v) => /^\d{1,8}(\.\d{1,3})?$/.test(v), t('products.reorderRule')),
   category: z.string().trim().max(40, t('common.tooLong')),
+  carton: optional((v) => parseCarton(v) !== null, t('products.cartonRule')),
+  unitsPerCarton: optional((v) => /^\d{1,6}$/.test(v) && Number(v) >= 1, t('products.unitsPerCartonRule')),
   trackBatch: z.boolean(),
   trackExpiry: z.boolean(),
   units: z.array(z.object({
@@ -170,10 +172,12 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           cost: product.costMinor === null ? '' : (product.costMinor / 100).toFixed(2),
           reorder: product.reorderPoint == null ? '' : String(product.reorderPoint),
           category: product.category ?? '',
+          carton: product.cartonLengthMm ? `${product.cartonLengthMm / 10}x${product.cartonWidthMm! / 10}x${product.cartonHeightMm! / 10}` : '',
+          unitsPerCarton: product.unitsPerCarton ? String(product.unitsPerCarton) : '',
           trackBatch: product.trackBatch, trackExpiry: product.trackExpiry,
           units: product.units.map((u) => ({ uom: u.uom, factor: String(u.factor), barcode: u.barcode ?? '' })),
         }
-      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', reorder: '', category: '', trackBatch: false, trackExpiry: false, units: [] },
+      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', reorder: '', category: '', carton: '', unitsPerCarton: '', trackBatch: false, trackExpiry: false, units: [] },
   })
   const units = useFieldArray({ control: form.control, name: 'units' })
   const { errors } = form.formState
@@ -190,6 +194,10 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
     costMinor: v.cost ? parseMoney(v.cost) : null,
     reorderPoint: v.reorder ? Number(v.reorder) : null,
     category: v.category ? v.category : null,
+    cartonLengthMm: v.carton ? parseCarton(v.carton)![0] : null,
+    cartonWidthMm: v.carton ? parseCarton(v.carton)![1] : null,
+    cartonHeightMm: v.carton ? parseCarton(v.carton)![2] : null,
+    unitsPerCarton: v.unitsPerCarton ? Number(v.unitsPerCarton) : null,
     trackBatch: v.trackBatch,
     trackExpiry: v.trackExpiry,
     units: v.units.map((u) => ({ uom: u.uom, factor: u.factor, barcode: u.barcode || null })),
@@ -229,6 +237,12 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           </Field>
           <Field label={t('products.reorderField')} error={errors.reorder?.message}>
             {(p) => <Input {...p} inputMode="decimal" placeholder="20" {...form.register('reorder')} />}
+          </Field>
+          <Field label={t('products.cartonField')} error={errors.carton?.message}>
+            {(p) => <Input {...p} placeholder="40x30x25" {...form.register('carton')} />}
+          </Field>
+          <Field label={t('products.unitsPerCartonField')} error={errors.unitsPerCarton?.message}>
+            {(p) => <Input {...p} inputMode="numeric" placeholder="12" {...form.register('unitsPerCarton')} />}
           </Field>
           <Field label={t('products.categoryField')} error={errors.category?.message}>
             {(p) => <Input {...p} maxLength={40} placeholder="Frozen" {...form.register('category')} />}

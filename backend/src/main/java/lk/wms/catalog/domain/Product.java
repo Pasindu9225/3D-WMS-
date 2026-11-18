@@ -71,6 +71,19 @@ public class Product extends TenantScoped {
     @Column(name = "abc_at", insertable = false, updatable = false)
     private java.time.Instant abcAt;
 
+    /** Real carton size (mm) and units per carton (v2.1, 3D view); all null when not known. */
+    @Column(name = "carton_length_mm")
+    private Integer cartonLengthMm;
+
+    @Column(name = "carton_width_mm")
+    private Integer cartonWidthMm;
+
+    @Column(name = "carton_height_mm")
+    private Integer cartonHeightMm;
+
+    @Column(name = "units_per_carton")
+    private Integer unitsPerCarton;
+
     /** Free text used by putaway rules (v1.2), e.g. Frozen. */
     @Column(length = 40)
     private String category;
@@ -190,6 +203,29 @@ public class Product extends TenantScoped {
 
     public java.math.BigDecimal getReorderPoint() {
         return reorderPoint;
+    }
+
+    public void setCarton(Integer lengthMm, Integer widthMm, Integer heightMm, Integer unitsPerCarton) {
+        this.cartonLengthMm = lengthMm;
+        this.cartonWidthMm = widthMm;
+        this.cartonHeightMm = heightMm;
+        this.unitsPerCarton = unitsPerCarton;
+    }
+
+    public Integer getCartonLengthMm() {
+        return cartonLengthMm;
+    }
+
+    public Integer getCartonWidthMm() {
+        return cartonWidthMm;
+    }
+
+    public Integer getCartonHeightMm() {
+        return cartonHeightMm;
+    }
+
+    public Integer getUnitsPerCarton() {
+        return unitsPerCarton;
     }
 
     public String getCategory() {

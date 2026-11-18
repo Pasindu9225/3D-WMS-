@@ -30,6 +30,11 @@ export interface Product {
   abcClass: 'A' | 'B' | 'C' | null
   /** Free text that putaway rules match, e.g. Frozen; null = none. */
   category: string | null
+  /** Real carton size in mm and units per carton (v2.1, 3D); null when not known. */
+  cartonLengthMm?: number | null
+  cartonWidthMm?: number | null
+  cartonHeightMm?: number | null
+  unitsPerCarton?: number | null
 }
 
 export type ProductInput = Omit<Product, 'id' | 'sku' | 'hasImage' | 'version' | 'abcClass'> & { sku?: string; version?: number }

@@ -1410,5 +1410,10 @@
   "rackTypes.preview": "Preview of the rack",
   "rackTypes.style.FLOOR": "Floor storage (pallets stacked on the floor, no rack)",
   "rackTypes.palletsHigh": "Pallets high",
-  "rackTypes.positions": "Pallet positions"
+  "rackTypes.positions": "Pallet positions",
+  "products.cartonField": "Carton size (cm, L×W×H)",
+  "products.cartonRule": "Like 40x30x25 (each side 1 to 500 cm)",
+  "products.unitsPerCartonField": "Units per carton",
+  "products.unitsPerCartonRule": "A whole number, 1 or more",
+  "error.CARTON_SIZE": "Give the carton’s length, width and height, or leave the carton size empty."
 }

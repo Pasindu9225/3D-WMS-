@@ -57,6 +57,14 @@ export function formatKg(g: number): string {
  * Volume in cm³ from what people know: litres ("1.5") or a box in cm ("30x20x15", also "30 × 20 × 15").
  * Null when it is neither.
  */
+/** A carton size "40x30x25" (cm, optional "cm") into millimetre sides [length, width, height]; null if unreadable. */
+export function parseCarton(text: string): [number, number, number] | null {
+  const m = /^(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(cm)?$/.exec(text.trim().toLowerCase())
+  if (!m) return null
+  const sides = [m[1], m[2], m[3]].map((v) => Math.round(Number(v) * 10)) as [number, number, number]
+  return sides.every((s) => s >= 10 && s <= 5000) ? sides : null
+}
+
 export function parseVolume(text: string): number | null {
   const t = text.trim().toLowerCase()
   const box = /^(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(cm)?$/.exec(t)

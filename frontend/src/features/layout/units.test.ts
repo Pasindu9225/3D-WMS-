@@ -43,3 +43,11 @@ it('reads volumes in litres or as a box in cm, and money in cents', async () => 
   expect(parseMoney('450')).toBe(45000)
   expect(parseMoney('4.555')).toBeNull()
 })
+
+it('reads a carton size in cm and keeps the three sides (v2.1)', async () => {
+  const { parseCarton } = await import('./units')
+  expect(parseCarton('40x30x25')).toEqual([400, 300, 250])
+  expect(parseCarton('40 × 30.5 × 25 cm')).toEqual([400, 305, 250])
+  expect(parseCarton('40x30')).toBeNull()
+  expect(parseCarton('0.5x30x25')).toBeNull() // 5 mm: smaller than any real carton
+})

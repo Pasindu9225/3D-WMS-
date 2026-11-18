@@ -222,6 +222,34 @@ public class StockService {
         return out;
     }
 
+/**
+     * Real cartons per bin (v2.1 3D): the bin's main product (most units) and its carton size, as
+     * [lengthMm, widthMm, heightMm, cartons], cartons = units / units per carton rounded up. Bins whose main product has no
+     * carton size are absent. The caller has checked access.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, int[]> binCartons(long warehouseId) {
+        Map<Long, Object[]> main = new HashMap<>(); // bin -> [productId, qty]
+        for (Object[] r : stock.binContents(warehouseId)) {
+            long bin = ((Number) r[0]).longValue();
+            BigDecimal qty = (BigDecimal) r[2];
+            Object[] best = main.get(bin);
+            if (best == null || qty.compareTo((BigDecimal) best[1]) > 0) {
+                main.put(bin, new Object[] {((Number) r[1]).longValue(), qty});
+            }
+        }
+        Map<Long, ProductService.Carton> cartons = products.cartons(main.values().stream().map(v -> (Long) v[0]).distinct().toList());
+        Map<Long, int[]> out = new HashMap<>();
+        main.forEach((bin, v) -> {
+            ProductService.Carton c = cartons.get((Long) v[0]);
+            if (c != null && ((BigDecimal) v[1]).signum() > 0) {
+                int count = ((BigDecimal) v[1]).divide(BigDecimal.valueOf(c.units()), 0, java.math.RoundingMode.CEILING).intValue();
+                out.put(bin, new int[] {c.lengthMm(), c.widthMm(), c.heightMm(), Math.max(1, count)});
+            }
+        });
+        return out;
+    }
+
     /** The earliest expiry date in each bin holding dated stock (3D expiry colours). The caller has checked access. */
     @Transactional(readOnly = true)
     public Map<Long, java.time.LocalDate> binEarliestExpiry(long warehouseId) {

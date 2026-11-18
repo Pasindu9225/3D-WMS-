@@ -68,12 +68,17 @@ public class ProductController {
             @jakarta.validation.constraints.DecimalMin("0") @jakarta.validation.constraints.DecimalMax("10000000")
             @jakarta.validation.constraints.Digits(integer = 8, fraction = 3) java.math.BigDecimal reorderPoint,
             @Size(max = 40) @Pattern(regexp = "[^\\p{Cntrl}]*") String category,
+            @Min(10) @Max(5000) Integer cartonLengthMm, // v2.1: real carton size for 3D (all three or none)
+            @Min(10) @Max(5000) Integer cartonWidthMm,
+            @Min(10) @Max(5000) Integer cartonHeightMm,
+            @Min(1) @Max(100_000) Integer unitsPerCarton,
             @NotNull @Size(max = 10) List<@NotNull @Valid UnitRequest> units,
             @Min(0) Integer version) { // required on update
 
         ProductSpec spec() {
             return new ProductSpec(name, barcode, baseUom, weightG, volumeCm3, trackBatch, trackExpiry, costMinor, reorderPoint, category,
-                    units.stream().map(u -> new UnitSpec(u.uom(), u.factor(), u.barcode())).toList());
+                    units.stream().map(u -> new UnitSpec(u.uom(), u.factor(), u.barcode())).toList(),
+                    cartonLengthMm, cartonWidthMm, cartonHeightMm, unitsPerCarton);
         }
     }
 
@@ -82,7 +87,7 @@ public class ProductController {
             java.util.regex.Pattern.compile("^\\s*([A-Za-z]+)\\s*=\\s*(\\d{1,7})\\s*(?::\\s*(\\S+))?\\s*$");
 
     static final List<String> COLUMNS = List.of("sku", "name", "barcode", "base_uom", "weight_kg", "volume_l", "cost",
-            "track_batch", "track_expiry", "units", "reorder_point", "category");
+            "track_batch", "track_expiry", "units", "reorder_point", "category", "carton_cm", "units_per_carton");
 
     private final ProductService products;
     private final jakarta.validation.Validator validator;
@@ -107,8 +112,20 @@ public class ProductController {
         CsvRows csv = new CsvRows(lk.wms.common.Csv.readUpload(file.getOriginalFilename(), file.getBytes()), COLUMNS,
                 List.of("sku", "name", "base_uom"));
         List<ProductService.ImportRow> rows = new java.util.ArrayList<>();
-        Map<String, String> columnOf = Map.of("sku", "sku", "name", "name", "barcode", "barcode", "baseUom", "base_uom",
-                "weightG", "weight_kg", "volumeCm3", "volume_l", "costMinor", "cost", "units", "units", "reorderPoint", "reorder_point", "category", "category");
+        Map<String, String> columnOf = Map.ofEntries(Map.entry("sku", "sku"),
+                Map.entry("name", "name"),
+                Map.entry("barcode", "barcode"),
+                Map.entry("baseUom", "base_uom"),
+                Map.entry("weightG", "weight_kg"),
+                Map.entry("volumeCm3", "volume_l"),
+                Map.entry("costMinor", "cost"),
+                Map.entry("units", "units"),
+                Map.entry("reorderPoint", "reorder_point"),
+                Map.entry("category", "category"),
+                Map.entry("cartonLengthMm", "carton_cm"),
+                Map.entry("cartonWidthMm", "carton_cm"),
+                Map.entry("cartonHeightMm", "carton_cm"),
+                Map.entry("unitsPerCarton", "units_per_carton"));
         for (int i = 0; i < csv.size(); i++) {
             int errorsBefore = csv.errors.size();
             Long weight = csv.scaled(i, "weight_kg", 1000);
@@ -119,7 +136,8 @@ public class ProductController {
             ProductRequest r = new ProductRequest(csv.upper(i, "sku"), csv.text(i, "name"), csv.text(i, "barcode"),
                     csv.upper(i, "base_uom"), toInt(weight), toInt(volume), csv.yesNo(i, "track_batch"),
                     csv.yesNo(i, "track_expiry"), cost, reorder == null ? null : java.math.BigDecimal.valueOf(reorder, 3),
-                    csv.text(i, "category"), units, null);
+                    csv.text(i, "category"), carton(csv.text(i, "carton_cm"), 0), carton(csv.text(i, "carton_cm"), 1),
+                    carton(csv.text(i, "carton_cm"), 2), toInt(csv.scaled(i, "units_per_carton", 1)), units, null);
             if (r.sku() == null) {
                 csv.error(i, "sku", "SKU is required");
             } else if (csv.valid(validator, i, r, columnOf) && csv.errors.size() == errorsBefore) {
@@ -159,6 +177,15 @@ public class ProductController {
             out.add(new UnitRequest(m.group(1).toUpperCase(java.util.Locale.ROOT), Integer.parseInt(m.group(2)), m.group(3)));
         }
         return out;
+    }
+
+/** One side (0 length, 1 width, 2 height) in mm of a CSV carton size like "40x30x25" (cm); null when blank, 0 when unreadable (then refused). */
+    static Integer carton(String text, int side) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^\\s*(\\d+(?:\\.\\d+)?)\\s*[xX×*]\\s*(\\d+(?:\\.\\d+)?)\\s*[xX×*]\\s*(\\d+(?:\\.\\d+)?)\\s*(?:cm)?\\s*$").matcher(text);
+        return m.matches() ? (int) Math.round(Double.parseDouble(m.group(side + 1)) * 10) : 0;
     }
 
     private static Integer toInt(Long v) {
