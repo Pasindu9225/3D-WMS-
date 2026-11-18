@@ -1,4 +1,4 @@
-import { defaultHeight } from '@/features/layout/geometry'
+import { defaultHeight, pointInPolygon } from '@/features/layout/geometry'
 import type { Opening } from '@/features/warehouses/api'
 import type { Scene } from './api'
 
@@ -276,16 +276,21 @@ export function edgeStripes(flat: number[], width: number, height = 0.012): BoxS
 /**
  * Outer walls with real door and dock openings (v2.1). Each wall is cut where its openings are: wall pieces between
  * them at full height, a lintel above each opening from its height up to the wall top, and a frame (two posts and a
- * top bar) around each opening, so a 1.2 m × 2.1 m door is a 1.2 m × 2.1 m hole. All sizes are real (plan mm in,
+ * top bar) around each opening, filled with a door leaf (door) or a roller shutter (dock), so a 1.2 m × 2.1 m door
+ * looks like a 1.2 m × 2.1 m door. Each dock also gets a marked 3 m loading strip on the floor inside. All sizes are real (plan mm in,
  * metres out). An opening belongs to the wall it is nearest (within 0.5 m); one sticking past a corner is cut there.
  */
 export function wallParts(flat: number[], openings: Opening[], wallHeightMm: number) {
   const walls: BoxSpec[] = []
-  const doors: BoxSpec[] = []
-  const docks: BoxSpec[] = []
+  const doors: BoxSpec[] = [] // door frames
+  const docks: BoxSpec[] = [] // dock frames
+  const leaves: BoxSpec[] = [] // door leaves filling each door opening
+  const shutters: BoxSpec[] = [] // roller shutters filling each dock opening
+  const aprons: BoxSpec[] = [] // marked loading strip on the floor inside each dock
+  const outline = Array.from({ length: flat.length / 2 }, (_, k) => ({ x: flat[k * 2]!, y: flat[k * 2 + 1]! }))
   const H = wallHeightMm * M
   const T = 0.2 // wall thickness, m
-  const F = 0.12 // frame width, m
+  const F = 0.15 // frame width, m
   const n = flat.length / 2
   for (let i = 0; i < n; i++) {
     const ax = flat[i * 2]!, ay = flat[i * 2 + 1]!
@@ -315,11 +320,23 @@ export function wallParts(flat: number[], openings: Opening[], wallHeightMm: num
       frame.push(piece(h.s0, Math.min(h.s1, h.s0 + fw), 0, top, T + 0.04))
       frame.push(piece(Math.max(h.s0, h.s1 - fw), h.s1, 0, top, T + 0.04))
       frame.push(piece(h.s0, h.s1, Math.max(0, top - F), top, T + 0.04))
+      // what fills the opening, inside the frame and a little thinner than the wall
+      ;(h.o.kind === 'DOCK' ? shutters : leaves).push(piece(h.s0 + fw, Math.max(h.s0 + fw, h.s1 - fw), 0, Math.max(0.01, top - F), 0.06))
+      if (h.o.kind === 'DOCK') {
+        // the side of the wall that is indoors: try 1 m along the wall's normal from the opening's middle
+        const mid = (h.s0 + h.s1) / 2
+        const px = ax + ux * mid, py = ay + uy * mid
+        const inward = pointInPolygon({ x: px - uy * 1000, y: py + ux * 1000 }, outline) ? 1 : -1
+        const nx = -uy * inward, ny = ux * inward
+        const depth = 3000 // a 3 m loading strip
+        aprons.push({ x: (px + nx * (depth / 2 + 150)) * M, y: 0.012, z: (py + ny * (depth / 2 + 150)) * M,
+          w: (h.s1 - h.s0) * M, h: 0.012, d: depth * M, rotY })
+      }
       at = Math.max(at, h.s1)
     }
     if (at < len) walls.push(piece(at, len, 0, H))
   }
-  return { walls, doors, docks }
+  return { walls, doors, docks, leaves, shutters, aprons }
 }
 
 /** Index of the wall edge an opening is nearest to. */

@@ -97,6 +97,63 @@ export function tagTexture(text: string): { texture: THREE.CanvasTexture; aspect
   return { texture, aspect: width / 40 }
 }
 
+let shutter: THREE.CanvasTexture | null | undefined
+/** A roller shutter: horizontal slats, darker grooves between them. */
+export function shutterTexture(): THREE.CanvasTexture | null {
+  if (shutter !== undefined) return shutter
+  shutter = draw(64, (g, s) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = 'rgba(30,41,59,0.45)'
+    for (let y = 0; y < s; y += 8) g.fillRect(0, y, s, 2)
+  })
+  if (shutter) {
+    shutter.wrapS = shutter.wrapT = THREE.RepeatWrapping
+    shutter.repeat.set(1, 6) // about 6 × 8 slats over a dock door
+  }
+  return shutter
+}
+
+let leaf: THREE.CanvasTexture | null | undefined
+/** A door leaf: two raised panels and a handle. */
+export function leafTexture(): THREE.CanvasTexture | null {
+  if (leaf !== undefined) return leaf
+  leaf = draw(64, (g, s) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    g.strokeStyle = 'rgba(15,23,42,0.45)'
+    g.lineWidth = 2
+    g.strokeRect(10, 6, s - 20, s * 0.38)
+    g.strokeRect(10, s * 0.52, s - 20, s * 0.4)
+    g.fillStyle = 'rgba(15,23,42,0.8)'
+    g.fillRect(s - 16, s * 0.46, 8, 3) // handle
+  })
+  return leaf
+}
+
+let hazard: THREE.CanvasTexture | null | undefined
+/** Yellow and black diagonal stripes, the marking in front of a loading dock. */
+export function hazardTexture(): THREE.CanvasTexture | null {
+  if (hazard !== undefined) return hazard
+  hazard = draw(64, (g, s) => {
+    g.fillStyle = '#facc15'
+    g.fillRect(0, 0, s, s)
+    g.strokeStyle = '#111827'
+    g.lineWidth = 9
+    for (let x = -s; x < s * 2; x += 24) {
+      g.beginPath()
+      g.moveTo(x, s)
+      g.lineTo(x + s, 0)
+      g.stroke()
+    }
+  })
+  if (hazard) {
+    hazard.wrapS = hazard.wrapT = THREE.RepeatWrapping
+    hazard.repeat.set(3, 3)
+  }
+  return hazard
+}
+
 /** A zone's code and name painted on the floor (white text on a clear background). */
 export function labelTexture(title: string, subtitle: string): THREE.CanvasTexture | null {
   return draw(256, (g, s) => {

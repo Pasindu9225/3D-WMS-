@@ -9,7 +9,7 @@ import type { CameraApi } from './camera'
 import { slowFromFrameTimes } from './perf'
 import { ZONE_COLOR } from './colors'
 import { buildInstances, centreOf, contentBox, edgeStripes, floorBox, wallParts, type BoxSpec } from './sceneLayout'
-import { boxTexture, cartonTexture, labelTexture, palletTexture, tagTexture } from './textures'
+import { boxTexture, cartonTexture, hazardTexture, labelTexture, leafTexture, palletTexture, shutterTexture, tagTexture } from './textures'
 import { routePoints, type PickRoute } from './route'
 
 const M = 1 / 1000
@@ -207,7 +207,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       </group>
       <Boxes specs={zoneLines.specs} color="#ffffff" colors={zoneLines.cols} />
       {scene.zones.map((z) => <ZoneLabel key={z.code} zone={z} />)}
-      <Boxes specs={kerb} color="#475569" />
+      {!walls && <Boxes specs={kerb} color="#475569" />}{/* walls mark the edge; a kerb would cross door openings */}
       <Boxes specs={parts.posts} color="#1d4ed8" colors={rackColors.posts} />
       <Boxes specs={parts.braces} color="#3b82f6" colors={rackColors.braces} />
       <Boxes specs={parts.beams} color="#f97316" colors={rackColors.beams} />
@@ -223,8 +223,11 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       {walls ? (
         <>
           <Boxes specs={walls.walls} color="#cbd5e1" opacity={0.32} />
-          <Boxes specs={walls.doors} color="#3b82f6" />
+          <Boxes specs={walls.doors} color="#1e3a8a" />
+          <Boxes specs={walls.leaves} color="#3b82f6" map={leafTexture()} />
           <Boxes specs={walls.docks} color="#f59e0b" />
+          <Boxes specs={walls.shutters} color="#cbd5e1" map={shutterTexture()} />
+          <Boxes specs={walls.aprons} color="#ffffff" map={hazardTexture()} />
         </>
       ) : <Boxes specs={doors} color="#facc15" />}
       {scene.zones.map((z) => {

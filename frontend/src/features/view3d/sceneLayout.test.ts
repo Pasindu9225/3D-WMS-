@@ -142,6 +142,20 @@ describe('walls with real door openings (v2.1)', () => {
     expect(docks).toHaveLength(0)
   })
 
+  it('fills a door with a door leaf, and a dock with a shutter and a loading strip on the indoor side', () => {
+    const d = wallParts(floor, [door], 8000)
+    expect(d.leaves).toHaveLength(1)
+    expect(d.leaves[0]!.w).toBeCloseTo(1.2 - 2 * 0.15) // inside the frame
+    expect(d.leaves[0]!.y + d.leaves[0]!.h / 2).toBeCloseTo(2.1 - 0.15)
+    expect(d.shutters).toHaveLength(0)
+    const dock = { kind: 'DOCK' as const, label: 'Dock 1', x: 10_000, y: 0, widthMm: 3000, heightMm: 4500 }
+    const k = wallParts(floor, [dock], 8000)
+    expect(k.shutters).toHaveLength(1)
+    expect(k.aprons).toHaveLength(1)
+    expect(k.aprons[0]!.z).toBeGreaterThan(0) // the floor is below the top wall (y > 0): the strip is indoors
+    expect(k.aprons[0]!.w).toBeCloseTo(3)
+  })
+
   it('uses the typed height, and a door at a corner never makes a negative piece', () => {
     const dock = { kind: 'DOCK' as const, label: 'Dock 1', x: 200, y: 0, widthMm: 3000, heightMm: 4500 }
     const { walls, docks } = wallParts(floor, [dock], 8000)
