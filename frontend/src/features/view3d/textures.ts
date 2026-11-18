@@ -71,30 +71,72 @@ export function palletTexture(): THREE.CanvasTexture | null {
 }
 
 /**
- * A name tag: white text on a dark rounded pill, for labels that keep the same size on screen at any distance.
- * Returns the texture and its width/height ratio.
+ * A name tag that keeps the same size on screen at any distance: a soft dark pill with, on the left, either a
+ * coloured badge holding a short code (zones: "A" in the zone's colour) or a small coloured marker (doors, docks).
+ * Drawn at twice the size for sharp text. Returns the texture and its width/height ratio.
  */
-export function tagTexture(text: string): { texture: THREE.CanvasTexture; aspect: number } | null {
-  const label = text.slice(0, 28)
-  const width = Math.max(96, Math.round(label.length * 15 + 28))
+export function tagTexture(text: string, accent: string, badge?: string): { texture: THREE.CanvasTexture; aspect: number } | null {
   if (typeof document === 'undefined') return null
+  const S = 2 // drawn at 2× for crisp text
+  const H = 30 * S
+  const label = text.slice(0, 32)
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = 40
   const g = canvas.getContext('2d')
   if (!g) return null
-  g.fillStyle = 'rgba(15,23,42,0.85)'
+  const font = `600 ${15 * S}px system-ui, -apple-system, "Segoe UI", sans-serif`
+  g.font = font
+  const textW = g.measureText(label).width
+  const lead = badge ? 26 * S : 18 * S // room for the badge or marker
+  const width = Math.ceil(6 * S + lead + textW + 12 * S)
+  canvas.width = width
+  canvas.height = H
+  // pill
+  g.fillStyle = 'rgba(15,23,42,0.72)'
   g.beginPath()
-  g.roundRect(1, 1, width - 2, 38, 10)
+  g.roundRect(0, 0, width, H, H / 2)
   g.fill()
-  g.fillStyle = '#ffffff'
-  g.font = 'bold 22px system-ui, sans-serif'
-  g.textAlign = 'center'
+  g.strokeStyle = 'rgba(255,255,255,0.18)'
+  g.lineWidth = S
+  g.stroke()
+  if (badge) {
+    g.fillStyle = accent
+    g.beginPath()
+    g.roundRect(4 * S, 4 * S, 22 * S, H - 8 * S, 6 * S)
+    g.fill()
+    g.fillStyle = '#ffffff'
+    g.font = `700 ${13 * S}px system-ui, -apple-system, "Segoe UI", sans-serif`
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText(badge.slice(0, 3), 15 * S, H / 2 + S)
+  } else {
+    g.fillStyle = accent
+    g.beginPath()
+    g.roundRect(9 * S, 8 * S, 6 * S, H - 16 * S, 3 * S) // a slim upright bar, like a door edge
+    g.fill()
+  }
+  g.font = font
+  g.fillStyle = '#f8fafc'
+  g.textAlign = 'left'
   g.textBaseline = 'middle'
-  g.fillText(label, width / 2, 21)
+  g.fillText(label, 6 * S + lead, H / 2 + S)
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
-  return { texture, aspect: width / 40 }
+  texture.anisotropy = 2
+  return { texture, aspect: width / H }
+}
+
+/**
+ * Hides labels that would cover a more important one on screen. Each rect is the label's box in screen pixels;
+ * items come in priority order (most important first). Returns which ones to show.
+ */
+export function declutter(rects: ({ x: number; y: number; w: number; h: number } | null)[], pad = 4): boolean[] {
+  const shown: { x: number; y: number; w: number; h: number }[] = []
+  return rects.map((r) => {
+    if (!r) return false
+    const hit = shown.some((s) => Math.abs(s.x - r.x) * 2 < s.w + r.w + pad && Math.abs(s.y - r.y) * 2 < s.h + r.h + pad)
+    if (!hit) shown.push(r)
+    return !hit
+  })
 }
 
 let shutter: THREE.CanvasTexture | null | undefined

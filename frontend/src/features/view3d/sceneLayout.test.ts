@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Scene } from './api'
 import { buildInstances, centreOf, contentBox, wallParts } from './sceneLayout'
+import { declutter } from './textures'
 
 const rack = (rotation: number): Scene['racks'][number] => ({
   code: 'R01', zone: 'A', x: 10_000, y: 5000, rotation, widthMm: 3000, depthMm: 1000, heightMm: 4000,
@@ -170,5 +171,14 @@ describe('walls with real door openings (v2.1)', () => {
     expect(box.cx).toBeCloseTo(10)
     expect(box.size).toBeLessThan(20)
     expect(contentBox({ floor: big, racks: [] }).size).toBeCloseTo(400)
+  })
+})
+
+describe('name tags never pile up (v2.1)', () => {
+  it('hides a tag that would cover a more important one, keeps those that do not touch', () => {
+    const zone = { x: 100, y: 100, w: 120, h: 30 }
+    const dockOnTop = { x: 130, y: 105, w: 80, h: 24 } // covers the zone tag
+    const doorApart = { x: 400, y: 300, w: 80, h: 24 }
+    expect(declutter([zone, dockOnTop, doorApart, null])).toEqual([true, false, true, false])
   })
 })

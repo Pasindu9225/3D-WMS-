@@ -9,7 +9,7 @@ import type { CameraApi } from './camera'
 import { slowFromFrameTimes } from './perf'
 import { ZONE_COLOR } from './colors'
 import { buildInstances, centreOf, contentBox, edgeStripes, floorBox, wallParts, type BoxSpec } from './sceneLayout'
-import { boxTexture, cartonTexture, hazardTexture, labelTexture, leafTexture, palletTexture, shutterTexture, tagTexture } from './textures'
+import { boxTexture, cartonTexture, declutter, hazardTexture, labelTexture, leafTexture, palletTexture, shutterTexture, tagTexture } from './textures'
 import { routePoints, type PickRoute } from './route'
 
 const M = 1 / 1000
@@ -82,21 +82,60 @@ function Boxes({ specs, color, colors, onPick, map, ghost, pickOnly, opacity }: 
  * A name that keeps the same size on screen however far away it is (a sprite without size attenuation), drawn over
  * everything, so zone and door names stay readable on a big floor.
  */
-function NameTag({ text, at }: { text: string; at: [number, number, number] }) {
-  const tag = useMemo(() => tagTexture(text), [text])
-  useEffect(() => () => tag?.texture.dispose(), [tag])
-  if (!tag) return null
-  const h = 0.035
+interface TagItem {
+  key: string
+  text: string
+  accent: string
+  badge?: string
+  at: [number, number, number]
+  /** Height as a share of the view (zones a little bigger than doors). */
+  h: number
+}
+
+/**
+ * Zone, door and dock names as screen-size tags. Items come most important first; on every frame drawn, a tag that
+ * would cover a more important (or nearer) one is hidden until you zoom in, so names never pile up.
+ */
+function Tags({ items }: { items: TagItem[] }) {
+  const tags = useMemo(() => items.map((i) => tagTexture(i.text, i.accent, i.badge)), [items])
+  useEffect(() => () => tags.forEach((t) => t?.texture.dispose()), [tags])
+  const sprites = useRef<(THREE.Sprite | null)[]>([])
+  const v = useMemo(() => new THREE.Vector3(), [])
+  useFrame(({ camera, size }) => {
+    const fov = (camera as THREE.PerspectiveCamera).fov ?? 45
+    const unit = size.height / (2 * Math.tan((fov * Math.PI) / 360)) // screen px per sprite unit
+    const rects = items.map((it, i) => {
+      const t = tags[i]
+      if (!t) return null
+      v.set(...it.at).project(camera)
+      if (v.z > 1 || Math.abs(v.x) > 1.2 || Math.abs(v.y) > 1.2) return null // behind the camera or off screen
+      const h = it.h * unit
+      return { x: ((v.x + 1) / 2) * size.width, y: ((1 - v.y) / 2) * size.height, w: h * t.aspect, h }
+    })
+    declutter(rects).forEach((show, i) => {
+      const s = sprites.current[i]
+      if (s) s.visible = show
+    })
+  })
   return (
-    <sprite position={at} scale={[h * tag.aspect, h, 1]} renderOrder={10}>
-      <spriteMaterial map={tag.texture} sizeAttenuation={false} depthTest={false} transparent />
-    </sprite>
+    <>
+      {items.map((it, i) => {
+        const t = tags[i]
+        if (!t) return null
+        return (
+          <sprite key={it.key} ref={(s) => { sprites.current[i] = s }} position={it.at} scale={[it.h * t.aspect, it.h, 1]}
+            renderOrder={10}>
+            <spriteMaterial map={t.texture} sizeAttenuation={false} depthTest={false} transparent />
+          </sprite>
+        )
+      })}
+    </>
   )
 }
 
-/** A zone's code and name painted flat on the floor at its middle, sized to the zone. */
+/** A zone's code painted flat on the floor at its middle, sized to the zone (its name floats above as a tag). */
 function ZoneLabel({ zone }: { zone: Scene['zones'][number] }) {
-  const texture = useMemo(() => labelTexture(zone.code, zone.name), [zone.code, zone.name])
+  const texture = useMemo(() => labelTexture(zone.code, ''), [zone.code])
   useEffect(() => () => texture?.dispose(), [texture])
   const c = centreOf(zone.polygon)
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
@@ -145,6 +184,17 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
     [scene.zones])
   const box = useMemo(() => floorBox(scene.floor), [scene.floor])
   const start = useMemo(() => contentBox(scene), [scene])
+  // Names, most important first: zones (coloured code badge), then docks (orange), then doors (blue).
+  const tagItems = useMemo<TagItem[]>(() => [
+    ...scene.zones.map((z) => {
+      const c = centreOf(z.polygon)
+      return { key: 'z' + z.code, text: z.name || z.code, badge: z.code, accent: ZONE_COLOR[z.type], at: [c.x * M, 1, c.y * M] as [number, number, number], h: 0.032 }
+    }),
+    ...[...scene.openings].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'DOCK' ? -1 : 1)).map((o) => ({
+      key: 'o' + o.label + o.x + o.y, text: o.label, accent: o.kind === 'DOCK' ? '#f59e0b' : '#3b82f6',
+      at: [o.x * M, ((o.heightMm ?? defaultHeight(o.kind)) + 500) * M, o.y * M] as [number, number, number], h: 0.026,
+    })),
+  ], [scene.zones, scene.openings])
   // Outer walls with real-size door and dock openings, when the server sends the wall height.
   const walls = useMemo(() => (scene.wallHeightMm ? wallParts(scene.floor, scene.openings, scene.wallHeightMm) : null),
     [scene.floor, scene.openings, scene.wallHeightMm])
@@ -230,13 +280,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
           <Boxes specs={walls.aprons} color="#ffffff" map={hazardTexture()} />
         </>
       ) : <Boxes specs={doors} color="#facc15" />}
-      {scene.zones.map((z) => {
-        const c = centreOf(z.polygon)
-        return <NameTag key={'zt' + z.code} text={`${z.code} · ${z.name}`} at={[c.x * M, 1, c.y * M]} />
-      })}
-      {scene.openings.map((o, i) => (
-        <NameTag key={'ot' + i} text={o.label} at={[o.x * M, ((o.heightMm ?? defaultHeight(o.kind)) + 600) * M, o.y * M]} />
-      ))}
+      <Tags items={tagItems} />
       {route && route.stops.length > 0 && <RouteLine route={route} />}
       <Rig box={box} start={start} onCamera={onCamera} />
       {drone && <Drone {...drone} />}
