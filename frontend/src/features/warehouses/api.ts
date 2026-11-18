@@ -69,7 +69,7 @@ export interface RackType {
   binsPerLevel: number
   maxWeightPerLevelG: number
   /** 3D look (v2.1): pallet racking or shelving, and the colours of uprights and beams (#rrggbb). */
-  style?: 'PALLET' | 'SHELF'
+  style?: 'PALLET' | 'SHELF' | 'FLOOR'
   uprightColor?: string
   beamColor?: string
 }

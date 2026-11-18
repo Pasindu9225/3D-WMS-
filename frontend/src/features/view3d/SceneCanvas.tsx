@@ -187,6 +187,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       <Boxes specs={parts.braces} color="#3b82f6" colors={rackColors.braces} />
       <Boxes specs={parts.beams} color="#f97316" colors={rackColors.beams} />
       <Boxes specs={parts.shelves} color="#94a3b8" colors={rackColors.shelves} />
+      <Boxes specs={parts.floorMarks} color="#fde047" />
       <Boxes specs={parts.labels} color="#f8fafc" />
       <Boxes specs={parts.pallets} color="#b98a52" map={palletTexture()} />
       <Boxes specs={parts.cartons} color="#d8a86c" colors={cartonColors} map={cartonTexture()} />

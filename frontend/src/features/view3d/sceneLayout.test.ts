@@ -82,3 +82,20 @@ it('draws each rack in its own colours; shelving gets solid shelves and no palle
   expect(classic.pallets).toHaveLength(2)
   expect(classic.postColors[0]).toBe('#1d4ed8')
 })
+
+it('floor storage: no uprights or beams, an outline per position, pallets stacked on each other', () => {
+  const s: Scene = {
+    publishedAt: 'x', floor: [], openings: [], zones: [], flags: '000', fill: [80, 80, 0],
+    racks: [{ code: '01', zone: 'F', x: 10_000, y: 5000, rotation: 0, widthMm: 2600, depthMm: 1200, heightMm: 3000,
+      binsPerLevel: 2, levels: [0, 1000, 2000], style: 'FLOOR' }],
+    bins: { ids: ['a', 'b', 'c'], codes: ['F-01-01-01', 'F-01-02-01', 'F-01-01-02'], rack: [0, 0, 0], level: [0, 1, 0], pos: [0, 0, 1] },
+  }
+  const p = buildInstances(s)
+  expect(p.posts).toHaveLength(0)
+  expect(p.beams).toHaveLength(0)
+  expect(p.braces).toHaveLength(0)
+  expect(p.floorMarks).toHaveLength(8) // 4 painted lines round each of the 2 positions
+  expect(p.pallets.map((x) => x.y)).toEqual([0.072, 1.072]) // on the floor, and on top of the one below (1 m stacking height)
+  expect(p.labels).toHaveLength(2) // floor plates in front of the 2 ground positions only
+  expect(p.labels.every((l) => l.y < 0.01)).toBe(true)
+})

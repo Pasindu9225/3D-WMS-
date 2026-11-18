@@ -110,7 +110,7 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
     height: length(500, 40_000),
     levels: whole(1, 20),
     binsPerLevel: whole(1, 50),
-    style: z.enum(['PALLET', 'SHELF']),
+    style: z.enum(['PALLET', 'SHELF', 'FLOOR']),
     uprightColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     beamColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     weight: z.string().refine((v) => {
@@ -172,10 +172,10 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
           </Field>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <Field label={t('rackTypes.levels')} error={errors.levels?.message}>
+          <Field label={look[0] === 'FLOOR' ? t('rackTypes.palletsHigh') : t('rackTypes.levels')} error={errors.levels?.message}>
             {(p) => <Input {...p} type="number" min={1} max={20} {...form.register('levels')} />}
           </Field>
-          <Field label={t('rackTypes.binsPerLevel')} error={errors.binsPerLevel?.message}>
+          <Field label={look[0] === 'FLOOR' ? t('rackTypes.positions') : t('rackTypes.binsPerLevel')} error={errors.binsPerLevel?.message}>
             {(p) => <Input {...p} type="number" min={1} max={50} {...form.register('binsPerLevel')} />}
           </Field>
           <Field label={t('rackTypes.weightPerLevel')} error={errors.weight?.message}>
@@ -190,6 +190,7 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
                 <select {...p} className="h-10 rounded-md border border-input bg-background px-3" {...form.register('style')}>
                   <option value="PALLET">{t('rackTypes.style.PALLET')}</option>
                   <option value="SHELF">{t('rackTypes.style.SHELF')}</option>
+                  <option value="FLOOR">{t('rackTypes.style.FLOOR')}</option>
                 </select>
               )}
             </Field>
@@ -215,7 +216,7 @@ function RackTypeDialog({ type, unit, onClose }: { type: RackType | null; unit: 
 }
 
 /** A small front view of the rack in its chosen look: uprights, beams (or shelves) and loads. */
-function RackPreview({ style, upright, beam, levels, slots }: { style: 'PALLET' | 'SHELF'; upright: string; beam: string; levels: number; slots: number }) {
+function RackPreview({ style, upright, beam, levels, slots }: { style: 'PALLET' | 'SHELF' | 'FLOOR'; upright: string; beam: string; levels: number; slots: number }) {
   const n = Math.min(Math.max(levels, 1), 8)
   const s = Math.min(Math.max(slots, 1), 6)
   const w = 120
@@ -232,16 +233,20 @@ function RackPreview({ style, upright, beam, levels, slots }: { style: 'PALLET' 
           <g key={r}>
             {cols.map((c) => (
               <g key={c}>
-                {style === 'PALLET' && <rect x={8 + c * slotW + 2} y={y - 5} width={slotW - 4} height={4} fill="#a16207" />}
-                <rect x={8 + c * slotW + 3} y={y - (style === 'PALLET' ? 5 : 1) - levelH * 0.5} width={slotW - 6} height={levelH * 0.5} fill="#d8a86c" stroke="#92400e" strokeWidth={0.5} />
+                {style !== 'SHELF' && <rect x={8 + c * slotW + 2} y={y - 5} width={slotW - 4} height={4} fill="#a16207" />}
+                <rect x={8 + c * slotW + 3} y={y - (style !== 'SHELF' ? 5 : 1) - levelH * 0.5} width={slotW - 6} height={levelH * 0.5} fill="#d8a86c" stroke="#92400e" strokeWidth={0.5} />
               </g>
             ))}
-            {r > 0 && <rect x={6} y={y} width={w - 12} height={style === 'SHELF' ? 3 : 4} fill={beam} />}
+            {r > 0 && style !== 'FLOOR' && <rect x={6} y={y} width={w - 12} height={style === 'SHELF' ? 3 : 4} fill={beam} />}
           </g>
         )
       })}
-      <rect x={4} y={4} width={5} height={h - 4} fill={upright} />
-      <rect x={w - 9} y={4} width={5} height={h - 4} fill={upright} />
+      {style === 'FLOOR' ? <rect x={2} y={h - 4} width={w - 4} height={3} fill="#fde047" /> : (
+        <>
+          <rect x={4} y={4} width={5} height={h - 4} fill={upright} />
+          <rect x={w - 9} y={4} width={5} height={h - 4} fill={upright} />
+        </>
+      )}
     </svg>
   )
 }

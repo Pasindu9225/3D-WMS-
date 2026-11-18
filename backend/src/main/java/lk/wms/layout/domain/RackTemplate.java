@@ -68,7 +68,7 @@ public class RackTemplate extends TenantScoped {
     private Instant deletedAt;
 
     /** How it looks in 3D (v2.1): PALLET racking or SHELF shelving, and its colours (#RRGGBB). */
-    public enum Style { PALLET, SHELF }
+    public enum Style { PALLET, SHELF, FLOOR }
 
     @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
     @Column(nullable = false)

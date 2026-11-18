@@ -113,6 +113,29 @@ class SceneApiTest extends ApiTest {
         send(otherAdmin, get("/api/v1/warehouses/" + warehouse + "/bin-status")).andExpect(status().isNotFound());
     }
 
+    @Test
+    void floorStorageRowsArePlacesWithoutARack() throws Exception {
+        // v2.1: a FLOOR rack type = 4 pallet positions side by side, stacked 3 high; the layout places it like a rack
+        String floorType = read(send(admin, post("/api/v1/rack-templates").content("{\"code\":\"FL\",\"name\":\"Floor row\","
+                + "\"widthMm\":5000,\"depthMm\":1200,\"heightMm\":4500,\"levels\":3,\"binsPerLevel\":4,"
+                + "\"maxWeightPerLevelG\":4000000,\"style\":\"FLOOR\"}")).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.style").value("FLOOR")), "$.id");
+        String floor = "[{\"x\":0,\"y\":0},{\"x\":40000,\"y\":0},{\"x\":40000,\"y\":20000},{\"x\":0,\"y\":20000}]";
+        send(admin, put("/api/v1/warehouses/" + warehouse + "/layout").content("{\"baseRevision\":1,\"layout\":{\"floor\":" + floor
+                + ",\"openings\":[],\"zones\":[{\"code\":\"F\",\"type\":\"STORAGE\",\"name\":\"Floor\",\"polygon\":" + floor
+                + "}],\"racks\":[{\"code\":\"01\",\"templateId\":\"" + floorType + "\",\"zone\":\"F\",\"x\":10000,\"y\":10000,\"rotation\":0}],"
+                + "\"settings\":{\"minAisleMm\":1200}}}")).andExpect(status().isOk());
+        send(admin, post("/api/v1/warehouses/" + warehouse + "/layout/publish").content("{\"baseRevision\":2}")).andExpect(status().isOk());
+        String body = send(admin, get("/api/v1/warehouses/" + warehouse + "/scene")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.racks[0].style").value("FLOOR"))
+                .andExpect(jsonPath("$.racks[0].levels.length()").value(3))
+                .andExpect(jsonPath("$.bins.ids.length()").value(12)) // 4 positions x 3 high
+                .andReturn().getResponse().getContentAsString();
+        assertThat(jsonList(body, "$.bins.codes")).contains("F-01-01-01", "F-01-03-04"); // same code scheme as racks
+        send(admin, get("/api/v1/warehouses/" + warehouse + "/bins?code=F-01-01")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(4));
+    }
+
     private void publish() throws Exception {
         send(admin, post("/api/v1/warehouses/" + warehouse + "/layout/publish").content("{\"baseRevision\":1}"))
                 .andExpect(status().isOk());

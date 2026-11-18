@@ -56,6 +56,7 @@ export function LiteMap({ scene, colors, selectedBin, selectedRack, onRack, rout
         return (
           <polygon key={r.code} points={poly.map((p) => `${p.x},${p.y}`).join(' ')} fill={rackColor[i]}
             stroke={active ? '#facc15' : '#1e293b'} strokeWidth={active ? 160 : 40} className="cursor-pointer"
+            strokeDasharray={r.style === 'FLOOR' ? '300 200' : undefined} fillOpacity={r.style === 'FLOOR' ? 0.6 : 1}
             onClick={() => onRack(i)}>
             <title>{r.code}</title>
           </polygon>

@@ -1407,5 +1407,8 @@
   "rackTypes.style.SHELF": "Shelving (solid shelves, cartons)",
   "rackTypes.uprightColor": "Uprights",
   "rackTypes.beamColor": "Beams / shelves",
-  "rackTypes.preview": "Preview of the rack"
+  "rackTypes.preview": "Preview of the rack",
+  "rackTypes.style.FLOOR": "Floor storage (pallets stacked on the floor, no rack)",
+  "rackTypes.palletsHigh": "Pallets high",
+  "rackTypes.positions": "Pallet positions"
 }

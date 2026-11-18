@@ -72,3 +72,17 @@ it('chooses how the rack looks in 3D: shelving in its own colours, shown in the 
   await waitFor(() => expect(requests.some((r) => r.method === 'POST')).toBe(true))
   expect(JSON.parse(requests.find((r) => r.method === 'POST')!.body!)).toMatchObject({ style: 'SHELF', uprightColor: '#22c55e', beamColor: '#64748b' })
 })
+
+it('floor storage: the form asks for pallet positions and pallets high; the preview has no uprights', async () => {
+  const user = userEvent.setup()
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RackTypesPage />
+    </QueryClientProvider>,
+  )
+  await user.click(await screen.findByRole('button', { name: /New rack type/ }))
+  await user.selectOptions(screen.getByLabelText('Type'), 'FLOOR')
+  expect(screen.getByLabelText('Pallets high')).toBeInTheDocument()
+  expect(screen.getByLabelText('Pallet positions')).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Preview of the rack' }).querySelectorAll('rect[fill="#1d4ed8"]')).toHaveLength(0)
+})

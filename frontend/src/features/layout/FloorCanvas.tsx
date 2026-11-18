@@ -179,7 +179,7 @@ export function FloorCanvas({ templates, statuses, editable, fitSignal }: {
             return (
               <RackNode key={i} index={i} rack={r} w={widthMm} d={depthMm} fill={RACK_FILL[statuses[i] ?? 'ok']}
                 selected={selection?.kind === 'rack' && selection.index === i} editable={editable}
-                typeW={t.widthMm} typeD={t.depthMm} nodes={rackNodes} onLive={setLive} unit={unit} />
+                typeW={t.widthMm} typeD={t.depthMm} nodes={rackNodes} onLive={setLive} unit={unit} floor={t.style === 'FLOOR'} />
             )
           })}
           {editable && !drawing && (
@@ -339,7 +339,7 @@ function ScaleBar({ scale, unit }: { scale: number; unit: Unit }) {
  * One rack. Memoized, and its label is sized in floor units (it scales with the drawing like a plan), so
  * zooming and panning redraw it without re-rendering 100s of React components.
  */
-const RackNode = memo(function RackNode({ index: i, rack: r, w, d, fill, selected, editable, typeW, typeD, nodes, onLive, unit }: {
+const RackNode = memo(function RackNode({ index: i, rack: r, w, d, fill, selected, editable, typeW, typeD, nodes, onLive, unit, floor }: {
   index: number
   rack: Rack
   w: number
@@ -352,6 +352,8 @@ const RackNode = memo(function RackNode({ index: i, rack: r, w, d, fill, selecte
   nodes: RefObject<Map<number, Konva.Group>>
   onLive: (live: { x: number; y: number; text: string } | null) => void
   unit: Unit
+  /** Floor storage row (v2.1): drawn dashed so it reads as pallets on the floor, not a rack. */
+  floor?: boolean
 }) {
   const { select, moveRack, updateRack } = useEditor.getState()
   const fontSize = Math.min(d * 0.6, w / (r.code.length * 0.62))
@@ -387,7 +389,8 @@ const RackNode = memo(function RackNode({ index: i, rack: r, w, d, fill, selecte
         moveRack(i, { x: n.x(), y: n.y() })
       }}>
       <Rect x={-w / 2} y={-d / 2} width={w} height={d} fill={fill} stroke={selected ? '#2563eb' : '#475569'}
-        strokeWidth={selected ? 3 : 1} strokeScaleEnabled={false} perfectDrawEnabled={false} />
+        strokeWidth={selected ? 3 : 1} strokeScaleEnabled={false} perfectDrawEnabled={false} opacity={floor ? 0.6 : 1}
+        dash={floor ? [8, 6] : undefined} />
       <Text x={-w / 2} y={-fontSize / 2} width={w} align="center" text={r.code} fontSize={fontSize} fill="#1e293b"
         listening={false} perfectDrawEnabled={false} />
     </Group>

@@ -22,7 +22,7 @@ export interface Scene {
     /** Height from the floor of each level, bottom first. */
     levels: number[]
     /** 3D look from the rack type (v2.1): pallet racking or shelving, and its colours. Missing in older data. */
-    style?: 'PALLET' | 'SHELF'
+    style?: 'PALLET' | 'SHELF' | 'FLOOR'
     uprightColor?: string
     beamColor?: string
   }[]

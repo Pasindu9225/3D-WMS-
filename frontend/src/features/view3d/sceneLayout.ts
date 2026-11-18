@@ -55,7 +55,9 @@ export interface SceneParts {
   /** Shelving (SHELF style): one solid shelf per raised level. */
   shelves: BoxSpec[]
   shelfColors: string[]
-  /** One white label plate per bin, on the beam under it. */
+  /** Floor storage (FLOOR style): a painted outline round each pallet position. */
+  floorMarks: BoxSpec[]
+  /** One white label plate per bin, on the beam under it (or on the floor in front of a floor position). */
   labels: BoxSpec[]
   /** A wooden pallet under every bin that holds stock. */
   pallets: BinBox[]
@@ -80,7 +82,20 @@ export function buildInstances(scene: Scene): SceneParts {
   const braceColors: string[] = []
   const beamColors: string[] = []
   const shelfColors: string[] = []
+  const floorMarks: BoxSpec[] = []
   for (const r of scene.racks) {
+    if (r.style === 'FLOOR') { // pallets stacked on the floor: no uprights or beams, a painted outline per position
+      const w = r.widthMm * M
+      const d = r.depthMm * M
+      const slot = w / Math.max(1, r.binsPerLevel)
+      const line = 0.06
+      for (let k = 0; k < r.binsPerLevel; k++) {
+        const lx = -w / 2 + slot * (k + 0.5)
+        for (const sz of [-1, 1]) floorMarks.push({ ...place(r, lx, (sz * d) / 2), y: 0.01, w: slot - 0.04, h: 0.01, d: line })
+        for (const sx of [-1, 1]) floorMarks.push({ ...place(r, lx + (sx * (slot - 0.04)) / 2, 0), y: 0.01, w: line, h: 0.01, d })
+      }
+      continue
+    }
     const up = r.uprightColor ?? UPRIGHT
     const beam = r.beamColor ?? BEAM
     const shelving = r.style === 'SHELF'
@@ -137,13 +152,16 @@ export function buildInstances(scene: Scene): SceneParts {
     const d = r.depthMm * M
     const slot = w / Math.max(1, r.binsPerLevel)
     const floorOf = r.levels[level[i]!]! * M
-    const ceiling = (r.levels[level[i]! + 1] ?? r.heightMm) * M - (r.levels[level[i]! + 1] !== undefined ? BEAM_H : 0)
+    const onFloor = r.style === 'FLOOR'
+    const ceiling = (r.levels[level[i]! + 1] ?? r.heightMm) * M - (r.levels[level[i]! + 1] !== undefined && !onFloor ? BEAM_H : 0)
     const binH = Math.max(0.05, ceiling - floorOf - GAP)
     const lx = -w / 2 + slot * (pos[i]! + 0.5)
     const p = place(r, lx, 0)
     const box = { ...p, y: floorOf + binH / 2, w: Math.max(0.05, slot - GAP), h: binH, d: Math.max(0.05, d - GAP) }
     bins.push(box)
-    if (floorOf > 0) {
+    if (onFloor && level[i] === 0) { // a plate lying on the floor in front of the position
+      labels.push({ ...place(r, lx, d / 2 + 0.12), y: 0.006, w: LABEL.w * 1.5, h: 0.006, d: LABEL.h * 2 })
+    } else if (!onFloor && floorOf > 0) {
       const front = place(r, lx, d / 2 + LABEL.d / 2)
       labels.push({ ...front, y: floorOf - BEAM_H / 2, ...LABEL })
     }
@@ -162,7 +180,7 @@ export function buildInstances(scene: Scene): SceneParts {
       empties.push({ ...box, bin: i })
     }
   }
-  return { posts, postColors, braces, braceColors, beams, beamColors, shelves, shelfColors, labels, pallets, cartons, empties, bins }
+  return { posts, postColors, braces, braceColors, beams, beamColors, shelves, shelfColors, floorMarks, labels, pallets, cartons, empties, bins }
 }
 
 /** Centre and size of the floor, for framing the camera. */
