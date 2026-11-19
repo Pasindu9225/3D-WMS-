@@ -59,7 +59,7 @@ public class SalesOrderService {
     }
 
     public record Summary(String id, String number, String status, String customerCode, String customerName,
-            String customerRef, String warehouseCode, LocalDate requestedDate, int lineCount, Instant createdAt) {
+            String customerRef, String warehouseCode, LocalDate requestedDate, int lineCount, Instant createdAt, String ownerCode) {
     }
 
     public record LineView(int lineNo, String sku, String productName, String uom, int factor, BigDecimal qty) {
@@ -73,7 +73,7 @@ public class SalesOrderService {
             String customerRef, String warehouseId, String warehouseCode, String shipTo, LocalDate requestedDate,
             String note, Instant createdAt, Instant releasedAt, Instant cancelledAt, String cancelReason, List<LineView> lines,
             List<ReservedView> reserved, PickService.Detail pick, String deliveryNoteNo, Integer cartons, Instant packedAt,
-            Shipped shipped, int version) {
+            Shipped shipped, int version, String ownerCode) {
     }
 
     /** The trip an order left on. */
@@ -247,9 +247,16 @@ public class SalesOrderService {
                     errors.add(new RowError(r.row(), "sku", e.getMessage()));
                 }
             }
+            ProductService.Owner owner = ProductService.Owner.OWN;
+            try {
+                owner = ProductService.oneOwner(group.stream().map(r -> found.get(r.line().sku())).filter(java.util.Objects::nonNull).toList());
+            } catch (ApiException e) {
+                errors.add(new RowError(first.row(), "sku", e.getMessage()));
+            }
             if (errors.isEmpty()) {
                 SalesOrder o = new SalesOrder(numbers.next(cu, KIND), cu.userId());
                 o.set(header(customer, first.orderRef(), wh, first.shipTo(), first.requestedDate(), first.note()), lines);
+                o.setOwner(owner.id(), owner.code());
                 made.add(o);
             }
         }
@@ -273,7 +280,9 @@ public class SalesOrderService {
         Map<String, OrderProduct> found = products.forOrder(s.lines().stream().map(LineSpec::sku).toList());
         Set<String> seen = new HashSet<>();
         List<SoLine.Spec> lines = s.lines().stream().map(l -> line(found, l, seen)).toList();
+        ProductService.Owner owner = ProductService.oneOwner(s.lines().stream().map(l -> found.get(l.sku())).toList());
         o.set(header(customer, s.customerRef(), wh, s.shipTo(), s.requestedDate(), s.note()), lines);
+        o.setOwner(owner.id(), owner.code());
     }
 
     private static Header header(CustomerRef c, String ref, WarehouseService.WarehouseRef wh, String shipTo,
@@ -350,7 +359,7 @@ public class SalesOrderService {
 
     static Summary summary(SalesOrder o) {
         return new Summary(o.getPublicId(), o.getNumber(), o.getStatus().name(), o.getCustomerCode(), o.getCustomerName(),
-                o.getCustomerRef(), o.getWarehouseCode(), o.getRequestedDate(), o.getLineCount(), o.getCreatedAt());
+                o.getCustomerRef(), o.getWarehouseCode(), o.getRequestedDate(), o.getLineCount(), o.getCreatedAt(), o.getOwnerCode());
     }
 
     private Detail detail(SalesOrder o) {
@@ -365,6 +374,6 @@ public class SalesOrderService {
                 o.getCustomerRef(), warehouses.publicIdOf(o.getWarehouseId()), o.getWarehouseCode(), o.getShipTo(),
                 o.getRequestedDate(), o.getNote(), o.getCreatedAt(), o.getReleasedAt(), o.getCancelledAt(), o.getCancelReason(),
                 lines, reserved, o.getStatus() == Status.DRAFT ? null : picks.forOrder(o), o.getDeliveryNoteNo(), o.getCartons(),
-                o.getPackedAt(), shipped(o), o.getVersion());
+                o.getPackedAt(), shipped(o), o.getVersion(), o.getOwnerCode());
     }
 }

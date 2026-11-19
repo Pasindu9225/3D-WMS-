@@ -16,6 +16,7 @@ it('has a message for every backend error code', () => {
   const codes = new Set<string>()
   for (const f of files) {
     for (const m of readFileSync(f, 'utf8').matchAll(/ApiException\(HttpStatus\.[A-Z_]+,\s*"([A-Z_]+)"/g)) codes.add(m[1]!)
+    for (const m of readFileSync(f, 'utf8').matchAll(/new Refusal\("([A-Z_]+)"/g)) codes.add(m[1]!) // putaway handling rules
   }
   expect(codes.size).toBeGreaterThan(20)
   const missing = [...codes].filter((c) => !(`error.${c}` in en))

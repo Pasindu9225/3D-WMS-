@@ -61,6 +61,19 @@ const SUPPLIERS = [
   { code: 'SUP-LAN', name: 'Lanka Home Care', contactName: 'Kumari Silva', phone: '011 345 6789' },
   { code: 'SUP-ISL', name: 'Island Electricals', contactName: 'Ruwan Fernando', phone: '011 456 7890' },
 ]
+// 3PL clients (v2.1): the companies whose goods DEMO1 stores, each limited to its HS sections (world customs groups)
+const CLIENTS = [
+  { code: 'CLI-CEY', name: 'Ceylon Foods Ltd', contactName: 'Nimal Perera', phone: '011 234 5678', allowedHsSections: [1, 2, 3, 4] },
+  { code: 'CLI-LAN', name: 'Lanka Home Care', contactName: 'Kumari Silva', phone: '011 345 6789', allowedHsSections: [6, 10] },
+  { code: 'CLI-ISL', name: 'Island Electricals', contactName: 'Ruwan Fernando', phone: '011 456 7890', allowedHsSections: [16] },
+]
+// whose goods: each supplier's products belong to the matching client
+const OWNER_OF = { 'SUP-CEY': 'CLI-CEY', 'SUP-LAN': 'CLI-LAN', 'SUP-ISL': 'CLI-ISL' }
+// world customs (HS) codes of the products that have no other handling
+const HS = { 'DHAL-1KG': '071340', 'TEA-400G': '090230', 'MILK-1L': '040120', 'COCO-OIL': '151311', 'BISC-200': '190590',
+  'SOAP-100': '340111', 'DETG-1KG': '340220', 'DISH-500': '340220', 'TISS-10': '481810', 'BULB-9W': '853950', 'FAN-16': '841451',
+  'KETL-17': '851671', 'EXT-4W': '854442', 'RCOOK-1': '851660' }
+
 const CUSTOMERS = [
   { code: 'CUS-KAN', name: 'Kandy City Mart', address: '12 Peradeniya Rd, Kandy' },
   { code: 'CUS-GAL', name: 'Galle Fort Stores', address: '5 Church St, Galle' },
@@ -179,16 +192,18 @@ async function main() {
 
   for (const s of SUPPLIERS) await upsertPartner('suppliers', s)
   for (const c of CUSTOMERS) await upsertPartner('customers', c)
-  console.log(`Suppliers: ${SUPPLIERS.length}, customers: ${CUSTOMERS.length}`)
+  for (const c of CLIENTS) await upsertPartner('clients', c)
+  console.log(`Suppliers: ${SUPPLIERS.length}, customers: ${CUSTOMERS.length}, clients (3PL): ${CLIENTS.length}`)
 
   // products
   const ids = {}
-  const body = ([sku, name, category, , weightG, [l, w, h], perCarton, cost, , expiry, handling]) => ({
+  const body = ([sku, name, category, supplier, weightG, [l, w, h], perCarton, cost, , expiry, handling]) => ({
     sku, name, baseUom: 'EA', weightG, volumeCm3: Math.round((l * w * h) / perCarton), trackBatch: expiry, trackExpiry: expiry,
     costMinor: cost * 100, reorderPoint: perCarton * 3, category, cartonLengthMm: l * 10, cartonWidthMm: w * 10,
     cartonHeightMm: h * 10, unitsPerCarton: perCarton,
     units: perCarton > 1 ? [{ uom: 'CASE', factor: perCarton }] : [],
-    handling: handling ?? null,
+    handling: { ...(handling ?? {}), hsCode: handling?.hsCode ?? HS[sku] },
+    ownerCode: OWNER_OF[supplier],
   })
   for (const spec of PRODUCTS) {
     const r = await api('POST', '/api/v1/products', body(spec))
@@ -197,7 +212,7 @@ async function main() {
   for (const p of (await must('GET', '/api/v1/products?size=100')).items) {
     ids[p.sku] = p.id
     const spec = PRODUCTS.find((s) => s[0] === p.sku)
-    if (spec?.[10] && !p.handling?.hsCode) await must('PUT', `/api/v1/products/${p.id}`, { ...body(spec), version: p.version }) // made before handling existed
+    if (spec && (!p.handling?.hsCode || p.ownerCode !== OWNER_OF[spec[3]])) await must('PUT', `/api/v1/products/${p.id}`, { ...body(spec), version: p.version }) // made before handling or clients existed
   }
   console.log(`Products: ${PRODUCTS.length} (with carton sizes and handling: frozen, dangerous goods, fragile, stack limits)`)
 

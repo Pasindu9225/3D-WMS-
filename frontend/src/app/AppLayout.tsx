@@ -31,6 +31,7 @@ const NAV: NavItem[] = [
   { to: '/app/warehouses', label: 'nav.warehouses', icon: Warehouse, permission: 'warehouses:read' },
   { to: '/app/rack-types', label: 'nav.rackTypes', icon: Boxes, permission: 'warehouses:read' },
   { to: '/app/3d', label: 'nav.view3d', icon: Cuboid, permission: 'warehouses:read' },
+  { to: '/app/clients', label: 'nav.clients', icon: Building2, permission: 'catalog:read' },
   { to: '/app/products', label: 'nav.products', icon: Barcode, permission: 'catalog:read' },
   { to: '/app/suppliers', label: 'nav.suppliers', icon: Truck, permission: 'catalog:read' },
   { to: '/app/purchase-orders', label: 'nav.purchaseOrders', icon: FileText, permission: 'inbound:read' },

@@ -34,7 +34,7 @@ public class ProductService {
     public record ProductView(String id, String sku, String barcode, String name, String baseUom, Integer weightG,
             Integer volumeCm3, boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, boolean hasImage,
             List<UnitView> units, int version, String abcClass, String category, Integer cartonLengthMm, Integer cartonWidthMm,
-            Integer cartonHeightMm, Integer unitsPerCarton, Handling handling) {
+            Integer cartonHeightMm, Integer unitsPerCarton, Handling handling, String ownerCode, String ownerName) {
     }
 
     /**
@@ -64,7 +64,8 @@ public class ProductService {
     /** Fields the user sets; the SKU is fixed once created (labels, orders and imports refer to it). */
     public record ProductSpec(String name, String barcode, String baseUom, Integer weightG, Integer volumeCm3,
             boolean trackBatch, boolean trackExpiry, Long costMinor, java.math.BigDecimal reorderPoint, String category, List<UnitSpec> units,
-            Integer cartonLengthMm, Integer cartonWidthMm, Integer cartonHeightMm, Integer unitsPerCarton, Handling handling) {
+            Integer cartonLengthMm, Integer cartonWidthMm, Integer cartonHeightMm, Integer unitsPerCarton, Handling handling,
+            String ownerCode) { // ownerCode (v2.1, 3PL): the client whose goods these are; null = the company's own
     }
 
     /** A barcode lookup (scanning): the product and how many base units one scan of it means. */
@@ -80,9 +81,11 @@ public class ProductService {
     private final ImageStore images;
     private final RateLimiter limiter;
     private final AuditService audit;
+    private final PartnerService partners;
 
     public ProductService(ProductRepository products, FileObjectRepository files, ImageStore images, RateLimiter limiter,
-            AuditService audit) {
+            AuditService audit, PartnerService partners) {
+        this.partners = partners;
         this.products = products;
         this.files = files;
         this.images = images;
@@ -91,8 +94,11 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProductView> list(String query, Pageable pageable) {
-        return products.search(likeText(query), pageable).map(ProductService::view);
+    /** owner (v2.1): null = every product; "-" = the company's own; else a client code. */
+    public Page<ProductView> list(String query, String owner, Pageable pageable) {
+        Page<Product> page = products.search(likeText(query), ownerFilter(owner), owner == null || owner.isBlank(), pageable);
+        java.util.Map<Long, PartnerService.ClientRef> owners = partners.clients(ownerIds(page.getContent()));
+        return page.map(p -> view(p, owners));
     }
 
     /** Search text for LIKE: trimmed, with ! % _ escaped (the queries use ESCAPE '!'), never a pattern. */
@@ -137,11 +143,17 @@ public class ProductService {
         java.util.Map<String, String> owner = new java.util.HashMap<>();
         products.productBarcodeOwners(barcodeRow.keySet()).forEach(o -> owner.put((String) o[0], (String) o[1]));
         products.unitBarcodeOwners(barcodeRow.keySet()).forEach(o -> owner.put((String) o[0], (String) o[1]));
+        java.util.Map<Integer, Long> ownerOf = new java.util.HashMap<>();
         for (ImportRow r : rows) {
             try {
                 checkUnits(r.spec());
             } catch (ApiException e) {
                 errors.add(new ImportResult.RowError(r.row(), "units", e.getMessage()));
+            }
+            try {
+                ownerOf.put(r.row(), owner(r.spec()));
+            } catch (ApiException e) {
+                errors.add(new ImportResult.RowError(r.row(), "COMMODITY_NOT_ALLOWED".equals(e.getCode()) ? "hs_code" : "owner", e.getMessage()));
             }
             for (String code : rowCodes.getOrDefault(r.row(), List.of())) {
                 String sku = owner.get(code);
@@ -161,7 +173,7 @@ public class ProductService {
                 } else {
                     updated++;
                 }
-                apply(p, r.spec());
+                apply(p, r.spec(), ownerOf.get(r.row()));
                 products.save(p);
             }
             try {
@@ -263,6 +275,22 @@ public class ProductService {
                 .map(p -> new Watch(p.getSku(), p.getName(), p.getBaseUom(), p.getReorderPoint())).orElse(null);
     }
 
+    /** A product's client (3PL owner, v2.1) as an internal id, or null for the company's own goods. */
+    @Transactional(readOnly = true)
+    public Long ownerOf(long productId) {
+        return products.withIds(java.util.List.of(productId)).stream().findFirst().map(Product::getOwnerId).orElse(null);
+    }
+
+    /** Owners of these products (internal ids); the company's own goods are absent. */
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, Long> owners(java.util.Collection<Long> productIds) {
+        java.util.Map<Long, Long> out = new java.util.HashMap<>();
+        if (!productIds.isEmpty()) {
+            products.withIds(productIds).forEach(p -> { if (p.getOwnerId() != null) out.put(p.getId(), p.getOwnerId()); });
+        }
+        return out;
+    }
+
     /** A product's category (putaway rules), or null. */
     @Transactional(readOnly = true)
     public String category(long productId) {
@@ -285,7 +313,14 @@ public class ProductService {
     /** Internal ids of products matching a search (SKU or barcode prefix, name contains), up to 500. */
     @Transactional(readOnly = true)
     public java.util.List<Long> idsMatching(String query) {
-        return products.search(likeText(query), org.springframework.data.domain.PageRequest.of(0, 500)).map(Product::getId).getContent();
+        return idsMatching(query, null);
+    }
+
+    /** As above, of one owner too (v2.1): null = any, "-" = the company's own, else a client code. */
+    @Transactional(readOnly = true)
+    public java.util.List<Long> idsMatching(String query, String owner) {
+        return products.search(likeText(query), ownerFilter(owner), owner == null, org.springframework.data.domain.PageRequest.of(0, 500))
+                .map(Product::getId).getContent();
     }
 
     /** A live product by public id, else 404. */
@@ -299,19 +334,37 @@ public class ProductService {
     }
 
     public record OrderProduct(long id, String publicId, String sku, String name, String baseUom, Long costMinor,
-            java.util.Map<String, Integer> factors) {
+            java.util.Map<String, Integer> factors, Long ownerId, String ownerCode) {
+    }
+
+    /** A 3PL order is for one client's goods (v2.1): the owner shared by these products, else 400 MIXED_OWNERS. */
+    public record Owner(Long id, String code) {
+        public static final Owner OWN = new Owner(null, null);
+    }
+
+    public static Owner oneOwner(java.util.Collection<OrderProduct> lines) {
+        java.util.Set<String> codes = new java.util.TreeSet<>();
+        lines.forEach(l -> codes.add(l.ownerCode() == null ? "your own goods" : l.ownerCode()));
+        if (codes.size() > 1) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "MIXED_OWNERS",
+                    "An order is for one client's goods; these lines belong to " + String.join(" and ", codes));
+        }
+        return lines.stream().findFirst().map(l -> new Owner(l.ownerId(), l.ownerCode())).orElse(Owner.OWN);
     }
 
     /** Live products by SKU, with every unit (the base unit has factor 1); unknown or archived SKUs are left out. */
     @Transactional(readOnly = true)
     public java.util.Map<String, OrderProduct> forOrder(java.util.Collection<String> skus) {
         java.util.Map<String, OrderProduct> out = new java.util.HashMap<>();
-        for (Product p : products.findBySkuInWithUnits(skus)) {
+        List<Product> found = products.findBySkuInWithUnits(skus);
+        java.util.Map<Long, PartnerService.ClientRef> owners = partners.clients(ownerIds(found));
+        for (Product p : found) {
+            PartnerService.ClientRef o = p.getOwnerId() == null ? null : owners.get(p.getOwnerId());
             java.util.Map<String, Integer> factors = new java.util.HashMap<>();
             factors.put(p.getBaseUom(), 1);
             p.getUnits().forEach(u -> factors.put(u.getUom(), u.getFactor()));
             out.put(p.getSku(), new OrderProduct(p.getId(), p.getPublicId(), p.getSku(), p.getName(), p.getBaseUom(),
-                    p.getCostMinor(), factors));
+                    p.getCostMinor(), factors, p.getOwnerId(), o == null ? null : o.code()));
         }
         return out;
     }
@@ -324,8 +377,9 @@ public class ProductService {
     @Transactional
     public ProductView create(CurrentUser cu, String sku, ProductSpec s) {
         checkBarcodes(s, null);
+        Long owner = owner(s);
         Product p = new Product(sku);
-        apply(p, s);
+        apply(p, s, owner);
         try {
             p = products.saveAndFlush(p);
         } catch (DataIntegrityViolationException e) {
@@ -343,8 +397,9 @@ public class ProductService {
             throw new ApiException(HttpStatus.CONFLICT, "PRODUCT_CHANGED", "Someone else changed this product; reload it");
         }
         checkBarcodes(s, p);
+        Long owner = owner(s);
         ProductView before = view(p);
-        apply(p, s);
+        apply(p, s, owner);
         try {
             products.flush();
         } catch (DataIntegrityViolationException e) {
@@ -491,7 +546,46 @@ public class ProductService {
         }
     }
 
-    private static void apply(Product p, ProductSpec s) {
+    /**
+     * The client (3PL stock owner) a product belongs to, or null for the company's own goods. A client limited to
+     * some HS sections only takes products whose HS code is in one of them.
+     */
+    // ponytail: one owner per product and SKUs unique per company (clients use their own SKUs or a prefix); per-client
+    // SKUs if a customer needs two clients with the same SKU.
+    private Long owner(ProductSpec s) {
+        if (s.ownerCode() == null || s.ownerCode().isBlank()) {
+            return null;
+        }
+        PartnerService.ClientRef c = partners.clientByCode(s.ownerCode().trim());
+        if (!c.sections().isEmpty()) {
+            String hs = s.handling() == null ? null : s.handling().hsCode();
+            int section = HsSections.of(hs);
+            if (!c.sections().contains(section)) {
+                String allowed = String.join(", ", c.sections().stream().map(HsSections::roman).toList());
+                throw new ApiException(HttpStatus.BAD_REQUEST, "COMMODITY_NOT_ALLOWED", hs == null
+                        ? "Client " + c.code() + " stores only HS sections " + allowed + "; give this product its HS code"
+                        : "Client " + c.code() + " stores only HS sections " + allowed + "; " + hs + " is section " + HsSections.roman(section));
+            }
+        }
+        return c.id();
+    }
+
+    private static java.util.Set<Long> ownerIds(java.util.Collection<Product> ps) {
+        java.util.Set<Long> ids = new java.util.HashSet<>();
+        ps.forEach(p -> { if (p.getOwnerId() != null) ids.add(p.getOwnerId()); });
+        return ids;
+    }
+
+    /** The internal id of the owner filter: a client code, "-" for the company's own goods; -1 when unknown. */
+    private Long ownerFilter(String owner) {
+        if (owner == null || owner.isBlank() || "-".equals(owner)) {
+            return null;
+        }
+        return partners.findClient(owner.trim()).map(PartnerService.ClientRef::id).orElse(-1L);
+    }
+
+    private static void apply(Product p, ProductSpec s, Long ownerId) {
+        p.setOwnerId(ownerId);
         p.set(s.name().trim(), s.barcode(), s.baseUom(), s.weightG(), s.volumeCm3(), s.trackBatch(), s.trackExpiry(),
                 s.costMinor(), s.reorderPoint(), s.category() == null || s.category().isBlank() ? null : s.category().trim());
         p.setUnits(s.units());
@@ -510,12 +604,17 @@ public class ProductService {
                 "Another product already uses this SKU or barcode (archived products keep theirs)");
     }
 
-    static ProductView view(Product p) {
+    private ProductView view(Product p) {
+        return view(p, partners.clients(ownerIds(List.of(p))));
+    }
+
+    static ProductView view(Product p, java.util.Map<Long, PartnerService.ClientRef> owners) {
+        PartnerService.ClientRef o = p.getOwnerId() == null ? null : owners.get(p.getOwnerId());
         return new ProductView(p.getPublicId(), p.getSku(), p.getBarcode(), p.getName(), p.getBaseUom(), p.getWeightG(),
                 p.getVolumeCm3(), p.isTrackBatch(), p.isTrackExpiry(), p.getCostMinor(), p.getReorderPoint(), p.getImageFileId() != null,
                 p.getUnits().stream().map(u -> new UnitView(u.getUom(), u.getFactor(), u.getBarcode())).toList(),
                 p.getVersion(), p.getAbcClass(), p.getCategory(), p.getCartonLengthMm(), p.getCartonWidthMm(), p.getCartonHeightMm(),
-                p.getUnitsPerCarton(), handling(p));
+                p.getUnitsPerCarton(), handling(p), o == null ? null : o.code(), o == null ? null : o.name());
     }
 
     private static Handling handling(Product p) {

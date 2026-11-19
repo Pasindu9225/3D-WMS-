@@ -98,6 +98,13 @@ public class PurchaseOrder extends TenantScoped {
     @Column(name = "cancel_reason", length = 200)
     private String cancelReason;
 
+    /** The client (3PL) whose goods the order is for (v2.1), copied from its lines; null = the company's own. */
+    @Column(name = "owner_id")
+    private Long ownerId;
+
+    @Column(name = "owner_code", length = 20)
+    private String ownerCode;
+
     @Version
     private int version;
 
@@ -163,6 +170,15 @@ public class PurchaseOrder extends TenantScoped {
         boolean all = lines.stream().allMatch(l -> l.getQtyReceived().compareTo(l.orderedBase()) >= 0);
         this.status = all ? Status.RECEIVED : Status.PARTLY_RECEIVED;
         this.updatedAt = Instant.now();
+    }
+
+    public void setOwner(Long id, String code) {
+        this.ownerId = id;
+        this.ownerCode = code;
+    }
+
+    public String getOwnerCode() {
+        return ownerCode;
     }
 
     public Long getId() {

@@ -32,6 +32,7 @@ export const router = createBrowserRouter([
           { path: 'warehouses/:id/3d', lazy: () => import('@/features/view3d/View3DPage').then((m) => ({ Component: m.View3DPage })) },
           { path: 'suppliers', lazy: () => import('@/features/catalog/PartnersPage').then((m) => ({ Component: m.SuppliersPage })) },
           { path: 'customers', lazy: () => import('@/features/catalog/PartnersPage').then((m) => ({ Component: m.CustomersPage })) },
+          { path: 'clients', lazy: () => import('@/features/catalog/PartnersPage').then((m) => ({ Component: m.ClientsPage })) },
           { path: 'sales-orders', lazy: () => import('@/features/outbound/SalesOrdersPage').then((m) => ({ Component: m.SalesOrdersPage })) },
           { path: 'pick', lazy: () => import('@/features/outbound/PickPage').then((m) => ({ Component: m.PickPage })) },
           { path: 'pick/:id', lazy: () => import('@/features/outbound/PickPage').then((m) => ({ Component: m.PickPage })) },

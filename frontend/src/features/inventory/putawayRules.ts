@@ -5,7 +5,9 @@ import { api } from '@/lib/api'
 export interface PutawayRule {
   id: string
   priority: number
-  appliesTo: 'PRODUCT' | 'CATEGORY' | 'ALL'
+  appliesTo: 'PRODUCT' | 'CATEGORY' | 'CLIENT' | 'ALL'
+  /** v2.1 (3PL): the client whose goods the rule is for. */
+  clientCode?: string | null
   sku: string | null
   productName: string | null
   category: string | null
@@ -16,7 +18,7 @@ export interface PutawayRule {
   version: number
 }
 
-export type NewPutawayRule = { warehouseId: string; priority: number; sku?: string; category?: string; binCode?: string; zoneCode?: string; onlyZone: boolean }
+export type NewPutawayRule = { warehouseId: string; priority: number; sku?: string; category?: string; clientCode?: string; binCode?: string; zoneCode?: string; onlyZone: boolean }
 
 export function usePutawayRules(warehouseId: string | undefined) {
   return useQuery({ queryKey: ['putaway-rules', warehouseId], queryFn: () => api<PutawayRule[]>(`/putaway-rules?warehouse=${warehouseId}`), enabled: !!warehouseId })

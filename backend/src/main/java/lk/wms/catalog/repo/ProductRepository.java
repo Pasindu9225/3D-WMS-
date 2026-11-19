@@ -31,15 +31,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("update Product p set p.abcClass = :abc, p.abcAt = :at where p.id in :ids")
     int setAbc(@Param("abc") String abc, @Param("at") java.time.Instant at, @Param("ids") java.util.Collection<Long> ids);
 
+    /** v2.1: does a live product still belong to this client? */
+    boolean existsByOwnerId(Long ownerId);
+
     /**
      * Search: SKU or barcode starting with the text, or name containing it (case-insensitive collation).
      * The text is escaped by the service ('!' escapes % and _), so it is a literal, never a pattern.
      */
     @Query("""
             select p from Product p
-            where :q = '' or p.sku like concat(:q, '%') escape '!' or p.barcode like concat(:q, '%') escape '!'
-               or p.name like concat('%', :q, '%') escape '!'""")
-    Page<Product> search(@Param("q") String q, Pageable pageable);
+            where (:q = '' or p.sku like concat(:q, '%') escape '!' or p.barcode like concat(:q, '%') escape '!'
+               or p.name like concat('%', :q, '%') escape '!')
+              and (:anyOwner = true or (:owner is null and p.ownerId is null) or p.ownerId = :owner)""")
+    Page<Product> search(@Param("q") String q, @Param("owner") Long owner, @Param("anyOwner") boolean anyOwner, Pageable pageable);
 
     Optional<Product> findByBarcode(String barcode);
 

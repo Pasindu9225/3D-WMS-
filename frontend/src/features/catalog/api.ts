@@ -37,6 +37,9 @@ export interface Product {
   unitsPerCarton?: number | null
   /** How it must be stored (v2.1); putaway follows it. */
   handling?: Handling | null
+  /** The client (3PL) whose goods these are (v2.1); null = the company's own goods. */
+  ownerCode?: string | null
+  ownerName?: string | null
 }
 
 export type StorageTemp = 'AMBIENT' | 'CHILLED' | 'FROZEN'
@@ -57,11 +60,13 @@ export type ProductInput = Omit<Product, 'id' | 'sku' | 'hasImage' | 'version' |
 
 export const PRODUCT_PAGE_SIZE = 25
 
-export function useProducts(q: string, page: number) {
+/** owner: '' = every product, '-' = the company's own goods, else a client code. */
+export function useProducts(q: string, page: number, owner = '') {
   const params = new URLSearchParams({ page: String(page), size: String(PRODUCT_PAGE_SIZE) })
   if (q) params.set('q', q)
+  if (owner) params.set('owner', owner)
   return useQuery({
-    queryKey: ['products', q, page],
+    queryKey: ['products', q, page, owner],
     queryFn: () => api<Page<Product>>(`/products?${params}`),
     placeholderData: keepPreviousData,
   })
@@ -110,12 +115,12 @@ export function useProductImage() {
 /** Image URL with a version so a replaced picture is not shown from the browser cache. */
 export const imageUrl = (p: Product) => `/api/v1/products/${p.id}/image?v=${p.version}`
 
-/** Suppliers and customers share one shape and one set of endpoints. */
-export type PartnerKind = 'suppliers' | 'customers'
+/** Suppliers, customers and clients (3PL stock owners) share one shape and one set of endpoints. */
+export type PartnerKind = 'suppliers' | 'customers' | 'clients'
 
 export interface Supplier {
   id: string
-  type: 'SUPPLIER' | 'CUSTOMER'
+  type: 'SUPPLIER' | 'CUSTOMER' | 'CLIENT'
   code: string
   name: string
   contactName: string | null
@@ -123,9 +128,16 @@ export interface Supplier {
   email: string | null
   address: string | null
   version: number
+  /** Clients only (v2.1): HS sections 1-21 they may store; empty = any commodity. */
+  allowedHsSections?: number[] | null
 }
 
-export type SupplierInput = Pick<Supplier, 'name' | 'contactName' | 'phone' | 'email' | 'address'> & { code?: string; version?: number }
+export type SupplierInput = Pick<Supplier, 'name' | 'contactName' | 'phone' | 'email' | 'address' | 'allowedHsSections'> & { code?: string; version?: number }
+
+/** Every live client, for owner pickers (a 3PL has tens, not thousands). */
+export function useClients() {
+  return useQuery({ queryKey: ['clients', 'all'], queryFn: () => api<Page<Supplier>>('/clients?size=100&sort=code') })
+}
 
 export function useSuppliers(q: string, page: number, kind: PartnerKind = 'suppliers') {
   const params = new URLSearchParams({ page: String(page), size: String(PRODUCT_PAGE_SIZE) })

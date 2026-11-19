@@ -31,7 +31,8 @@ public class PutawayRuleController {
 
     public record RuleRequest(@NotBlank @Size(max = 26) String warehouseId, @NotNull @Min(0) @Max(999) Integer priority,
             @Size(max = 64) String sku, @Size(max = 40) @Pattern(regexp = "[^\\p{Cntrl}]*") String category,
-            @Size(max = 60) String binCode, @Size(max = 10) String zoneCode, Boolean onlyZone) {
+            @Size(max = 60) String binCode, @Size(max = 10) String zoneCode, Boolean onlyZone,
+            @Pattern(regexp = "[A-Za-z0-9][A-Za-z0-9-]{0,19}") String clientCode) { // v2.1: every product of one client
     }
 
     public record RuleUpdate(@NotNull @Min(0) Integer version, @NotNull @Min(0) @Max(999) Integer priority, Boolean onlyZone,
@@ -54,7 +55,7 @@ public class PutawayRuleController {
     @PreAuthorize("hasAuthority('tasks:assign')")
     @ResponseStatus(HttpStatus.CREATED)
     public RuleView create(@Valid @RequestBody RuleRequest b) {
-        return rules.create(CurrentUser.require(), b.warehouseId(), b.priority(), b.sku(), b.category(), b.binCode(), b.zoneCode(),
+        return rules.create(CurrentUser.require(), b.warehouseId(), b.priority(), b.sku(), b.category(), b.clientCode(), b.binCode(), b.zoneCode(),
                 Boolean.TRUE.equals(b.onlyZone()));
     }
 
