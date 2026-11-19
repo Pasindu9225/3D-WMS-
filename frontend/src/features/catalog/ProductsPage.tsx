@@ -14,7 +14,7 @@ import { errorMessage, fieldErrors } from '@/lib/errors'
 import { t, type MessageKey } from '@/lib/i18n'
 import { useDebounced } from '@/lib/useDebounced'
 import { ImportDialog } from './ImportDialog'
-import { imageUrl, PRODUCT_PAGE_SIZE, useArchiveProduct, useClients, useProductImage, useProducts, useRecalculateAbc, useSaveProduct, type Product } from './api'
+import { imageUrl, PRODUCT_PAGE_SIZE, useArchiveProduct, useProductImage, useProducts, useRecalculateAbc, useSaveProduct, type Product } from './api'
 
 /** The company's products: SKU, barcode, units of measure, size and weight (v0.4 task 1). */
 export function ProductsPage() {
@@ -25,9 +25,7 @@ export function ProductsPage() {
   const [search, setSearch] = useState('')
   const q = useDebounced(search.trim())
   const [page, setPage] = useState(0)
-  const [owner, setOwner] = useState('') // '' all, '-' own goods, else a client code
-  const clients = useClients()
-  const list = useProducts(q, page, owner)
+  const list = useProducts(q, page)
   const archive = useArchiveProduct()
   const [editing, setEditing] = useState<Product | 'new' | null>(null)
   const [archiving, setArchiving] = useState<Product | null>(null)
@@ -51,24 +49,11 @@ export function ProductsPage() {
           </div>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Input aria-label={t('products.search')} placeholder={t('products.search')} value={search} maxLength={200} className="max-w-sm"
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(0)
-          }} />
-        {(clients.data?.items.length ?? 0) > 0 && (
-          <select aria-label={t('products.ownerFilter')} className={SELECT + ' w-auto'} value={owner}
-            onChange={(e) => {
-              setOwner(e.target.value)
-              setPage(0)
-            }}>
-            <option value="">{t('products.ownerAll')}</option>
-            <option value="-">{t('products.ownerOwn')}</option>
-            {clients.data?.items.map((c) => <option key={c.id} value={c.code}>{c.code} · {c.name}</option>)}
-          </select>
-        )}
-      </div>
+      <Input aria-label={t('products.search')} placeholder={t('products.search')} value={search} maxLength={200} className="max-w-sm"
+        onChange={(e) => {
+          setSearch(e.target.value)
+          setPage(0)
+        }} />
       {list.isError && <FormMessage tone="error">{errorMessage(list.error)}</FormMessage>}
       {archive.isError && <FormMessage tone="error">{errorMessage(archive.error)}</FormMessage>}
       {abc.isError && <FormMessage tone="error">{errorMessage(abc.error)}</FormMessage>}
@@ -81,7 +66,6 @@ export function ProductsPage() {
             <Th className="hidden md:table-cell">{t('products.col.barcode')}</Th>
             <Th className="hidden sm:table-cell">{t('products.col.units')}</Th>
             <Th className="hidden lg:table-cell">{t('products.col.weight')}</Th>
-            <Th className="hidden md:table-cell">{t('products.col.owner')}</Th>
             <Th className="hidden lg:table-cell">{t('products.col.category')}</Th>
             <Th className="hidden sm:table-cell" title={t('abc.hint')}>{t('products.col.abc')}</Th>
             <Th className="w-1"><span className="sr-only">{t('users.col.actions')}</span></Th>
@@ -107,7 +91,6 @@ export function ProductsPage() {
                 {[p.baseUom, ...p.units.map((u) => `${u.uom} = ${u.factor} ${p.baseUom}`)].join(' · ')}
               </td>
               <td className="hidden tabular-nums lg:table-cell">{p.weightG === null ? '—' : formatKg(p.weightG)}</td>
-              <td className="hidden text-sm md:table-cell" title={p.ownerName ?? undefined}>{p.ownerCode ?? '—'}</td>
               <td className="hidden text-sm lg:table-cell">{p.category ?? '—'}</td>
               <td className="hidden font-mono font-medium sm:table-cell">{p.abcClass ?? '—'}</td>
               <td className="whitespace-nowrap text-right">
@@ -121,7 +104,7 @@ export function ProductsPage() {
             </Tr>
           ))}
           {data && data.items.length === 0 && (
-            <tr><td colSpan={9} className="py-8 text-center text-muted-foreground">{q ? t('products.noMatch') : t('products.empty')}</td></tr>
+            <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">{q ? t('products.noMatch') : t('products.empty')}</td></tr>
           )}
         </tbody>
       </Table>
@@ -188,7 +171,6 @@ const schema = z.object({
   hazardClass: z.string(),
   stackMax: optional((v) => /^[0-9]{1,2}$/.test(v) && Number(v) >= 1 && Number(v) <= 50, t('products.stackRule')),
   fragile: z.boolean(),
-  ownerCode: z.string(),
   trackBatch: z.boolean(),
   trackExpiry: z.boolean(),
   units: z.array(z.object({
@@ -201,7 +183,6 @@ type Values = z.input<typeof schema>
 
 function ProductDialog({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const save = useSaveProduct()
-  const clients = useClients()
   // Uploading a picture bumps the version; keep the latest so Save does not look like someone else's change.
   const [current, setCurrent] = useState(product)
   const form = useForm<Values, unknown, z.output<typeof schema>>({
@@ -219,11 +200,10 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           hsCode: product.handling?.hsCode ?? '', storageTemp: product.handling?.storageTemp ?? 'AMBIENT',
           hazardClass: product.handling?.hazardClass ?? '', stackMax: product.handling?.stackMax ? String(product.handling.stackMax) : '',
           fragile: product.handling?.fragile ?? false,
-          ownerCode: product.ownerCode ?? '',
           trackBatch: product.trackBatch, trackExpiry: product.trackExpiry,
           units: product.units.map((u) => ({ uom: u.uom, factor: String(u.factor), barcode: u.barcode ?? '' })),
         }
-      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', reorder: '', category: '', carton: '', unitsPerCarton: '', hsCode: '', storageTemp: 'AMBIENT', hazardClass: '', stackMax: '', fragile: false, ownerCode: '', trackBatch: false, trackExpiry: false, units: [] },
+      : { sku: '', name: '', barcode: '', baseUom: 'EA', weight: '', volume: '', cost: '', reorder: '', category: '', carton: '', unitsPerCarton: '', hsCode: '', storageTemp: 'AMBIENT', hazardClass: '', stackMax: '', fragile: false, trackBatch: false, trackExpiry: false, units: [] },
   })
   const units = useFieldArray({ control: form.control, name: 'units' })
   const { errors } = form.formState
@@ -244,7 +224,6 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
     cartonWidthMm: v.carton ? parseCarton(v.carton)![1] : null,
     cartonHeightMm: v.carton ? parseCarton(v.carton)![2] : null,
     unitsPerCarton: v.unitsPerCarton ? Number(v.unitsPerCarton) : null,
-    ownerCode: v.ownerCode || null,
     handling: {
       hsCode: v.hsCode ? hsDigits(v.hsCode) : null,
       storageTemp: v.storageTemp,
@@ -306,16 +285,6 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
           <label className="flex items-center gap-2"><input type="checkbox" {...form.register('trackBatch')} /> {t('products.trackBatch')}</label>
           <label className="flex items-center gap-2"><input type="checkbox" {...form.register('trackExpiry')} /> {t('products.trackExpiry')}</label>
         </div>
-        {(clients.data?.items.length ?? 0) > 0 && (
-          <Field label={t('products.ownerField')} error={server.ownerCode}>
-            {(p) => (
-              <select {...p} className={SELECT} {...form.register('ownerCode')}>
-                <option value="">{t('products.ownerOwn')}</option>
-                {clients.data?.items.map((c) => <option key={c.id} value={c.code}>{c.code} · {c.name}</option>)}
-              </select>
-            )}
-          </Field>
-        )}
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">{t('products.handling')}</legend>
           <p className="text-xs text-muted-foreground">{t('products.handlingHint')}</p>

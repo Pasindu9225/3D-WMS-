@@ -73,14 +73,13 @@ public class ProductController {
             @Min(10) @Max(5000) Integer cartonHeightMm,
             @Min(1) @Max(100_000) Integer unitsPerCarton,
             @Valid ProductService.Handling handling, // v2.1: null = ambient, not dangerous, no stack limit
-            @Pattern(regexp = "[A-Z0-9][A-Z0-9-]{0,19}") String ownerCode, // v2.1 (3PL): the client's code; null = own goods
             @NotNull @Size(max = 10) List<@NotNull @Valid UnitRequest> units,
             @Min(0) Integer version) { // required on update
 
         ProductSpec spec() {
             return new ProductSpec(name, barcode, baseUom, weightG, volumeCm3, trackBatch, trackExpiry, costMinor, reorderPoint, category,
                     units.stream().map(u -> new UnitSpec(u.uom(), u.factor(), u.barcode())).toList(),
-                    cartonLengthMm, cartonWidthMm, cartonHeightMm, unitsPerCarton, handling, ownerCode);
+                    cartonLengthMm, cartonWidthMm, cartonHeightMm, unitsPerCarton, handling);
         }
     }
 
@@ -90,7 +89,7 @@ public class ProductController {
 
     static final List<String> COLUMNS = List.of("sku", "name", "barcode", "base_uom", "weight_kg", "volume_l", "cost",
             "track_batch", "track_expiry", "units", "reorder_point", "category", "carton_cm", "units_per_carton",
-            "hs_code", "storage_temp", "hazard_class", "stack_max", "fragile", "owner");
+            "hs_code", "storage_temp", "hazard_class", "stack_max", "fragile");
 
     private final ProductService products;
     private final jakarta.validation.Validator validator;
@@ -132,8 +131,7 @@ public class ProductController {
                 Map.entry("handling.hsCode", "hs_code"),
                 Map.entry("handling.storageTemp", "storage_temp"),
                 Map.entry("handling.hazardClass", "hazard_class"),
-                Map.entry("handling.stackMax", "stack_max"),
-                Map.entry("ownerCode", "owner"));
+                Map.entry("handling.stackMax", "stack_max"));
         for (int i = 0; i < csv.size(); i++) {
             int errorsBefore = csv.errors.size();
             Long weight = csv.scaled(i, "weight_kg", 1000);
@@ -147,7 +145,7 @@ public class ProductController {
                     csv.text(i, "category"), carton(csv.text(i, "carton_cm"), 0), carton(csv.text(i, "carton_cm"), 1),
                     carton(csv.text(i, "carton_cm"), 2), toInt(csv.scaled(i, "units_per_carton", 1)),
                     new ProductService.Handling(hsCode(csv.text(i, "hs_code")), csv.upper(i, "storage_temp"), csv.text(i, "hazard_class"),
-                            toInt(csv.scaled(i, "stack_max", 1)), csv.yesNo(i, "fragile")), csv.upper(i, "owner"), units, null);
+                            toInt(csv.scaled(i, "stack_max", 1)), csv.yesNo(i, "fragile")), units, null);
             if (r.sku() == null) {
                 csv.error(i, "sku", "SKU is required");
             } else if (csv.valid(validator, i, r, columnOf) && csv.errors.size() == errorsBefore) {
@@ -211,9 +209,8 @@ public class ProductController {
     @PreAuthorize("hasAuthority('catalog:read')")
     public PageResponse<ProductView> list(@RequestParam(required = false) @Size(max = 200) String q,
             @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) @Size(max = 40) String sort,
-            @RequestParam(required = false) @Pattern(regexp = "-|[A-Z0-9][A-Z0-9-]{0,19}") String owner) {
-        return PageResponse.of(products.list(q, owner, PageResponse.request(page, size, sort,
+            @RequestParam(required = false) @Size(max = 40) String sort) {
+        return PageResponse.of(products.list(q, PageResponse.request(page, size, sort,
                 Map.of("sku", "sku", "name", "name"), Sort.by("sku"))), p -> p);
     }
 

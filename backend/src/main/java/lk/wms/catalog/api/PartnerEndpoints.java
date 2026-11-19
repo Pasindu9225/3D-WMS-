@@ -3,9 +3,7 @@ package lk.wms.catalog.api;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -54,12 +52,10 @@ public abstract class PartnerEndpoints {
             @Pattern(regexp = "[0-9 +()-]{3,30}") String phone,
             @Email @Size(max = 254) String email,
             @Size(max = 500) String address,
-            @Min(0) Integer version,
-            /** Clients only (v2.1): HS sections 1-21 they may store; empty = any. */
-            @Size(max = 21) List<@NotNull @Min(1) @Max(21) Integer> allowedHsSections) {
+            @Min(0) Integer version) {
 
         PartnerSpec spec() {
-            return new PartnerSpec(name, contactName, phone, email, address, allowedHsSections);
+            return new PartnerSpec(name, contactName, phone, email, address);
         }
     }
 
@@ -125,7 +121,7 @@ public abstract class PartnerEndpoints {
                 "email", "email", "address", "address");
         for (int i = 0; i < csv.size(); i++) {
             PartnerRequest r = new PartnerRequest(csv.upper(i, "code"), csv.text(i, "name"), csv.text(i, "contact"),
-                    csv.text(i, "phone"), csv.text(i, "email"), csv.text(i, "address"), null, null);
+                    csv.text(i, "phone"), csv.text(i, "email"), csv.text(i, "address"), null);
             if (r.code() == null) {
                 csv.error(i, "code", "Code is required");
             } else if (csv.valid(validator, i, r, columnOf)) {

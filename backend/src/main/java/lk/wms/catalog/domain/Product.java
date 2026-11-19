@@ -104,10 +104,6 @@ public class Product extends TenantScoped {
     @Column(nullable = false)
     private boolean fragile;
 
-    /** The client (3PL) whose goods these are (v2.1); null = the company's own goods. */
-    @Column(name = "owner_id")
-    private Long ownerId;
-
     @Column(name = "image_file_id")
     private Long imageFileId;
 
@@ -238,14 +234,6 @@ public class Product extends TenantScoped {
         this.hazardClass = hazardClass;
         this.stackMax = stackMax;
         this.fragile = fragile;
-    }
-
-    public Long getOwnerId() {
-        return ownerId;
-    }
-
-    public void setOwnerId(Long ownerId) {
-        this.ownerId = ownerId;
     }
 
     public String getHsCode() {

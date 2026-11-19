@@ -16,13 +16,6 @@ import { ImportDialog } from './ImportDialog'
 
 export const SuppliersPage = () => <PartnersPage kind="suppliers" />
 export const CustomersPage = () => <PartnersPage kind="customers" />
-export const ClientsPage = () => <PartnersPage kind="clients" />
-
-/** The 21 sections of the world customs (HS) code, for what a client may store. */
-const HS_SECTIONS = Array.from({ length: 21 }, (_, i) => i + 1)
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI']
-const sectionsText = (s: number[] | null | undefined) =>
-  s && s.length ? s.map((n) => ROMAN[n - 1]).join(', ') : t('clients.anyCommodity')
 
 /** Suppliers (who the company buys from) or customers (who it ships to): one list, one dialog. */
 function PartnersPage({ kind }: { kind: PartnerKind }) {
@@ -67,7 +60,6 @@ function PartnersPage({ kind }: { kind: PartnerKind }) {
             <Th>{t('suppliers.col.name')}</Th>
             <Th className="hidden md:table-cell">{t('suppliers.col.contact')}</Th>
             <Th className="hidden lg:table-cell">{t('suppliers.col.email')}</Th>
-            {kind === 'clients' && <Th className="hidden sm:table-cell">{t('clients.col.sections')}</Th>}
             <Th className="w-1"><span className="sr-only">{t('users.col.actions')}</span></Th>
           </tr>
         </thead>
@@ -78,7 +70,6 @@ function PartnersPage({ kind }: { kind: PartnerKind }) {
               <td>{s.name}</td>
               <td className="hidden text-sm md:table-cell">{[s.contactName, s.phone].filter(Boolean).join(' · ') || '—'}</td>
               <td className="hidden text-sm lg:table-cell">{s.email ?? '—'}</td>
-              {kind === 'clients' && <td className="hidden text-sm sm:table-cell" title={(s.allowedHsSections ?? []).map((n) => t(('hs.section.' + n) as MessageKey)).join(', ')}>{sectionsText(s.allowedHsSections)}</td>}
               <td className="whitespace-nowrap text-right">
                 {manage && (
                   <>
@@ -90,7 +81,7 @@ function PartnersPage({ kind }: { kind: PartnerKind }) {
             </Tr>
           ))}
           {data && data.items.length === 0 && (
-            <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">{q ? t(k('noMatch')) : t(k('empty'))}</td></tr>
+            <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">{q ? t(k('noMatch')) : t(k('empty'))}</td></tr>
           )}
         </tbody>
       </Table>
@@ -130,7 +121,6 @@ type Values = z.input<typeof schema>
 
 function SupplierDialog({ kind, supplier, onClose }: { kind: PartnerKind; supplier: Supplier | null; onClose: () => void }) {
   const save = useSaveSupplier(kind)
-  const [sections, setSections] = useState<number[]>(supplier?.allowedHsSections ?? [])
   const form = useForm<Values, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -143,7 +133,6 @@ function SupplierDialog({ kind, supplier, onClose }: { kind: PartnerKind; suppli
   const submit = form.handleSubmit((v) => save.mutate({
     id: supplier?.id, code: supplier ? undefined : v.code, version: supplier?.version, name: v.name,
     contactName: v.contactName || null, phone: v.phone || null, email: v.email || null, address: v.address || null,
-    ...(kind === 'clients' ? { allowedHsSections: sections } : {}),
   }, { onSuccess: onClose }))
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()} title={t(`${kind}.${supplier ? 'editTitle' : 'new'}` as MessageKey)}>
@@ -172,21 +161,6 @@ function SupplierDialog({ kind, supplier, onClose }: { kind: PartnerKind; suppli
         <Field label={t('suppliers.address')} error={errors.address?.message}>
           {(p) => <Input {...p} maxLength={500} {...form.register('address')} />}
         </Field>
-        {kind === 'clients' && (
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">{t('clients.sections')}</legend>
-            <p className="text-xs text-muted-foreground">{t('clients.sectionsHint')}</p>
-            <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto rounded-md border p-2 text-sm sm:grid-cols-2">
-              {HS_SECTIONS.map((n) => (
-                <label key={n} className="flex items-start gap-2">
-                  <input type="checkbox" className="mt-1" checked={sections.includes(n)}
-                    onChange={() => setSections((s) => (s.includes(n) ? s.filter((x) => x !== n) : [...s, n].sort((a, b) => a - b)))} />
-                  <span><span className="font-mono">{ROMAN[n - 1]}</span> {t(('hs.section.' + n) as MessageKey)}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        )}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={save.isPending}>{save.isPending ? t('common.saving') : t('common.save')}</Button>

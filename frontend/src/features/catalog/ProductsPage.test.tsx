@@ -49,7 +49,6 @@ it('creates a product from kg, a box size in cm, a price and a case unit', async
   expect(JSON.parse(requests.find((r) => r.method === 'POST')!.body!)).toEqual({
     sku: 'OIL-1L', name: 'Coconut oil 1L', barcode: '4791234000011', baseUom: 'EA', weightG: 950, volumeCm3: 2000,
     costMinor: 125050, reorderPoint: null, category: null, cartonLengthMm: null, cartonWidthMm: null, cartonHeightMm: null, unitsPerCarton: null, trackBatch: false, trackExpiry: true, units: [{ uom: 'CASE', factor: 12, barcode: null }],
-    ownerCode: null,
     handling: { hsCode: '151311', storageTemp: 'AMBIENT', hazardClass: '3', stackMax: 4, fragile: true },
   })
 }, 15_000) // a long form: much typing

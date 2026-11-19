@@ -236,13 +236,11 @@ export function useStockRows(warehouseId: string | undefined, filter: { product?
   })
 }
 
-/** owner (v2.1): '' = every owner, '-' = the company's own goods, else a client code. */
-export function useProductTotals(warehouseId: string | undefined, q: string, page: number, owner = '') {
+export function useProductTotals(warehouseId: string | undefined, q: string, page: number) {
   const params = new URLSearchParams({ warehouse: warehouseId ?? '', page: String(page), size: '50' })
   if (q) params.set('q', q)
-  if (owner) params.set('owner', owner)
   return useQuery({
-    queryKey: ['stock-products', warehouseId, q, page, owner],
+    queryKey: ['stock-products', warehouseId, q, page],
     queryFn: () => api<Page<ProductTotal>>(`/stock/products?${params}`),
     enabled: !!warehouseId,
     placeholderData: keepPreviousData,

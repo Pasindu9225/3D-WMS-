@@ -22,12 +22,10 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 public class PartnerService {
 
     public record PartnerView(String id, String type, String code, String name, String contactName, String phone,
-            String email, String address, int version, List<Integer> allowedHsSections) {
+            String email, String address, int version) {
     }
 
-    /** allowedHsSections: clients only; null = leave as it is (CSV import), empty = any commodity. */
-    public record PartnerSpec(String name, String contactName, String phone, String email, String address,
-            List<Integer> allowedHsSections) {
+    public record PartnerSpec(String name, String contactName, String phone, String email, String address) {
     }
 
     /** One CSV row, already validated field by field. */
@@ -36,10 +34,8 @@ public class PartnerService {
 
     private final PartnerRepository partners;
     private final AuditService audit;
-    private final lk.wms.catalog.repo.ProductRepository products;
 
-    public PartnerService(PartnerRepository partners, AuditService audit, lk.wms.catalog.repo.ProductRepository products) {
-        this.products = products;
+    public PartnerService(PartnerRepository partners, AuditService audit) {
         this.partners = partners;
         this.audit = audit;
     }
@@ -80,37 +76,6 @@ public class PartnerService {
                 .collect(Collectors.toMap(Partner::getCode, p -> new CustomerRef(p.getId(), p.getCode(), p.getName(), p.getAddress())));
     }
 
-    /** A client (3PL stock owner): internal id, code, name, the HS sections it may store (empty = any). */
-    public record ClientRef(long id, String code, String name, List<Integer> sections) {
-    }
-
-    /** A live client by its code, else 404. */
-    @Transactional(readOnly = true)
-    public ClientRef clientByCode(String code) {
-        return partners.findByTypeAndCodeIn(Partner.Type.CLIENT, List.of(code)).stream().findFirst().map(PartnerService::client)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "CLIENT_NOT_FOUND", "Client " + code + " not found"));
-    }
-
-    /** A live client by code, if there is one. */
-    @Transactional(readOnly = true)
-    public java.util.Optional<ClientRef> findClient(String code) {
-        return partners.findByTypeAndCodeIn(Partner.Type.CLIENT, List.of(code)).stream().findFirst().map(PartnerService::client);
-    }
-
-    /** Clients by internal id (products, orders and rules hold these ids). */
-    @Transactional(readOnly = true)
-    public Map<Long, ClientRef> clients(java.util.Collection<Long> ids) {
-        return ids.isEmpty() ? Map.of() : partners.findByIdIn(ids).stream().collect(Collectors.toMap(Partner::getId, PartnerService::client));
-    }
-
-    private static ClientRef client(Partner p) {
-        return new ClientRef(p.getId(), p.getCode(), p.getName(), sections(p.getAllowedHsSections()));
-    }
-
-    static List<Integer> sections(String list) {
-        return list == null || list.isBlank() ? List.of() : java.util.Arrays.stream(list.split(",")).map(Integer::valueOf).toList();
-    }
-
     @Transactional
     public PartnerView create(CurrentUser cu, Partner.Type type, String code, PartnerSpec s) {
         Partner p = new Partner(type, code);
@@ -140,9 +105,6 @@ public class PartnerService {
     @Transactional
     public void archive(CurrentUser cu, Partner.Type type, String publicId) {
         Partner p = find(type, publicId);
-        if (type == Partner.Type.CLIENT && products.existsByOwnerId(p.getId())) {
-            throw new ApiException(HttpStatus.CONFLICT, "CLIENT_IN_USE", "Products still belong to " + p.getCode() + "; archive or move them first");
-        }
         p.archive();
         audit.record(cu.tenantId(), cu.userId(), "PARTNER_ARCHIVED", "partner", p.getPublicId(), view(p), null);
     }
@@ -190,10 +152,6 @@ public class PartnerService {
     private static void apply(Partner p, PartnerSpec s) {
         p.set(s.name().trim(), blankToNull(s.contactName()), blankToNull(s.phone()), blankToNull(s.email()),
                 blankToNull(s.address()));
-        if (p.getType() == Partner.Type.CLIENT && s.allowedHsSections() != null) {
-            p.setAllowedHsSections(s.allowedHsSections().isEmpty() ? null
-                    : String.join(",", new java.util.TreeSet<>(s.allowedHsSections()).stream().map(String::valueOf).toList()));
-        }
     }
 
     static String blankToNull(String v) {
@@ -207,7 +165,6 @@ public class PartnerService {
 
     static PartnerView view(Partner p) {
         return new PartnerView(p.getPublicId(), p.getType().name(), p.getCode(), p.getName(), p.getContactName(),
-                p.getPhone(), p.getEmail(), p.getAddress(), p.getVersion(),
-                p.getType() == Partner.Type.CLIENT ? sections(p.getAllowedHsSections()) : null);
+                p.getPhone(), p.getEmail(), p.getAddress(), p.getVersion());
     }
 }

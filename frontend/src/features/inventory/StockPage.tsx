@@ -8,7 +8,6 @@ import { t, type MessageKey } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useDebounced } from '@/lib/useDebounced'
 import { ExportLinks } from '@/features/report/ExportLinks'
-import { useClients } from '@/features/catalog/api'
 import { useMovements, useProductTotals, useStockRows, type ProductTotal } from './api'
 
 type Tab = 'products' | 'bins' | 'movements'
@@ -77,29 +76,14 @@ function ByProduct({ warehouseId, onOpen }: { warehouseId: string | undefined; o
   const [search, setSearch] = useState('')
   const q = useDebounced(search.trim())
   const [page, setPage] = useState(0)
-  const [owner, setOwner] = useState('')
-  const clients = useClients()
-  const totals = useProductTotals(warehouseId, q, page, owner)
+  const totals = useProductTotals(warehouseId, q, page)
   return (
     <>
-      <div className="flex flex-wrap gap-2">
-        <Input aria-label={t('stock.searchProduct')} placeholder={t('stock.searchProduct')} className="max-w-sm" value={search} maxLength={200}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(0)
-          }} />
-        {(clients.data?.items.length ?? 0) > 0 && (
-          <select aria-label={t('products.ownerFilter')} className="h-9 rounded-md border border-input bg-background px-2 text-sm" value={owner}
-            onChange={(e) => {
-              setOwner(e.target.value)
-              setPage(0)
-            }}>
-            <option value="">{t('products.ownerAll')}</option>
-            <option value="-">{t('products.ownerOwn')}</option>
-            {clients.data?.items.map((c) => <option key={c.id} value={c.code}>{c.code} · {c.name}</option>)}
-          </select>
-        )}
-      </div>
+      <Input aria-label={t('stock.searchProduct')} placeholder={t('stock.searchProduct')} className="max-w-sm" value={search} maxLength={200}
+        onChange={(e) => {
+          setSearch(e.target.value)
+          setPage(0)
+        }} />
       {totals.isError && <FormMessage tone="error">{errorMessage(totals.error)}</FormMessage>}
       <Table>
         <thead>

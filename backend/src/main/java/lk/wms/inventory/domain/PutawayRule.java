@@ -59,10 +59,6 @@ public class PutawayRule extends TenantScoped {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    /** v2.1 (3PL): every product of this client; set alone (no product, no category). */
-    @Column(name = "owner_id")
-    private Long ownerId;
-
     @Version
     private int version;
 
@@ -81,14 +77,6 @@ public class PutawayRule extends TenantScoped {
         this.onlyZone = onlyZone;
         this.createdBy = userId;
         this.createdAt = Instant.now();
-    }
-
-    public void setOwnerId(Long ownerId) {
-        this.ownerId = ownerId;
-    }
-
-    public Long getOwnerId() {
-        return ownerId;
     }
 
     public void set(int priority, boolean onlyZone, boolean active) {

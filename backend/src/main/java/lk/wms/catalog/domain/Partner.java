@@ -22,7 +22,7 @@ import org.hibernate.type.SqlTypes;
 @SQLRestriction("deleted_at is null")
 public class Partner extends TenantScoped {
 
-    public enum Type { SUPPLIER, CUSTOMER, CLIENT }
+    public enum Type { SUPPLIER, CUSTOMER }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -66,10 +66,6 @@ public class Partner extends TenantScoped {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
-    /** Clients (3PL, v2.1): HS sections 1-21 they may store, "2,4"; null = any. */
-    @Column(name = "allowed_hs_sections", length = 80)
-    private String allowedHsSections;
-
     protected Partner() {
     }
 
@@ -87,14 +83,6 @@ public class Partner extends TenantScoped {
         this.email = email;
         this.address = address;
         this.updatedAt = Instant.now();
-    }
-
-    public void setAllowedHsSections(String sections) {
-        this.allowedHsSections = sections;
-    }
-
-    public String getAllowedHsSections() {
-        return allowedHsSections;
     }
 
     public void archive() {

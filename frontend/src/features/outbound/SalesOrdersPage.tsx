@@ -81,7 +81,6 @@ export function SalesOrdersPage() {
             <Tr key={o.id}>
               <td className="font-mono font-medium">
                 <Link className="underline-offset-2 hover:underline" to={`/app/sales-orders/${o.id}`}>{o.number}</Link>
-                {o.ownerCode && <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal" title={t('orders.owner')}>{o.ownerCode}</span>}
               </td>
               <td>{o.customerName} <span className="text-xs text-muted-foreground">{o.customerCode}</span></td>
               <td className="hidden font-mono text-sm md:table-cell">{o.customerRef ?? '—'}</td>

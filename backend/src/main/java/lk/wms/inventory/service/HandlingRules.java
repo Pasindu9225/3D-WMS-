@@ -25,21 +25,6 @@ final class HandlingRules {
     private HandlingRules() {
     }
 
-    /** The owner key of the company's own goods (clients are their partner ids, always positive). */
-    static final long OWN = 0L;
-
-    /**
-     * 3PL (v2.1): one client's goods never share a place with another client's (the company's own goods count as an
-     * owner too). Receiving, dispatch and quarantine are exempt: goods only pass through them.
-     */
-    static Refusal mixedOwner(Candidate c, java.util.Set<Long> ownersInPlace, long owner) {
-        if (List.of("RECEIVING", "DISPATCH", "QUARANTINE").contains(c.zoneType())) {
-            return null;
-        }
-        return ownersInPlace.stream().anyMatch(o -> o != owner)
-                ? new Refusal("OWNER_MIXED", c.code() + " holds another client's goods; each place keeps one client's stock") : null;
-    }
-
     /**
      * Null when the product may go into this place.
      *

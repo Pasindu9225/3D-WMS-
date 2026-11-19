@@ -43,7 +43,7 @@ public class PurchaseOrderService {
     }
 
     public record Summary(String id, String number, String status, String supplierCode, String supplierName,
-            String warehouseCode, LocalDate expectedDate, long totalMinor, int lineCount, Instant createdAt, String ownerCode) {
+            String warehouseCode, LocalDate expectedDate, long totalMinor, int lineCount, Instant createdAt) {
     }
 
     public record LineView(int lineNo, String sku, String productName, String uom, int factor, BigDecimal qty,
@@ -53,7 +53,7 @@ public class PurchaseOrderService {
     public record Detail(String id, String number, String status, String supplierCode, String supplierName,
             String warehouseId, String warehouseCode, LocalDate expectedDate, String note, long totalMinor,
             Instant createdAt, Instant approvedAt, Instant cancelledAt, String cancelReason, List<LineView> lines,
-            int version, String ownerCode) {
+            int version) {
     }
 
     static final String KIND = "PO";
@@ -164,8 +164,6 @@ public class PurchaseOrderService {
             return new PoLine.Spec(p.id(), p.sku(), p.name(), l.uom(), factor, l.qty().setScale(3, RoundingMode.UNNECESSARY), cost);
         }).toList();
         String note = s.note() == null || s.note().isBlank() ? null : s.note().trim();
-        ProductService.Owner owner = ProductService.oneOwner(s.lines().stream().map(l -> found.get(l.sku())).toList());
-        o.setOwner(owner.id(), owner.code());
         try {
             o.set(new Party(supplier.id(), supplier.code(), supplier.name()), new Party(wh.id(), wh.code(), null),
                     s.expectedDate(), note, lines);
@@ -194,7 +192,7 @@ public class PurchaseOrderService {
 
     static Summary summary(PurchaseOrder o) {
         return new Summary(o.getPublicId(), o.getNumber(), o.getStatus().name(), o.getSupplierCode(), o.getSupplierName(),
-                o.getWarehouseCode(), o.getExpectedDate(), o.getTotalMinor(), o.getLineCount(), o.getCreatedAt(), o.getOwnerCode());
+                o.getWarehouseCode(), o.getExpectedDate(), o.getTotalMinor(), o.getLineCount(), o.getCreatedAt());
     }
 
     private Detail detail(PurchaseOrder o) {
@@ -203,6 +201,6 @@ public class PurchaseOrderService {
         return new Detail(o.getPublicId(), o.getNumber(), o.getStatus().name(), o.getSupplierCode(), o.getSupplierName(),
                 warehouses.publicIdOf(o.getWarehouseId()), o.getWarehouseCode(), o.getExpectedDate(), o.getNote(),
                 o.getTotalMinor(), o.getCreatedAt(), o.getApprovedAt(), o.getCancelledAt(), o.getCancelReason(), lines,
-                o.getVersion(), o.getOwnerCode());
+                o.getVersion());
     }
 }

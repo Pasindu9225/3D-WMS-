@@ -49,8 +49,7 @@ export function PutawayRulesPage() {
             <Tr key={r.id}>
               <td className="text-right tabular-nums">{r.priority}</td>
               <td>{r.appliesTo === 'PRODUCT' ? <><span className="font-mono text-sm font-semibold">{r.sku}</span> {r.productName}</>
-                : r.appliesTo === 'CATEGORY' ? t('prules.category', { c: r.category ?? '' })
-                : r.appliesTo === 'CLIENT' ? t('prules.client', { c: r.clientCode ?? '' }) : t('prules.all')}
+                : r.appliesTo === 'CATEGORY' ? t('prules.category', { c: r.category ?? '' }) : t('prules.all')}
                 {!r.active && <span className="ml-1 text-xs text-muted-foreground">{t('refill.off')}</span>}</td>
               <td>{r.binCode ? t('prules.toBin', { bin: r.binCode }) : t(r.onlyZone ? 'prules.onlyZone' : 'prules.toZone', { zone: r.zoneCode ?? '' })}</td>
               <td className="whitespace-nowrap">{manage && <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>{t('refill.edit')}</Button>}</td>
@@ -69,7 +68,7 @@ const PRIORITY = /^\d{1,3}$/
 
 function NewRuleDialog({ warehouseId, onClose }: { warehouseId: string; onClose: () => void }) {
   const action = usePutawayRuleAction()
-  const [to, setTo] = useState<'PRODUCT' | 'CATEGORY' | 'CLIENT' | 'ALL'>('PRODUCT')
+  const [to, setTo] = useState<'PRODUCT' | 'CATEGORY' | 'ALL'>('PRODUCT')
   const [what, setWhat] = useState('')
   const [dest, setDest] = useState<'BIN' | 'ZONE'>('ZONE')
   const [where, setWhere] = useState('')
@@ -82,8 +81,7 @@ function NewRuleDialog({ warehouseId, onClose }: { warehouseId: string; onClose:
         e.preventDefault()
         if (!valid) return
         action.mutate({ kind: 'create', rule: { warehouseId, priority: Number(priority), onlyZone: dest === 'ZONE' && only,
-          ...(to === 'PRODUCT' ? { sku: what.trim() } : to === 'CATEGORY' ? { category: what.trim() }
-            : to === 'CLIENT' ? { clientCode: what.trim().toUpperCase() } : {}),
+          ...(to === 'PRODUCT' ? { sku: what.trim() } : to === 'CATEGORY' ? { category: what.trim() } : {}),
           ...(dest === 'BIN' ? { binCode: where.trim() } : { zoneCode: where.trim() }) } }, { onSuccess: onClose })
       }}>
         {action.isError && <FormMessage tone="error">{errorMessage(action.error)}</FormMessage>}
@@ -91,13 +89,12 @@ function NewRuleDialog({ warehouseId, onClose }: { warehouseId: string; onClose:
           <select {...p} className="h-10 rounded-md border border-input bg-background px-3" value={to} onChange={(e) => setTo(e.target.value as typeof to)}>
             <option value="PRODUCT">{t('prules.toProduct')}</option>
             <option value="CATEGORY">{t('prules.toCategory')}</option>
-            <option value="CLIENT">{t('prules.toClient')}</option>
             <option value="ALL">{t('prules.all')}</option>
           </select>
         )}</Field>
         {to !== 'ALL' && (
-          <Field label={to === 'PRODUCT' ? t('refill.product') : to === 'CLIENT' ? t('prules.clientCode') : t('prules.categoryName')}>
-            {(p) => <Input {...p} className={to === 'CATEGORY' ? '' : 'font-mono'} maxLength={to === 'PRODUCT' ? 64 : to === 'CLIENT' ? 20 : 40} value={what} onChange={(e) => setWhat(e.target.value)} />}
+          <Field label={to === 'PRODUCT' ? t('refill.product') : t('prules.categoryName')}>
+            {(p) => <Input {...p} className={to === 'PRODUCT' ? 'font-mono' : ''} maxLength={to === 'PRODUCT' ? 64 : 40} value={what} onChange={(e) => setWhat(e.target.value)} />}
           </Field>
         )}
         <Field label={t('prules.col.goesTo')}>{(p) => (

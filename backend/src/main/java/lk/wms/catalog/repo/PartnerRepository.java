@@ -23,7 +23,4 @@ public interface PartnerRepository extends JpaRepository<Partner, Long> {
     Page<Partner> search(@Param("type") Partner.Type type, @Param("q") String q, Pageable pageable);
 
     List<Partner> findByTypeAndCodeIn(Partner.Type type, Collection<String> codes);
-
-    /** By internal ids (other rows hold them); the tenant filter still applies. */
-    List<Partner> findByIdIn(Collection<Long> ids);
 }

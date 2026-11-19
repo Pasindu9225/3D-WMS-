@@ -47,9 +47,8 @@ public class StockController {
     @PreAuthorize("hasAuthority('inventory:read')")
     public PageResponse<ProductTotal> byProduct(@RequestParam("warehouse") @Size(max = 26) String warehouseId,
             @RequestParam(required = false) @Size(max = 200) String q,
-            @RequestParam(required = false) @jakarta.validation.constraints.Pattern(regexp = "-|[A-Z0-9][A-Z0-9-]{0,19}") String owner,
             @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        return PageResponse.of(stock.byProduct(CurrentUser.require(), warehouseId, q, owner,
+        return PageResponse.of(stock.byProduct(CurrentUser.require(), warehouseId, q,
                 PageResponse.request(page, size, null, Map.of(), Sort.unsorted())), r -> r);
     }
 

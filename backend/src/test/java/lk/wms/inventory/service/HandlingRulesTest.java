@@ -81,14 +81,4 @@ class HandlingRulesTest {
         assertThat(code(h("AMBIENT", null, 2, false), shelf, List.of(), List.of(), 48, carton)).isNull();
         assertThat(code(Handling.NONE, shelf, List.of(), List.of(), 1000, carton)).isNull(); // no rule: capacity decides
     }
-
-    @Test
-    void oneClientsGoodsPerPlace() {
-        Candidate shelf = place("STORAGE", null, "SHELF", 1);
-        assertThat(HandlingRules.mixedOwner(shelf, java.util.Set.of(), 7)).isNull(); // empty
-        assertThat(HandlingRules.mixedOwner(shelf, java.util.Set.of(7L), 7)).isNull(); // same client
-        assertThat(HandlingRules.mixedOwner(shelf, java.util.Set.of(8L), 7).code()).isEqualTo("OWNER_MIXED");
-        assertThat(HandlingRules.mixedOwner(shelf, java.util.Set.of(HandlingRules.OWN), 7).code()).isEqualTo("OWNER_MIXED");
-        assertThat(HandlingRules.mixedOwner(place("RECEIVING", null, "SHELF", 1), java.util.Set.of(8L), 7)).isNull(); // passing through
-    }
 }

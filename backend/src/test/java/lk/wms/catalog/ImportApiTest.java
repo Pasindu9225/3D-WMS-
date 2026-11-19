@@ -94,16 +94,6 @@ class ImportApiTest extends ApiTest {
     }
 
     @Test
-    void ownerColumnImports() throws Exception { // v2.1, 3PL
-        send(admin, post("/api/v1/clients").content("{\"code\":\"FOOD\",\"name\":\"Foods\",\"allowedHsSections\":[2]}")).andExpect(status().isCreated());
-        String bad = importCsv(admin, "products", "p.csv", "sku,name,base_uom,hs_code,owner\nT-1,Tea,EA,0902.30,food\nB-1,Bleach,EA,2828.90,FOOD\nX-1,X,EA,,NOPE\n")
-                .andExpect(jsonPath("$.saved").value(false)).andReturn().getResponse().getContentAsString();
-        assertThat(bad).contains("\"row\":3", "\"field\":\"hs_code\"", "\"row\":4", "\"field\":\"owner\"").doesNotContain("\"row\":2");
-        importCsv(admin, "products", "p.csv", "sku,name,base_uom,hs_code,owner\nT-1,Tea,EA,0902.30,food\n").andExpect(jsonPath("$.saved").value(true));
-        send(admin, get("/api/v1/products?owner=FOOD")).andExpect(jsonPath("$.items[0].sku").value("T-1"));
-    }
-
-    @Test
     void anyBadRowMeansNothingIsSavedAndEveryProblemIsListedByRow() throws Exception {
         String csv = "sku,name,base_uom,weight_kg,track_expiry,units,barcode\n"
                 + "GOOD-1,Fine,EA,1,no,,111\n"

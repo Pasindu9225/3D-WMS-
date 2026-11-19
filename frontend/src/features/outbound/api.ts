@@ -16,8 +16,6 @@ export interface SoSummary {
   requestedDate: string | null
   lineCount: number
   createdAt: string
-  /** The client (3PL) whose goods the order is for (v2.1); null = the company's own. */
-  ownerCode?: string | null
 }
 
 export interface SoLine {

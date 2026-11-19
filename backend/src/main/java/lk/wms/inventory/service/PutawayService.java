@@ -101,7 +101,7 @@ public class PutawayService {
         BigDecimal needV = times(qty, size == null ? null : size.volumeCm3());
 
         List<Candidate> all = bins.putawayCandidates(cu, w.id()); // nearest first
-        List<PutawayRuleService.Match> rules = putawayRules.matching(w.id(), product.id(), products.category(product.id()), products.ownerOf(product.id()));
+        List<PutawayRuleService.Match> rules = putawayRules.matching(w.id(), product.id(), products.category(product.id()));
         Placed placed = placed(all, inBins, product.id());
         java.util.function.Predicate<Candidate> ok = c -> placed.refusal(product, c, qty) == null;
         Fit fit = new Fit(load, sameProduct, needW, needV, ok, home(placed.handling(product.id())));
@@ -145,19 +145,13 @@ public class PutawayService {
      * the pallets in each floor-row column and how much of the product each place holds.
      */
     private record Placed(Map<Long, ProductService.Handling> handlingById, Map<Long, Map<Long, String>> hazardsByRack,
-            Map<String, List<long[]>> columns, Map<Long, BigDecimal> sameUnits, Map<Long, ProductService.Carton> cartons,
-            Map<Long, Long> ownerOf, Map<Long, Set<Long>> ownersByBin) {
+            Map<String, List<long[]>> columns, Map<Long, BigDecimal> sameUnits, Map<Long, ProductService.Carton> cartons) {
 
         ProductService.Handling handling(long productId) {
             return handlingById.getOrDefault(productId, ProductService.Handling.NONE);
         }
 
         HandlingRules.Refusal refusal(ProductService.Basic product, Candidate c, BigDecimal qty) {
-            HandlingRules.Refusal mixed = HandlingRules.mixedOwner(c, ownersByBin.getOrDefault(c.id(), Set.of()),
-                    ownerOf.getOrDefault(product.id(), HandlingRules.OWN));
-            if (mixed != null) {
-                return mixed;
-            }
             List<String> rackHazards = hazardsByRack.getOrDefault(c.rackId(), Map.of()).entrySet().stream()
                     .filter(e -> e.getKey() != product.id()).map(Map.Entry::getValue).toList();
             List<HandlingRules.Below> below = columns.getOrDefault(c.rackId() + "/" + c.position(), List.of()).stream()
@@ -173,8 +167,6 @@ public class PutawayService {
         Set<Long> ids = new HashSet<>(inBins.stream().map(Stock::getProductId).toList());
         ids.add(productId);
         Map<Long, ProductService.Handling> handling = products.handling(ids);
-        Map<Long, Long> ownerOf = products.owners(ids);
-        Map<Long, Set<Long>> ownersByBin = new HashMap<>();
         Map<Long, Map<Long, String>> hazards = new HashMap<>();
         Map<String, List<long[]>> columns = new HashMap<>();
         Map<Long, BigDecimal> same = new HashMap<>();
@@ -190,12 +182,11 @@ public class PutawayService {
             if ("FLOOR".equals(c.style())) {
                 columns.computeIfAbsent(c.rackId() + "/" + c.position(), k -> new ArrayList<>()).add(new long[] {c.level(), s.getProductId()});
             }
-            ownersByBin.computeIfAbsent(c.id(), k -> new HashSet<>()).add(ownerOf.getOrDefault(s.getProductId(), HandlingRules.OWN));
             if (s.getProductId() == productId) {
                 same.merge(c.id(), s.getQtyOnHand(), BigDecimal::add);
             }
         }
-        return new Placed(handling, hazards, columns, same, products.cartons(List.of(productId)), ownerOf, ownersByBin);
+        return new Placed(handling, hazards, columns, same, products.cartons(List.of(productId)));
     }
 
     /** Same batch, then same product, then empty bins (storage zones only, or any zone but quarantine) among these candidates. */
@@ -249,7 +240,7 @@ public class PutawayService {
 
     /** An "only this zone" rule: a bin outside its zone(s) is refused, unless a rule names that very bin. */
     private void checkOnlyZone(CurrentUser cu, long warehouseId, long productId, BinService.BinRef bin) {
-        List<PutawayRuleService.Match> rules = putawayRules.matching(warehouseId, productId, products.category(productId), products.ownerOf(productId));
+        List<PutawayRuleService.Match> rules = putawayRules.matching(warehouseId, productId, products.category(productId));
         Set<String> zones = new java.util.TreeSet<>();
         rules.stream().filter(PutawayRuleService.Match::onlyZone).forEach(r -> zones.add(r.zoneCode()));
         if (zones.isEmpty() || rules.stream().anyMatch(r -> Objects.equals(r.binId(), bin.id()))) {

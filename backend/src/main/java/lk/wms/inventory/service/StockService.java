@@ -131,11 +131,10 @@ public class StockService {
     }
 
     @Transactional(readOnly = true)
-    /** owner (v2.1, 3PL): null = every owner, "-" = the company's own goods, else a client code. */
-    public Page<ProductTotal> byProduct(CurrentUser cu, String warehouseId, String query, String owner, Pageable pageable) {
+    public Page<ProductTotal> byProduct(CurrentUser cu, String warehouseId, String query, Pageable pageable) {
         WarehouseService.WarehouseRef w = warehouses.requireAccess(cu, warehouseId);
-        boolean any = (query == null || query.isBlank()) && owner == null;
-        List<Long> ids = any ? List.of(-1L) : products.idsMatching(query, owner);
+        boolean any = query == null || query.isBlank();
+        List<Long> ids = any ? List.of(-1L) : products.idsMatching(query);
         Page<Object[]> page = stock.totalsByProduct(w.id(), any, ids.isEmpty() ? List.of(-1L) : ids, pageable);
         Map<Long, ProductService.Basic> names = products.basics(page.getContent().stream()
                 .map(r -> ((Number) r[0]).longValue()).toList());
