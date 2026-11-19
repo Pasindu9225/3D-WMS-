@@ -67,7 +67,7 @@ function CountWalk({ id }: { id: string }) {
         <h1 className="text-xl font-semibold"><span className="font-mono">{c.number}</span> · {c.warehouseCode}</h1>
         <p className="text-sm text-muted-foreground">{t('count.left', { n: c.open, of: c.lines })}</p>
       </div>
-      {next ? <CountLineCard key={next.seq} view={c} line={next} />
+      {next ? <CountLineCard key={`${next.seq}-${next.again}`} view={c} line={next} />
         : <FormMessage tone="success"><CheckCircle2 className="mr-1 inline size-4" />{t('count.allDone')}</FormMessage>}
       {c.status === 'OPEN' && (
         <Button variant="outline" className="h-12" onClick={() => setFinding(true)}><PackagePlus /> {t('count.found')}</Button>
@@ -76,7 +76,8 @@ function CountWalk({ id }: { id: string }) {
         {c.items.map((l) => (
           <li key={l.seq} className={`flex items-center justify-between gap-2 px-3 py-2 ${l === next ? 'bg-secondary' : ''}`}>
             <span className="min-w-0 truncate"><span className="font-mono">{l.binCode}</span> · {l.sku}
-              {l.added && <span className="ml-1 text-xs text-muted-foreground">{t('count.addedTag')}</span>}</span>
+              {l.added && <span className="ml-1 text-xs text-muted-foreground">{t('count.addedTag')}</span>}
+              {l.again && <span className="ml-1 text-xs font-medium text-amber-700 dark:text-amber-400">{t('count.againTag')}</span>}</span>
             <span className="shrink-0 tabular-nums">{l.counted === null ? '—' : `${num(l.counted)} ${l.baseUom}`}</span>
           </li>
         ))}
@@ -100,6 +101,7 @@ function CountLineCard({ view, line }: { view: CounterView; line: CounterLine })
         <span className="font-mono text-2xl font-bold">{line.binCode}</span></p>
       <p>{t('count.countThis')} <span className="font-mono font-semibold">{line.sku}</span> {line.productName}
         {lot(line) && <span className="block text-sm text-muted-foreground">{lot(line)}</span>}</p>
+      {line.again && <FormMessage tone="error">{t('count.again')}</FormMessage>}
       <form className="grid gap-3" onSubmit={(e) => {
         e.preventDefault()
         if (ready) action.mutate({ kind: 'count', id: view.id, seq: line.seq, binCode: bin.trim(), code: code.trim(), qty: Number(qty) })

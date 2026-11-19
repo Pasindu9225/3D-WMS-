@@ -7,16 +7,16 @@ import { CountPage } from './CountPage'
 import { CountPlanPage } from './CountPlanPage'
 
 const cline = (seq: number, bin: string, status = 'OPEN', counted: number | null = null) => ({
-  seq, binCode: bin, sku: 'OIL-1L', productName: 'Coconut oil', baseUom: 'EA', batchNo: null, expiry: null, added: false, status, counted,
+  seq, binCode: bin, sku: 'OIL-1L', productName: 'Coconut oil', baseUom: 'EA', batchNo: null, expiry: null, added: false, status, counted, again: false,
 })
 let counter: Record<string, unknown>
 const calls: { url: string; body: unknown }[] = []
 const review = {
   id: 'c1', number: 'CC-000001', warehouseCode: 'MAIN', scope: 'ZONE', scopeValue: 'A', status: 'REVIEW', createdAt: '2026-11-17T05:00:00Z',
-  approvedAt: null, cancelReason: null, version: 3, differences: 1, valueMinor: -45000,
+  approvedAt: null, cancelReason: null, version: 3, differences: 1, valueMinor: -45000, tolerancePct: 2,
   lines: [
-    { ...cline(1, 'A-01-01-01', 'COUNTED', 5), expected: 5, difference: 0, valueMinor: 0, countedBy: 'Kamal', countedAt: '2026-11-17T05:10:00Z' },
-    { ...cline(2, 'A-01-01-02', 'COUNTED', 2), expected: 3, difference: -1, valueMinor: -45000, countedBy: 'Kamal', countedAt: '2026-11-17T05:12:00Z' },
+    { ...cline(1, 'A-01-01-01', 'COUNTED', 5), expected: 5, difference: 0, valueMinor: 0, countedBy: 'Kamal', countedAt: '2026-11-17T05:10:00Z', firstCount: null, overLimit: false },
+    { ...cline(2, 'A-01-01-02', 'COUNTED', 2), expected: 3, difference: -1, valueMinor: -45000, countedBy: 'Kamal', countedAt: '2026-11-17T05:12:00Z', firstCount: 1, overLimit: true },
   ],
 }
 
@@ -91,4 +91,18 @@ it('shows the manager expected, counted and difference, and approves', async () 
   await user.click(screen.getByRole('button', { name: 'Approve differences' }))
   await user.click(screen.getAllByRole('button', { name: 'Approve differences' }).at(-1)!)
   await waitFor(() => expect(calls[0]).toMatchObject({ url: '/api/v1/count-plans/c1/approve', body: { version: 3 } }))
+})
+
+it('asks the counter to count a place again, and shows the manager the first count and the limit', async () => {
+  counter = { ...counter, items: [{ ...cline(1, 'A-01-01-01'), again: true }, cline(2, 'A-01-01-02')] }
+  show('/worker/count/c1', '/worker/count/:id', CountPage)
+  expect(await screen.findByText('Please count this place once more, carefully.')).toBeInTheDocument()
+  expect(screen.getByText('(count again)')).toBeInTheDocument()
+})
+
+it('shows the manager the first count, the over-limit line and the allowed difference', async () => {
+  show('/app/counts/c1', '/app/counts/:id', CountPlanPage)
+  expect(await screen.findByText('first count 1')).toBeInTheDocument()
+  expect(screen.getByText('over the limit')).toBeInTheDocument()
+  expect(screen.getByText(/allowed difference 2%/)).toBeInTheDocument()
 })

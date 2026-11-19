@@ -66,6 +66,10 @@ public class CountPlan extends TenantScoped {
     @Column(name = "approved_at")
     private Instant approvedAt;
 
+    /** Allowed difference in percent of the expected quantity; null = a manager reviews every count. */
+    @Column(name = "tolerance_pct", precision = 5, scale = 2, updatable = false)
+    private java.math.BigDecimal tolerancePct;
+
     @Column(name = "cancel_reason", length = 200)
     private String cancelReason;
 
@@ -79,7 +83,8 @@ public class CountPlan extends TenantScoped {
     protected CountPlan() {
     }
 
-    public CountPlan(String number, long warehouseId, Scope scope, String scopeValue, long userId) {
+    public CountPlan(String number, long warehouseId, Scope scope, String scopeValue, java.math.BigDecimal tolerancePct, long userId) {
+        this.tolerancePct = tolerancePct;
         this.publicId = Ulid.next();
         this.number = number;
         this.warehouseId = warehouseId;
@@ -110,6 +115,24 @@ public class CountPlan extends TenantScoped {
     public void cancel(String reason) {
         status = Status.CANCELLED;
         cancelReason = reason;
+    }
+
+    public java.math.BigDecimal getTolerancePct() {
+        return tolerancePct;
+    }
+
+    /** Is this line's difference more than the allowed percent? Anything found where none was expected is. */
+    public boolean overLimit(CountLine l) {
+        if (tolerancePct == null || l.getStatus() != CountLine.Status.COUNTED) {
+            return false;
+        }
+        java.math.BigDecimal diff = l.difference().abs();
+        return diff.multiply(java.math.BigDecimal.valueOf(100)).compareTo(tolerancePct.multiply(l.getExpectedQty())) > 0;
+    }
+
+    /** Everything counted, and every difference within the limit: may be booked without a manager. */
+    public boolean withinLimit() {
+        return tolerancePct != null && status == Status.REVIEW && lines.stream().noneMatch(this::overLimit);
     }
 
     public Long getId() {

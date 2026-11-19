@@ -77,14 +77,17 @@ function NewCountDialog({ onClose }: { onClose: () => void }) {
   const [warehouse, setWarehouse] = useState('')
   const [scope, setScope] = useState<CountScope>('ZONE')
   const [value, setValue] = useState('')
+  const [tolerance, setTolerance] = useState('2')
   const warehouseId = warehouse || warehouses.data?.items[0]?.id || ''
-  const valid = warehouseId !== '' && (scope === 'ALL' || value.trim() !== '')
+  const limitOk = tolerance.trim() === '' || (/^\d{1,3}(\.\d{1,2})?$/.test(tolerance.trim()) && Number(tolerance) <= 100)
+  const valid = warehouseId !== '' && (scope === 'ALL' || value.trim() !== '') && limitOk
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()} title={t('counts.new')} description={t('counts.newHint')}>
       <form className="grid gap-3" onSubmit={(e) => {
         e.preventDefault()
         if (valid) {
-          create.mutate({ warehouseId, scope, scopeValue: scope === 'ALL' ? undefined : value.trim() },
+          create.mutate({ warehouseId, scope, scopeValue: scope === 'ALL' ? undefined : value.trim(),
+            tolerancePct: tolerance.trim() === '' ? undefined : Number(tolerance) },
             { onSuccess: (plan) => navigate(`/app/counts/${plan.id}`) })
         }
       }}>
@@ -125,6 +128,10 @@ function NewCountDialog({ onClose }: { onClose: () => void }) {
             )}
           </Field>
         )}
+        <Field label={t('counts.tolerance')} error={limitOk ? undefined : t('counts.toleranceBad')}>
+          {(p) => <Input {...p} inputMode="decimal" className="w-28" value={tolerance} onChange={(e) => setTolerance(e.target.value)} />}
+        </Field>
+        <p className="-mt-2 text-xs text-muted-foreground">{t('counts.toleranceHint')}</p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={!valid || create.isPending}>{t('counts.start')}</Button>

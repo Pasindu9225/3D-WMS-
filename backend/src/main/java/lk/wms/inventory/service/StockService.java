@@ -32,6 +32,10 @@ public class StockService {
             String batchNo, LocalDate expiryDate, BigDecimal qtyOnHand, BigDecimal qtyReserved, Instant receivedAt) {
     }
 
+    /** A product's stock at the end of a past day, valued at today's cost (cents; null when it has no cost). */
+    public record AsOfRow(String productId, String sku, String name, String baseUom, BigDecimal onHand, Long valueMinor) {
+    }
+
     public record ProductTotal(String productId, String sku, String name, String baseUom, BigDecimal onHand,
             BigDecimal inReceiving, long bins, BigDecimal reserved, BigDecimal inDispatch, BigDecimal inQuarantine) {
     }
@@ -145,6 +149,34 @@ public class StockService {
                     p == null ? "" : p.baseUom(), (BigDecimal) r[1], (BigDecimal) r[2], ((Number) r[3]).longValue(), (BigDecimal) r[4], (BigDecimal) r[5],
                     held.getOrDefault(((Number) r[0]).longValue(), BigDecimal.ZERO));
         });
+    }
+
+    /**
+     * Stock per product at the end of a day (UTC, like the movement dates), summed from the ledger.
+     * ponytail: reads the ledger up to that day and pages in memory (one row per product); daily snapshots if it gets slow.
+     * ponytail: valued at today's cost; past costs are not kept.
+     */
+    @Transactional(readOnly = true)
+    public Page<AsOfRow> asOf(CurrentUser cu, String warehouseId, LocalDate date, Pageable pageable) {
+        WarehouseService.WarehouseRef w = warehouses.requireAccess(cu, warehouseId);
+        if (date.isAfter(LocalDate.now(ZoneOffset.UTC))) {
+            throw new lk.wms.common.errors.ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "DATE_IN_FUTURE",
+                    "Choose today or an earlier day");
+        }
+        List<Object[]> held = ledger.balancesBefore(w.id(), date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant()).stream()
+                .filter(r -> ((BigDecimal) r[1]).signum() != 0).toList();
+        int from = (int) Math.min(pageable.getOffset(), held.size());
+        List<Object[]> page = held.subList(from, Math.min(from + pageable.getPageSize(), held.size()));
+        Map<Long, ProductService.Basic> names = products.basics(page.stream().map(r -> ((Number) r[0]).longValue()).toList());
+        List<AsOfRow> rows = page.stream().map(r -> {
+            ProductService.Basic p = names.get(((Number) r[0]).longValue());
+            BigDecimal qty = (BigDecimal) r[1];
+            Long value = p == null || p.costMinor() == null ? null
+                    : qty.multiply(BigDecimal.valueOf(p.costMinor())).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact();
+            return new AsOfRow(p == null ? null : p.publicId(), p == null ? "?" : p.sku(), p == null ? "" : p.name(),
+                    p == null ? "" : p.baseUom(), qty, value);
+        }).toList();
+        return new org.springframework.data.domain.PageImpl<>(rows, pageable, held.size());
     }
 
     /** The ledger with the movement type by name (other modules do not see the ledger entity). */

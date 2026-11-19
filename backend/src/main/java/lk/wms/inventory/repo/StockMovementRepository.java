@@ -24,6 +24,20 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     /** A move already made with this Idempotency-Key (tenant-filtered). */
     boolean existsByClientRef(String clientRef);
 
+    /**
+     * Each product's stock in a warehouse at a moment, from the ledger: what came in (from no place) minus what went
+     * out (to no place); moves inside the warehouse add nothing.
+     */
+    @org.springframework.data.jpa.repository.Query("""
+            select m.productId, sum(case
+                when m.fromBinId is null and m.fromReceiving = false and m.fromDispatch = false then m.qty
+                when m.toBinId is null and m.toReceiving = false and m.toDispatch = false then -m.qty
+                else 0 end)
+            from StockMovement m where m.warehouseId = :warehouseId and m.createdAt < :before
+            group by m.productId order by m.productId""")
+    java.util.List<Object[]> balancesBefore(@org.springframework.data.repository.query.Param("warehouseId") long warehouseId,
+            @org.springframework.data.repository.query.Param("before") java.time.Instant before);
+
     /** The ledger of one warehouse, newest first, optionally for one product, one bin (either side) or one type. */
     @org.springframework.data.jpa.repository.Query("""
             select m from StockMovement m

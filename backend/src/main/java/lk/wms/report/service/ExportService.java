@@ -51,7 +51,8 @@ public class ExportService {
     public enum Format { XLSX, PDF }
 
     /** Filters, as the screens have them; unused ones are null. */
-    public record Filter(String warehouseId, String movementType, LocalDate from, LocalDate to, String orderStatus, String query) {
+    public record Filter(String warehouseId, String movementType, LocalDate from, LocalDate to, String orderStatus, String query,
+            LocalDate asOf) {
     }
 
     /** A checked export, ready to write: title for the file and page, the columns, and how to fetch each page of rows. */
@@ -88,6 +89,14 @@ public class ExportService {
         Plan plan = switch (what) {
             case STOCK -> {
                 WarehouseService.WarehouseRef wh = warehouses.requireAccess(cu, f.warehouseId());
+                if (f.asOf() != null) {
+                    Function<Pageable, Page<List<Object>>> src = p -> stock.asOf(cu, f.warehouseId(), f.asOf(), p)
+                            .map(r -> List.<Object>of(r.sku(), r.name(), r.onHand(), r.baseUom(),
+                                    r.valueMinor() == null ? "" : BigDecimal.valueOf(r.valueMinor(), 2)));
+                    yield new Plan(what, format, "stock-" + wh.code() + "-on-" + f.asOf(), "Stock on " + f.asOf(),
+                            "Warehouse " + wh.code() + " · end of day (UTC), valued at today's cost",
+                            List.of("SKU", "Product", "On hand", "Unit", "Value (LKR)"), 0, src);
+                }
                 Function<Pageable, Page<List<Object>>> src = p -> stock.rows(cu, f.warehouseId(), null, null, null, false, p)
                         .map(r -> List.<Object>of(place(r.binCode()), r.sku(), r.name(), text(r.batchNo()), date(r.expiryDate()), r.qtyOnHand(),
                                 r.qtyReserved(), r.baseUom(), r.receivedAt()));

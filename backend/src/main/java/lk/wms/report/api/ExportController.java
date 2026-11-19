@@ -45,6 +45,7 @@ public class ExportController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) @Pattern(regexp = "DRAFT|RELEASED|PICKING|PICKED|PACKED|SHIPPED|CANCELLED") String status,
             @RequestParam(required = false) @Size(max = 200) String q,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
             HttpServletResponse response) throws IOException {
         CurrentUser cu = CurrentUser.require();
         if (limiter.tryConsume(RateLimiter.Scope.EXPORT, Long.toString(cu.userId())) > 0) {
@@ -52,7 +53,7 @@ public class ExportController {
         }
         Format f = Format.valueOf(format.toUpperCase(Locale.ROOT));
         ExportService.Plan plan = exports.plan(cu, What.valueOf(what.toUpperCase(Locale.ROOT)), f,
-                new Filter(warehouse, type, from, to, status, q));
+                new Filter(warehouse, type, from, to, status, q, asOf));
         response.setContentType(f == Format.XLSX ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "application/pdf");
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
                 ContentDisposition.attachment().filename(plan.fileName() + "." + format).build().toString());

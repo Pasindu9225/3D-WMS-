@@ -46,7 +46,7 @@ public class CountService {
 
     /** What a counter sees: never the expected quantity. */
     public record CounterLine(int seq, String binCode, String sku, String productName, String baseUom, String batchNo,
-            LocalDate expiry, boolean added, String status, BigDecimal counted) {
+            LocalDate expiry, boolean added, String status, BigDecimal counted, boolean again) {
     }
 
     public record CounterView(String id, String number, String warehouseCode, String status, int lines, int open,
@@ -56,12 +56,16 @@ public class CountService {
     /** What the manager sees when reviewing: expected, counted, difference and its value (cents). */
     public record ReviewLine(int seq, String binCode, String sku, String productName, String baseUom, String batchNo,
             LocalDate expiry, boolean added, String status, BigDecimal expected, BigDecimal counted, BigDecimal difference,
-            Long valueMinor, String countedBy, Instant countedAt) {
+            Long valueMinor, String countedBy, Instant countedAt, BigDecimal firstCount, boolean overLimit) {
     }
 
     public record ReviewView(String id, String number, String warehouseCode, String scope, String scopeValue,
             String status, Instant createdAt, Instant approvedAt, String cancelReason, int version, int differences,
-            long valueMinor, List<ReviewLine> lines) {
+            long valueMinor, BigDecimal tolerancePct, List<ReviewLine> lines) {
+    }
+
+    /** Every line counted and within the count's limit: booked after the counter's commit (CountAutoApprove). */
+    public record CountWithinLimit(long tenantId, String planId, long userId) {
     }
 
     public record Summary(String id, String number, String warehouseCode, String scope, String scopeValue, String status,
@@ -82,12 +86,15 @@ public class CountService {
     private final AuditService audit;
     private final lk.wms.auth.service.UserService users;
     private final int maxLines;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public CountService(CountPlanRepository plans, StockRepository stock, StockMovementService moves, DocNumbers numbers,
             WarehouseService warehouses, BinService bins, ProductService products, AuditService audit,
             lk.wms.auth.service.UserService users,
-            @org.springframework.beans.factory.annotation.Value("${wms.count.max-lines:2000}") int maxLines) {
+            @org.springframework.beans.factory.annotation.Value("${wms.count.max-lines:2000}") int maxLines,
+            org.springframework.context.ApplicationEventPublisher events) {
         this.maxLines = maxLines;
+        this.events = events;
         this.plans = plans;
         this.stock = stock;
         this.moves = moves;
@@ -101,7 +108,7 @@ public class CountService {
 
     /** Starts a count of a whole warehouse, one zone (bins whose code starts with it) or one ABC class. */
     @Transactional
-    public ReviewView create(CurrentUser cu, String warehouseId, CountPlan.Scope scope, String scopeValue) {
+    public ReviewView create(CurrentUser cu, String warehouseId, CountPlan.Scope scope, String scopeValue, BigDecimal tolerancePct) {
         WarehouseService.WarehouseRef wh = warehouses.requireAccess(cu, warehouseId);
         String value = scopeValue == null ? null : scopeValue.trim().toUpperCase(Locale.ROOT);
         List<Long> binIds = List.of(-1L);
@@ -133,7 +140,7 @@ public class CountService {
         }
         Map<Long, BinService.BinLabel> labels = bins.labels(rows.stream().map(Stock::getBinId).distinct().toList());
         Map<Long, ProductService.Basic> basics = products.basics(new HashSet<>(rows.stream().map(Stock::getProductId).toList()));
-        CountPlan plan = new CountPlan(numbers.next(cu, KIND), wh.id(), scope, value, cu.userId());
+        CountPlan plan = new CountPlan(numbers.next(cu, KIND), wh.id(), scope, value, tolerancePct, cu.userId());
         rows.stream().filter(s -> basics.containsKey(s.getProductId()))
                 .sorted(Comparator.comparing((Stock s) -> labels.get(s.getBinId()).code())
                         .thenComparing(s -> basics.get(s.getProductId()).sku())
@@ -143,7 +150,8 @@ public class CountService {
                         s.getBatchNo(), s.getExpiryDate()), false));
         plans.saveAndFlush(plan);
         audit.record(cu.tenantId(), cu.userId(), "COUNT_CREATED", "count_plan", plan.getPublicId(), null,
-                Map.of("number", plan.getNumber(), "scope", scope.name() + (value == null ? "" : " " + value), "lines", plan.getLines().size()));
+                Map.of("number", plan.getNumber(), "scope", scope.name() + (value == null ? "" : " " + value), "lines", plan.getLines().size(),
+                        "tolerancePct", tolerancePct == null ? "none" : tolerancePct));
         return review(plan);
     }
 
@@ -251,6 +259,33 @@ public class CountService {
         if (plan.getStatus() != CountPlan.Status.REVIEW) {
             throw new ApiException(HttpStatus.CONFLICT, "COUNT_NOT_READY", "Every line must be counted first");
         }
+        List<Map<String, Object>> booked = book(plan, cu.userId());
+        plan.approve(cu.userId());
+        plans.flush();
+        audit.record(cu.tenantId(), cu.userId(), "COUNT_APPROVED", "count_plan", plan.getPublicId(), null,
+                Map.of("number", plan.getNumber(), "differences", booked));
+        return review(plan);
+    }
+
+    /**
+     * Books a count whose differences are all within its limit, with no manager. Runs in its own transaction after
+     * the last count committed; if a difference cannot be booked, nothing is and the count waits in REVIEW.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void autoApprove(CountWithinLimit e) {
+        CountPlan plan = plans.lockByPublicId(e.planId()).orElse(null);
+        if (plan == null || !plan.withinLimit()) {
+            return; // changed meanwhile (a recount, a cancel, or a manager was quicker)
+        }
+        List<Map<String, Object>> booked = book(plan, e.userId());
+        plan.approve(e.userId());
+        plans.flush();
+        audit.record(e.tenantId(), e.userId(), "COUNT_AUTO_APPROVED", "count_plan", plan.getPublicId(), null,
+                Map.of("number", plan.getNumber(), "tolerancePct", plan.getTolerancePct(), "differences", booked));
+    }
+
+    /** Every difference as a COUNT movement (found = into the bin, missing = out of it); all or nothing. */
+    private List<Map<String, Object>> book(CountPlan plan, long userId) {
         List<Map<String, Object>> booked = new ArrayList<>();
         for (CountLine l : plan.getLines()) {
             BigDecimal diff = l.difference();
@@ -261,17 +296,13 @@ public class CountService {
             try {
                 moves.move(new Move(Kind.COUNT, plan.getWarehouseId(), l.getProductId(), l.getBatchNo(), l.getExpiryDate(),
                         diff.signum() < 0 ? bin : null, diff.signum() > 0 ? bin : null, diff.abs(), "Count " + plan.getNumber(),
-                        REF, plan.getId(), cu.userId()));
+                        REF, plan.getId(), userId));
             } catch (ApiException e) {
                 throw new ApiException(e.getStatus(), e.getCode(), l.getBinCode() + " " + l.getSku() + ": " + e.getMessage());
             }
             booked.add(Map.of("bin", l.getBinCode(), "sku", l.getSku(), "difference", diff));
         }
-        plan.approve(cu.userId());
-        plans.flush();
-        audit.record(cu.tenantId(), cu.userId(), "COUNT_APPROVED", "count_plan", plan.getPublicId(), null,
-                Map.of("number", plan.getNumber(), "differences", booked));
-        return review(plan);
+        return booked;
     }
 
     @Transactional
@@ -293,10 +324,17 @@ public class CountService {
         BigDecimal expected = moves.onHandLocked(plan.getWarehouseId(), line.getBinId(), line.getProductId(), line.getBatchNo(),
                 line.getExpiryDate());
         line.counted(counted, expected, cu.userId());
+        boolean again = plan.overLimit(line) && !line.wasSentBack();
+        if (again) {
+            line.sendBack(); // blind: the counter is only asked to count it once more
+        }
         plan.progress();
         plans.flush();
         audit.record(cu.tenantId(), cu.userId(), "COUNT_LINE", "count_plan", plan.getPublicId(), null,
-                Map.of("bin", line.getBinCode(), "sku", line.getSku(), "counted", counted, "added", line.isAdded()));
+                Map.of("bin", line.getBinCode(), "sku", line.getSku(), "counted", counted, "added", line.isAdded(), "sentBack", again));
+        if (plan.withinLimit()) {
+            events.publishEvent(new CountWithinLimit(cu.tenantId(), plan.getPublicId(), cu.userId()));
+        }
     }
 
     private static CountLine.Spec spec(long binId, String binCode, ProductService.Basic p, String batchNo, LocalDate expiry) {
@@ -335,7 +373,7 @@ public class CountService {
     private CounterView counter(CountPlan p) {
         List<CounterLine> items = p.getLines().stream().map(l -> new CounterLine(l.getSeq(), l.getBinCode(), l.getSku(),
                 l.getProductName(), l.getBaseUom(), l.getBatchNo(), l.getExpiryDate(), l.isAdded(), l.getStatus().name(),
-                l.getCountedQty())).toList();
+                l.getCountedQty(), l.getStatus() == CountLine.Status.OPEN && l.wasSentBack())).toList();
         int open = (int) p.getLines().stream().filter(l -> l.getStatus() == CountLine.Status.OPEN).count();
         return new CounterView(p.getPublicId(), p.getNumber(), warehouses.codeOf(p.getWarehouseId()), p.getStatus().name(),
                 items.size(), open, items);
@@ -363,10 +401,10 @@ public class CountService {
             var who = l.getCountedBy() == null ? null : names.get(l.getCountedBy());
             return new ReviewLine(l.getSeq(), l.getBinCode(), l.getSku(), l.getProductName(), l.getBaseUom(), l.getBatchNo(),
                     l.getExpiryDate(), l.isAdded(), l.getStatus().name(), l.getExpectedQty(), l.getCountedQty(), diff, value,
-                    who == null ? null : who.fullName(), l.getCountedAt());
+                    who == null ? null : who.fullName(), l.getCountedAt(), l.getFirstQty(), p.overLimit(l));
         }).toList();
         return new ReviewView(p.getPublicId(), p.getNumber(), warehouses.codeOf(p.getWarehouseId()), p.getScope().name(), p.getScopeValue(),
                 p.getStatus().name(), p.getCreatedAt(), p.getApprovedAt(), p.getCancelReason(), p.getVersion(),
-                totals.get("n").intValue(), totals.get("value"), lines);
+                totals.get("n").intValue(), totals.get("value"), p.getTolerancePct(), lines);
     }
 }

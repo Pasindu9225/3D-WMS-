@@ -75,6 +75,9 @@ public class CountLine extends TenantScoped {
     @Column(name = "counted_qty", precision = 14, scale = 3)
     private BigDecimal countedQty;
 
+    @Column(name = "first_qty", precision = 14, scale = 3)
+    private BigDecimal firstQty;
+
     @Column(name = "counted_by")
     private Long countedBy;
 
@@ -114,6 +117,22 @@ public class CountLine extends TenantScoped {
         this.countedBy = null;
         this.countedAt = null;
         this.status = Status.OPEN;
+    }
+
+    /** Over the count's limit: keep the first figure and send the line back to be counted once more. */
+    public void sendBack() {
+        BigDecimal first = countedQty;
+        recount();
+        this.firstQty = first;
+    }
+
+    /** Sent back once already (the second count stands). */
+    public boolean wasSentBack() {
+        return firstQty != null;
+    }
+
+    public BigDecimal getFirstQty() {
+        return firstQty;
     }
 
     /** Counted minus expected (positive = found more); zero until counted. */

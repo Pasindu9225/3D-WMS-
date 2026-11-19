@@ -52,6 +52,17 @@ public class StockController {
                 PageResponse.request(page, size, null, Map.of(), Sort.unsorted())), r -> r);
     }
 
+    /** Stock per product at the end of a past day (from the ledger). */
+    @GetMapping("/stock/as-of")
+    @PreAuthorize("hasAuthority('inventory:read')")
+    public PageResponse<StockService.AsOfRow> asOf(@RequestParam("warehouse") @Size(max = 26) String warehouseId,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate date,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return PageResponse.of(stock.asOf(CurrentUser.require(), warehouseId, date,
+                PageResponse.request(page, size, null, Map.of(), Sort.unsorted())), r -> r);
+    }
+
     /** The movement history, newest first. */
     @GetMapping("/stock-movements")
     @PreAuthorize("hasAuthority('inventory:read')")

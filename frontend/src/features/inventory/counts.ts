@@ -29,6 +29,8 @@ export interface CounterLine {
   added: boolean
   status: 'OPEN' | 'COUNTED'
   counted: number | null
+  /** Sent back once because the first count was over the allowed difference. */
+  again: boolean
 }
 
 export interface CounterView {
@@ -48,6 +50,9 @@ export interface ReviewLine extends CounterLine {
   valueMinor: number | null
   countedBy: string | null
   countedAt: string | null
+  /** The first figure of a line sent back for a recount. */
+  firstCount: number | null
+  overLimit: boolean
 }
 
 export interface ReviewView {
@@ -63,6 +68,8 @@ export interface ReviewView {
   version: number
   differences: number
   valueMinor: number
+  /** Allowed difference in percent; null = a manager reviews every count. */
+  tolerancePct: number | null
   lines: ReviewLine[]
 }
 
@@ -85,7 +92,7 @@ export function useReview(id: string | undefined) {
 export function useCreateCount() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (b: { warehouseId: string; scope: CountScope; scopeValue?: string }) =>
+    mutationFn: (b: { warehouseId: string; scope: CountScope; scopeValue?: string; tolerancePct?: number }) =>
       api<ReviewView>('/count-plans', { method: 'POST', body: b }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['counts'] }),
   })

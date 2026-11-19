@@ -50,7 +50,8 @@ export function CountPlanPage() {
       {action.isError && <FormMessage tone="error">{errorMessage(action.error)}</FormMessage>}
       {c.status === 'OPEN' && <FormMessage tone="success">{t('counts.stillCounting')}</FormMessage>}
       {c.cancelReason && <p className="text-sm text-muted-foreground">{t('counts.cancelledBecause', { reason: c.cancelReason })}</p>}
-      <p className="text-sm">{t('counts.summary', { n: c.differences, value: formatMoney(c.valueMinor) })}</p>
+      <p className="text-sm">{t('counts.summary', { n: c.differences, value: formatMoney(c.valueMinor) })}
+        {' · '}{c.tolerancePct === null ? t('counts.noLimit') : t('counts.limit', { pct: num(c.tolerancePct) })}</p>
       <Table>
         <thead>
           <tr>
@@ -73,9 +74,11 @@ export function CountPlanPage() {
                 {l.added && <span className="ml-1 text-xs text-muted-foreground">{t('count.addedTag')}</span>}</td>
               <td className="text-sm">{[l.batchNo, l.expiry].filter(Boolean).join(' · ') || '—'}</td>
               <td className="text-right tabular-nums">{l.expected === null ? '—' : num(l.expected)}</td>
-              <td className="text-right tabular-nums">{l.counted === null ? t('counts.notYet') : `${num(l.counted)} ${l.baseUom}`}</td>
+              <td className="text-right tabular-nums">{l.counted === null ? t('counts.notYet') : `${num(l.counted)} ${l.baseUom}`}
+                {l.firstCount !== null && <span className="block text-xs text-muted-foreground">{t('counts.firstCount', { n: num(l.firstCount) })}</span>}</td>
               <td className={`text-right tabular-nums ${l.difference ? 'font-medium text-destructive' : ''}`}>
                 {l.difference === null ? '—' : (l.difference > 0 ? '+' : '') + num(l.difference)}
+                {l.overLimit && <span className="block text-xs">{t('counts.overLimit')}</span>}
               </td>
               <td className="text-right tabular-nums">{l.valueMinor === null || l.difference === 0 ? '—' : formatMoney(l.valueMinor)}</td>
               <td className="hidden text-sm md:table-cell">{l.countedBy ?? '—'}</td>

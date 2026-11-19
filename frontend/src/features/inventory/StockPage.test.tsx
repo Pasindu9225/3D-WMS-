@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { StockPage } from './StockPage'
@@ -12,6 +12,10 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     urls.push(url)
     if (url.startsWith('/api/v1/warehouses')) return Response.json(page([{ id: 'w1', code: 'MAIN', name: 'Main' }]))
+    if (url === '/api/v1/auth/me') return Response.json({ id: 'u', email: 'a@b.lk', displayName: 'A', permissions: ['inventory:read', 'reports:export'] })
+    if (url.startsWith('/api/v1/stock/as-of')) {
+      return Response.json(page([{ productId: 'p1', sku: 'OIL-1L', name: 'Coconut oil', baseUom: 'EA', onHand: 7, valueMinor: 315000 }]))
+    }
     if (url.startsWith('/api/v1/stock/products')) {
       return Response.json(page([{ productId: 'p1', sku: 'OIL-1L', name: 'Coconut oil', baseUom: 'EA', onHand: 24, inReceiving: 14, bins: 1, reserved: 0, inDispatch: 0 }]))
     }
@@ -45,4 +49,18 @@ it('shows totals per product, where a product is, and the movement history', asy
   await user.click(screen.getByRole('tab', { name: 'Movements' }))
   expect(await screen.findByRole('cell', { name: 'Put away' })).toBeInTheDocument()
   expect(screen.getByText('Receiving area → A-R01-01-01')).toBeInTheDocument()
+})
+
+it('shows stock on a past day, with an Excel download for that day', async () => {
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <StockPage />
+    </QueryClientProvider>,
+  )
+  await screen.findByRole('button', { name: /OIL-1L/ })
+  fireEvent.change(screen.getByLabelText('On date'), { target: { value: '2026-10-31' } })
+  expect(await screen.findByText('3,150.00')).toBeInTheDocument()
+  expect(urls).toContain('/api/v1/stock/as-of?warehouse=w1&date=2026-10-31&page=0&size=50')
+  await screen.findAllByRole('link', { name: /Excel/ })
+  expect(screen.getAllByRole('link', { name: /Excel/ }).map((a) => a.getAttribute('href'))).toContain('/api/v1/exports/stock.xlsx?warehouse=w1&asOf=2026-10-31')
 })

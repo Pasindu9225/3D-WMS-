@@ -8,7 +8,8 @@ import { t, type MessageKey } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useDebounced } from '@/lib/useDebounced'
 import { ExportLinks } from '@/features/report/ExportLinks'
-import { useMovements, useProductTotals, useStockRows, type ProductTotal } from './api'
+import { formatMoney } from '@/features/layout/units'
+import { useMovements, useProductTotals, useStockAsOf, useStockRows, type ProductTotal } from './api'
 
 type Tab = 'products' | 'bins' | 'movements'
 const TYPES = ['RECEIVE', 'PUTAWAY', 'TRANSFER', 'ADJUST'] as const
@@ -77,13 +78,26 @@ function ByProduct({ warehouseId, onOpen }: { warehouseId: string | undefined; o
   const q = useDebounced(search.trim())
   const [page, setPage] = useState(0)
   const totals = useProductTotals(warehouseId, q, page)
+  const [date, setDate] = useState('')
+  const today = new Date().toISOString().slice(0, 10)
   return (
     <>
-      <Input aria-label={t('stock.searchProduct')} placeholder={t('stock.searchProduct')} className="max-w-sm" value={search} maxLength={200}
-        onChange={(e) => {
-          setSearch(e.target.value)
-          setPage(0)
-        }} />
+      <div className="flex flex-wrap items-end gap-3">
+        {!date && (
+          <Input aria-label={t('stock.searchProduct')} placeholder={t('stock.searchProduct')} className="max-w-sm" value={search} maxLength={200}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(0)
+            }} />
+        )}
+        <label className="grid gap-1 text-sm">
+          <span className="text-muted-foreground">{t('stock.asOf.date')}</span>
+          <input type="date" className="h-10 rounded-md border border-input bg-background px-3 text-sm" max={today} value={date}
+            onChange={(e) => setDate(e.target.value)} />
+        </label>
+        {date && <button type="button" className="h-10 text-sm underline" onClick={() => setDate('')}>{t('stock.asOf.now')}</button>}
+      </div>
+      {date ? <AsOf warehouseId={warehouseId} date={date} /> : (<>
       {totals.isError && <FormMessage tone="error">{errorMessage(totals.error)}</FormMessage>}
       <Table>
         <thead>
@@ -119,6 +133,44 @@ function ByProduct({ warehouseId, onOpen }: { warehouseId: string | undefined; o
         </tbody>
       </Table>
       <Paging data={totals.data} onPage={setPage} />
+      </>)}
+    </>
+  )
+}
+
+/** Stock per product at the end of a past day, from the movement history; valued at today's cost. */
+function AsOf({ warehouseId, date }: { warehouseId: string | undefined; date: string }) {
+  const [page, setPage] = useState(0)
+  const rows = useStockAsOf(warehouseId, date, page)
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">{t('stock.asOf.hint', { date })}</p>
+        {warehouseId && <ExportLinks what="stock" params={{ warehouse: warehouseId, asOf: date }} />}
+      </div>
+      {rows.isError && <FormMessage tone="error">{errorMessage(rows.error)}</FormMessage>}
+      <Table>
+        <thead>
+          <tr>
+            <Th>{t('stock.col.product')}</Th>
+            <Th className="text-right">{t('stock.col.onHand')}</Th>
+            <Th className="text-right">{t('stock.asOf.value')}</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.data?.items.map((r) => (
+            <Tr key={r.sku}>
+              <td><span className="font-mono text-sm font-semibold">{r.sku}</span> {r.name}</td>
+              <td className="text-right tabular-nums">{num(r.onHand)} <span className="text-xs text-muted-foreground">{r.baseUom}</span></td>
+              <td className="text-right tabular-nums">{r.valueMinor === null ? '—' : formatMoney(r.valueMinor)}</td>
+            </Tr>
+          ))}
+          {rows.data && rows.data.items.length === 0 && (
+            <tr><td colSpan={3} className="py-8 text-center text-muted-foreground">{t('stock.asOf.empty')}</td></tr>
+          )}
+        </tbody>
+      </Table>
+      <Paging data={rows.data} onPage={setPage} />
     </>
   )
 }

@@ -247,6 +247,26 @@ export function useProductTotals(warehouseId: string | undefined, q: string, pag
   })
 }
 
+/** A product's stock at the end of a past day, valued at today's cost. */
+export interface AsOfRow {
+  productId: string | null
+  sku: string
+  name: string
+  baseUom: string
+  onHand: number
+  valueMinor: number | null
+}
+
+export function useStockAsOf(warehouseId: string | undefined, date: string, page: number) {
+  const params = new URLSearchParams({ warehouse: warehouseId ?? '', date, page: String(page), size: '50' })
+  return useQuery({
+    queryKey: ['stock-as-of', warehouseId, date, page],
+    queryFn: () => api<Page<AsOfRow>>(`/stock/as-of?${params}`),
+    enabled: !!warehouseId && date !== '',
+    placeholderData: keepPreviousData,
+  })
+}
+
 export function useMovements(warehouseId: string | undefined, filter: { type?: string; from?: string; to?: string; product?: string }, page: number) {
   const params = new URLSearchParams({ warehouse: warehouseId ?? '', page: String(page), size: '50' })
   if (filter.type) params.set('type', filter.type)

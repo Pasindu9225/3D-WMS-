@@ -38,7 +38,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class CountController {
 
     public record CreateRequest(@NotBlank @Size(max = 26) String warehouseId, @NotNull CountPlan.Scope scope,
-            @Size(max = 20) @Pattern(regexp = "[A-Za-z0-9]*") String scopeValue) {
+            @Size(max = 20) @Pattern(regexp = "[A-Za-z0-9]*") String scopeValue,
+            @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2) BigDecimal tolerancePct) {
     }
 
     public record CountRequest(@NotBlank @Size(max = 60) String binCode, @NotBlank @Size(max = 64) String code,
@@ -80,7 +81,7 @@ public class CountController {
     @PreAuthorize("hasAuthority('counts:approve')")
     @ResponseStatus(HttpStatus.CREATED)
     public ReviewView create(@Valid @RequestBody CreateRequest body) {
-        return counts.create(CurrentUser.require(), body.warehouseId(), body.scope(), body.scopeValue());
+        return counts.create(CurrentUser.require(), body.warehouseId(), body.scope(), body.scopeValue(), body.tolerancePct());
     }
 
     /** Blind: the places to count, never the expected quantities. */
