@@ -1,4 +1,4 @@
-import { ArrowLeft, Cuboid, Map, Pause, Plane, Play, RotateCcw, Scan, Search, Square, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { ArrowLeft, Cuboid, Footprints, Map, Pause, Plane, Play, RotateCcw, Scan, Search, Square, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router'
 import { useRoute } from './route'
@@ -18,6 +18,7 @@ import { LiteMap, RackBins } from './LiteMap'
 import { buildInstances, floorBox } from './sceneLayout'
 import { findBin, suggestions } from './search'
 import { droneTour } from './drone'
+import { Stick, type Here } from './walk'
 
 // three.js and React Three Fiber load only here, never in the main bundle (SPEC v0.3).
 const SceneCanvas = lazy(() => import('./SceneCanvas').then((m) => ({ default: m.SceneCanvas })))
@@ -115,6 +116,12 @@ export function View3DPage() {
   const tour = useMemo(() => (droneOn && scene.data ? droneTour(scene.data, route) : null), [droneOn, scene.data, route])
   const stopDrone = useCallback(() => setDrone(null), [])
   const onDroneProgress = useCallback((done: number) => setDrone((d) => (d ? { ...d, done } : d)), [])
+  // Walk-through (v2.1): first person at eye height; here is the last place, kept for the Lite map.
+  const [walking, setWalking] = useState(false)
+  const [here, setHere] = useState<Here | null>(null)
+  const [stick] = useState(() => new Stick())
+  const walk = useMemo(() => (walking ? { stick, onMove: setHere } : null), [walking, stick])
+  const touch = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches
 
   const find = (text: string) => {
     const i = findBin(codes, text)
@@ -133,6 +140,7 @@ export function View3DPage() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setDrone(null)
+        setWalking(false)
         setSelected(null)
         setRack(null)
         return
@@ -142,7 +150,7 @@ export function View3DPage() {
         searchBox.current?.focus()
         return
       }
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.ctrlKey || e.metaKey || e.altKey) return
+      if (walking || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.ctrlKey || e.metaKey || e.altKey) return
       const action = camera.current && shortcut(e.key, e.shiftKey, camera.current, step)
       if (action) {
         e.preventDefault() // arrows would scroll the page
@@ -151,7 +159,7 @@ export function View3DPage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [floor])
+  }, [floor, walking])
   return (
     <div className="-m-4 flex h-[calc(100dvh-3.5rem)] flex-col sm:-m-6">
       <div className="flex flex-wrap items-center gap-2 border-b bg-card px-4 py-2">
@@ -201,7 +209,7 @@ export function View3DPage() {
         {notPublished && <p className="p-6 text-muted-foreground">{t('view3d.notPublished')}</p>}
         {scene.isError && !notPublished && <div className="p-6"><FormMessage tone="error">{errorMessage(scene.error)}</FormMessage></div>}
         {scene.data && view === 'lite' && (
-          <LiteMap scene={scene.data} colors={colors} selectedBin={selected} selectedRack={rack} onRack={setRack} route={route} />
+          <LiteMap scene={scene.data} colors={colors} selectedBin={selected} selectedRack={rack} onRack={setRack} route={route} here={here} />
         )}
         {scene.data && view === 'lite' && rack !== null && (
           <RackBins scene={scene.data} rack={rack} colors={colors} selectedBin={selected} onBin={setSelected}
@@ -216,7 +224,7 @@ export function View3DPage() {
         )}
         {scene.data && view === '3d' && (
           <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">{t('view3d.loading3d')}</p>}>
-            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} route={route} ghosts={mode !== 'real'}
+            {parts && <SceneCanvas scene={scene.data} parts={parts} colors={colors} selected={selected} onSelect={setSelected} onCamera={onCamera} onSlow={onSlow} route={route} ghosts={mode !== 'real'} walk={walk}
               drone={drone && tour ? { tour, playing: drone.playing, speed: drone.speed, onProgress: onDroneProgress, onStop: stopDrone } : null} />}
           </Suspense>
         )}
@@ -257,7 +265,10 @@ export function View3DPage() {
                   <Button variant="ghost" size="icon" aria-label={t('view3d.top')} title={t('view3d.top')} onClick={() => camera.current?.top()}><Scan /></Button>
                   <Button variant="ghost" size="icon" aria-label={t('view3d.reset')} title={t('view3d.reset')} onClick={() => camera.current?.reset()}><RotateCcw /></Button>
                   <Button variant={drone ? 'default' : 'ghost'} size="icon" aria-label={t('drone.start')} title={t('drone.start')} aria-pressed={!!drone}
-                    onClick={() => { setSelected(null); setDrone(drone ? null : { playing: true, speed: 1, done: 0 }) }}><Plane /></Button>
+                    onClick={() => { setSelected(null); setWalking(false); setDrone(drone ? null : { playing: true, speed: 1, done: 0 }) }}><Plane /></Button>
+                  <Button variant={walking ? 'default' : 'ghost'} size="icon" aria-label={walking ? t('walk.stop') : t('walk.start')}
+                    title={walking ? t('walk.stop') : t('walk.start')} aria-pressed={walking}
+                    onClick={() => { setDrone(null); setWalking(!walking) }}><Footprints /></Button>
                 </div>
                 {drone && (
                   <div role="group" aria-label={t('drone.bar')} className="flex items-center gap-1 rounded-lg border bg-card/90 p-1 shadow-sm">
@@ -271,11 +282,17 @@ export function View3DPage() {
                     <Button variant="ghost" size="icon" aria-label={t('drone.stop')} onClick={stopDrone}><X /></Button>
                   </div>
                 )}
-                <p className="hidden rounded bg-card/80 px-2 py-1 text-xs text-muted-foreground sm:block">{t('view3d.keys')}</p>
+                <p className="hidden rounded bg-card/80 px-2 py-1 text-xs text-muted-foreground sm:block">{t(walking ? 'walk.keys' : 'view3d.keys')}</p>
               </div>
             )}
           </div>
         )}
+        {scene.data && view === '3d' && walking && (
+          <div aria-label={t('walk.here')} role="img" className="pointer-events-none absolute top-3 left-3 size-44 overflow-hidden rounded-lg border shadow-lg">
+            <LiteMap scene={scene.data} colors={colors} selectedBin={selected} selectedRack={null} onRack={() => undefined} here={here} dot={3} />
+          </div>
+        )}
+        {scene.data && view === '3d' && walking && touch && <Joystick stick={stick} />}
         {notFound && (
           <p role="status" className="absolute top-3 left-3 rounded-md border bg-card/95 px-3 py-2 text-sm">{t('view3d.notFound', { code: notFound })}</p>
         )}
@@ -284,6 +301,41 @@ export function View3DPage() {
             onClose={() => setSelected(null)} />
         )}
       </div>
+    </div>
+  )
+}
+
+/** On-screen joystick for the walk-through on phones and tablets: drag the knob; no library. */
+function Joystick({ stick }: { stick: Stick }) {
+  const [knob, setKnob] = useState({ x: 0, y: 0 })
+  const R = 44 // px the knob can travel
+  const set = (x: number, y: number) => {
+    stick.push(x, y)
+    setKnob({ x, y })
+  }
+  const move = (e: React.PointerEvent<HTMLDivElement>) => {
+    const b = e.currentTarget.getBoundingClientRect()
+    let x = (e.clientX - b.left - b.width / 2) / R
+    let y = -(e.clientY - b.top - b.height / 2) / R
+    const l = Math.hypot(x, y)
+    if (l > 1) { x /= l; y /= l }
+    set(x, y)
+  }
+  return (
+    <div role="slider" aria-label={t('walk.joystick')} aria-valuenow={Math.round(knob.y * 100)} tabIndex={-1}
+      className="absolute bottom-40 left-4 z-10 size-28 touch-none rounded-full border-2 border-white/60 bg-card/60 shadow-lg sm:bottom-28"
+      onPointerDown={(e) => {
+        move(e)
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId) // keep the knob while the finger slides off the pad
+        } catch {
+          // no live pointer to capture (synthetic event)
+        }
+      }}
+      onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e) }}
+      onPointerUp={() => set(0, 0)} onPointerCancel={() => set(0, 0)}>
+      <span className="absolute top-1/2 left-1/2 size-12 rounded-full bg-primary/80"
+        style={{ transform: `translate(calc(-50% + ${knob.x * R}px), calc(-50% + ${-knob.y * R}px))` }} />
     </div>
   )
 }

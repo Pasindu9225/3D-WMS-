@@ -11,6 +11,7 @@ import { ZONE_COLOR } from './colors'
 import { buildInstances, centreOf, contentBox, edgeStripes, floorBox, wallParts, zoneTitle, type BoxSpec } from './sceneLayout'
 import { boxTexture, cartonTexture, declutter, hazardTexture, labelTexture, leafTexture, palletTexture, shutterTexture, tagTexture } from './textures'
 import { routePoints, type PickRoute } from './route'
+import { EYE, SPEED, step, walkStart, type Here, type Stick } from './walk'
 
 const M = 1 / 1000
 
@@ -158,8 +159,10 @@ function ZoneLabel({ zone }: { zone: Scene['zones'][number] }) {
  * stays light on office laptops (SPEC: performance rules for 3D). Posts, shelves and bins are one instanced
  * draw call each, whatever the number of racks.
  */
-export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow, onFrame, route, drone, ghosts = true }: {
+export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera, onSlow, onFrame, route, drone, walk, ghosts = true }: {
   scene: Scene
+  /** The walk-through (v2.1) while it is on. */
+  walk?: WalkProps | null
   /** A pick walk drawn on the floor (v1.2), if any. */
   /** The drone flight (v2.1) while it is on. */
   /** Show empty bins as faint coloured boxes (colour modes); off in the Real look. */
@@ -284,6 +287,7 @@ export function SceneCanvas({ scene, parts, colors, selected, onSelect, onCamera
       {route && route.stops.length > 0 && <RouteLine route={route} />}
       <Rig box={box} start={start} onCamera={onCamera} />
       {drone && <Drone {...drone} />}
+      {walk && <Walk scene={scene} {...walk} />}
       {onSlow && <FpsWatch onSlow={onSlow} />}
       {onFrame && <Spin onFrame={onFrame} />}
     </Canvas>
@@ -390,6 +394,117 @@ function Drone({ tour, playing, speed, onProgress, onStop }: DroneProps) {
       onProgress(done.current)
     }
     invalidate() // render on demand: ask for the next frame straight away
+  })
+  return null
+}
+
+export interface WalkProps {
+  /** The on-screen joystick (phones and tablets): x right, y forward, -1..1. */
+  stick: Stick
+  /** Where the walker is, a few times a second (for the "you are here" dot). */
+  onMove: (here: Here) => void
+}
+
+const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'])
+
+/**
+ * First-person walk at eye height (v2.1). Like the drone it drives the orbit controls (switched off for the mouse,
+ * limits lifted so you can look up), so stopping leaves you where you stood. Keys W A S D or arrows walk, a drag
+ * looks around (a short click still picks a bin), racks and the floor edge stop you (walk.ts). Frames are drawn
+ * only while something moves.
+ */
+function Walk({ scene, stick, onMove }: WalkProps & { scene: Scene }) {
+  const get = useThree((state) => state.get)
+  const me = useRef<{ x: number; z: number; yaw: number; pitch: number } | null>(null)
+  const keys = useRef(new Set<string>())
+  const reported = useRef(0)
+  useEffect(() => {
+    const { controls: c, camera: cam, invalidate, gl } = get()
+    const controls = c as unknown as CameraControls | null
+    const camera = cam as THREE.PerspectiveCamera
+    const dom = gl.domElement
+    if (!controls) return
+    me.current = { ...walkStart(scene), pitch: 0 }
+    const saved = { maxPolarAngle: controls.maxPolarAngle, minDistance: controls.minDistance, fov: camera.fov, near: camera.near }
+    controls.enabled = false
+    controls.maxPolarAngle = Math.PI
+    controls.minDistance = 0
+    camera.fov = 65
+    camera.near = 0.1
+    camera.updateProjectionMatrix()
+    stick.listen(invalidate)
+    const down = (e: KeyboardEvent) => {
+      if (!WALK_KEYS.has(e.code) || e.target instanceof HTMLInputElement || e.ctrlKey || e.metaKey || e.altKey) return
+      e.preventDefault() // arrows would scroll the page
+      keys.current.add(e.code)
+      invalidate()
+    }
+    const up = (e: KeyboardEvent) => keys.current.delete(e.code)
+    const clear = () => keys.current.clear()
+    let last: { x: number; y: number } | null = null
+    const press = (e: PointerEvent) => { last = { x: e.clientX, y: e.clientY } }
+    const drag = (e: PointerEvent) => {
+      const m = me.current
+      if (!last || !m) return
+      m.yaw -= (e.clientX - last.x) * 0.005
+      m.pitch = Math.max(-1.05, Math.min(1.05, m.pitch - (e.clientY - last.y) * 0.005)) // ±60°
+      last = { x: e.clientX, y: e.clientY }
+      invalidate()
+    }
+    const release = () => { last = null }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', clear)
+    dom.addEventListener('pointerdown', press)
+    window.addEventListener('pointermove', drag)
+    window.addEventListener('pointerup', release)
+    invalidate()
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', clear)
+      dom.removeEventListener('pointerdown', press)
+      window.removeEventListener('pointermove', drag)
+      window.removeEventListener('pointerup', release)
+      stick.listen(null)
+      controls.maxPolarAngle = saved.maxPolarAngle
+      controls.minDistance = saved.minDistance
+      camera.fov = saved.fov
+      camera.near = saved.near
+      camera.updateProjectionMatrix()
+      const m = me.current
+      // hand back to orbiting: look at the floor a few metres ahead, from where you stand
+      if (m) void controls.setLookAt(m.x, EYE, m.z, m.x - Math.sin(m.yaw) * 5, 0, m.z - Math.cos(m.yaw) * 5, false)
+      controls.enabled = true
+      invalidate()
+    }
+  }, [get, scene, stick])
+  useFrame(({ controls: c, invalidate }, delta) => {
+    const controls = c as unknown as CameraControls | null
+    const m = me.current
+    if (!controls || !m) return
+    const k = keys.current
+    const on = (...codes: string[]) => (codes.some((c) => k.has(c)) ? 1 : 0)
+    let ahead = on('KeyW', 'ArrowUp') - on('KeyS', 'ArrowDown') + stick.y
+    let right = on('KeyD', 'ArrowRight') - on('KeyA', 'ArrowLeft') + stick.x
+    const len = Math.hypot(ahead, right)
+    if (len > 1) { ahead /= len; right /= len }
+    const fx = -Math.sin(m.yaw), fz = -Math.cos(m.yaw) // facing, on the floor
+    const moving = len > 0.05
+    if (moving) {
+      const d = SPEED * (on('ShiftLeft', 'ShiftRight') ? 2.5 : 1) * Math.min(delta, 0.1)
+      const to = step(scene, m.x, m.z, (fx * ahead - fz * right) * d, (fz * ahead + fx * right) * d)
+      m.x = to.x
+      m.z = to.z
+    }
+    const cp = Math.cos(m.pitch)
+    void controls.setLookAt(m.x, EYE, m.z, m.x + fx * cp * 2, EYE + Math.sin(m.pitch) * 2, m.z + fz * cp * 2, false)
+    reported.current += delta
+    if (reported.current > 0.2 || !moving) {
+      reported.current = 0
+      onMove({ x: m.x * 1000, y: m.z * 1000, angle: (Math.atan2(fz, fx) * 180) / Math.PI })
+    }
+    if (moving) invalidate() // render on demand: keep drawing only while walking
   })
   return null
 }

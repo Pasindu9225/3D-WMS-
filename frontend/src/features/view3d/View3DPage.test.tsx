@@ -8,8 +8,10 @@ import { View3DPage } from './View3DPage'
 vi.mock('./live', () => ({ useLiveBins: () => 'live' })) // no sockets in unit tests
 // The fake canvas reports "slow" when the page passes onSlow, so the Lite suggestion can be tested.
 vi.mock('./SceneCanvas', () => ({
-  SceneCanvas: ({ onSlow, drone }: { onSlow?: () => void; drone?: { playing: boolean; speed: number; tour: unknown[]; onStop: () => void } | null }) => (
+  SceneCanvas: ({ onSlow, drone, walk }: { onSlow?: () => void; drone?: { playing: boolean; speed: number; tour: unknown[]; onStop: () => void } | null;
+    walk?: { onMove: (h: { x: number; y: number; angle: number }) => void } | null }) => (
     <p>3D canvas<button type="button" onClick={onSlow}>simulate slow</button>
+      {walk && <span>walking<button type="button" onClick={() => walk.onMove({ x: 2000, y: 3000, angle: -90 })}>simulate step</button></span>}
       {drone && <span>drone {drone.playing ? 'flying' : 'paused'} at {drone.speed}x over {drone.tour.length} points<button type="button" onClick={drone.onStop}>simulate landing</button></span>}</p>
   ),
 }))
@@ -112,4 +114,20 @@ it('drone view: flies, pauses, changes speed, and stops with the button, Esc or 
   await user.click(screen.getByRole('button', { name: 'Drone view (fly around)' }))
   await user.click(screen.getByRole('button', { name: 'simulate landing' }))
   expect(screen.queryByRole('group', { name: 'Drone view' })).not.toBeInTheDocument()
+})
+
+it('walks through the warehouse: keys hint, a "you are here" map, and Esc stops it', async () => {
+  sceneReply = Response.json(SCENE)
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'Walk through (first person)' }))
+  expect(screen.getByText(/^walking/)).toBeInTheDocument()
+  expect(screen.getByText(/W A S D or arrows to walk/)).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'simulate step' }))
+  expect(screen.getByRole('img', { name: 'You are here' })).toBeInTheDocument()
+  expect(screen.getAllByText('You are here').length).toBeGreaterThan(0) // the dot on the small map
+  await userEvent.keyboard('{Escape}')
+  expect(screen.queryByText(/^walking/)).not.toBeInTheDocument()
+  // the Lite map keeps the last place
+  await userEvent.click(screen.getByRole('radio', { name: /Lite/ }))
+  expect(screen.getByText('You are here')).toBeInTheDocument()
 })

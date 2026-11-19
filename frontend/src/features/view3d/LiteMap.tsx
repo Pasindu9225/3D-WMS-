@@ -6,13 +6,18 @@ import type { Scene } from './api'
 import { ZONE_COLOR } from './colors'
 import { routePoints, type PickRoute } from './route'
 import { zoneTitle } from './sceneLayout'
+import type { Here } from './walk'
 
 /**
  * Lite mode: the warehouse as a flat SVG plan for weak PCs. No WebGL and no three.js download; racks take the
  * colour of their bins (the worst status wins), a click opens the rack's bins.
  */
-export function LiteMap({ scene, colors, selectedBin, selectedRack, onRack, route }: {
+export function LiteMap({ scene, colors, selectedBin, selectedRack, onRack, route, here, dot = 1 }: {
   scene: Scene
+  /** "You are here" from the walk-through (v2.1), if any. */
+  here?: Here | null
+  /** Size of the dot (the small map while walking draws it bigger). */
+  dot?: number
   /** A pick walk to draw over the plan (v1.2), if any. */
   route?: PickRoute | null
   /** Per-bin colours (same as the 3D view), so both modes tell the same story. */
@@ -85,6 +90,15 @@ export function LiteMap({ scene, colors, selectedBin, selectedRack, onRack, rout
       {labels.zones.map((z) => <ZoneTag key={'zt' + z.code} {...z} fs={fs} />)}
       {labels.openings.map((l, i) => <OpeningLabel key={'ol' + i} {...l} fs={fs} />)}
       {route && route.stops.length > 0 && <RouteOverlay route={route} />}
+      {here && (
+        <g pointerEvents="none">
+          <line x1={here.x} y1={here.y} x2={here.x + Math.cos((here.angle * Math.PI) / 180) * fs * 3 * dot}
+            y2={here.y + Math.sin((here.angle * Math.PI) / 180) * fs * 3 * dot} stroke="#ef4444" strokeWidth={fs * 0.6 * dot} strokeLinecap="round" />
+          <circle cx={here.x} cy={here.y} r={fs * 1.2 * dot} fill="#ef4444" stroke="#ffffff" strokeWidth={fs * 0.35 * dot}>
+            <title>{t('walk.here')}</title>
+          </circle>
+        </g>
+      )}
     </svg>
   )
 }

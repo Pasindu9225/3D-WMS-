@@ -389,9 +389,12 @@ Eight versions take the product from an empty repo to a sellable SaaS. Versions 
 - [x] Floor storage (owner, 2026-11-18): pallets stacked on the floor without racks — a FLOOR rack type is a row of pallet positions, its levels are how many pallets high; placed, published, labelled, put away and picked like racks; 3D draws floor outlines and stacked pallets, the editor and Lite map draw it dashed
 - [x] Real carton sizes: products keep a carton size and units per carton; 3D stacks real-size cartons per place — V33; product form and CSV (carton_cm, units_per_carton); scene sends each place's main product carton size and count; cartons stacked in a grid that fits the pallet, shelf or floor position (turned if more fit), at most 48 per place and 60,000 in view
 - [x] Stock on a past date and count limits (owner, 2026-11-19): stock per product at the end of any past day, summed from the movement ledger, on the Stock page and as an Excel/PDF download (asOf); a count may carry an allowed difference in percent: a line further off is counted again once (blind), a count within the limit is booked with no manager, otherwise the manager approves as before — V37
-- [ ] Walk-through: first-person view at eye height (1.7 m); keys (W A S D / arrows) and mouse to look on a PC, on-screen joystick on phones and tablets; cannot walk through racks or walls; click a bin to see what is in it; "you are here" dot on the Lite map
+- [x] Walk-through: first-person view at eye height (1.7 m); keys (W A S D / arrows) and mouse to look on a PC, on-screen joystick on phones and tablets; cannot walk through racks or walls; click a bin to see what is in it; "you are here" dot on the Lite map
+  — done: footprints button in the 3D view; starts 1.5 m inside the first door facing in; 1.4 m/s (Shift ×2.5); drag to look (±60° up and down), a short click still opens a bin; a 0.3 m body stops at racks, floor rows and the outer walls and slides along them; a small map top-left shows the red "you are here" dot and heading, kept on the Lite map afterwards; joystick on touch screens; draws frames only while moving, 67 fps on DEMO1 (151 racks) on the dev PC
 
 **Deliverables:** two new camera modes in the 3D view, no new library (three.js, React Three Fiber and drei are already in the app).
+
+**Status 2026-11-19:** all tasks done; ships with the v1.0 deployment once a server exists.
 
 **Exit criteria:** drone tour and walk-through run smoothly (30 fps or more) on the test layout on a mid-range PC; the 3D page stays within its size budget.
 
